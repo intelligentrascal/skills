@@ -10,7 +10,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { envMs, isObj, rand, readJson, writeJson } from "./util.mjs";
-import { PatchError, applyMapPatch, mapDirOf, mapFile, mapMetaFile, readMapMeta, validateMap } from "./maps.mjs";
+import { ClaimError, PatchError, QUEUED, applyMapPatch, claim, mapDirOf, mapEventsFile, mapFile, mapMetaFile, readMapMeta, release, validateMap } from "./maps.mjs";
 import { eventsFile, lastSeq, publicOwner, readMeta, sessionDirById, stateFile, touchHeartbeat } from "./sessions.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -132,6 +132,7 @@ export function createHub({ home, version, codeTime = 0, log = () => {}, env = p
   addSessionRoutes(hub);
   addLiveRoutes(hub);
   addMapRoutes(hub);
+  addClaimRoutes(hub);
 
   hub.server = http.createServer(async (req, res) => {
     hub.lastBusy = Date.now(); // any request (ensure's /health included) restarts the idle clock
@@ -202,22 +203,29 @@ function addSessionRoutes(hub) {
     if (!tokenOk(readMeta(dir)?.token, req.headers["x-grill-token"])) throw httpError(401, "session token required");
   };
 
-  // Per-session seq. The seq read, the increment and the append all run in one synchronous
-  // block, so concurrent sends are serialized by the event loop and never share a seq. The cache
-  // is re-read from the log when the file size is not what the hub last wrote (first use, a hub
-  // restart, or a line appended by someone else).
-  const seqs = new Map(); // id → { seq, size }
-  hub.appendSend = (id, dir, actions) => {
-    const file = eventsFile(dir);
+  // Per-log seq (session send logs here, map event logs in addMapRoutes). The seq read, the
+  // increment and the append all run in one synchronous block, so concurrent appends are
+  // serialized by the event loop and never share a seq. The cache (keyed by file) is re-read from
+  // the log when the file size is not what the hub last wrote (first use, a hub restart, or a line
+  // appended by someone else). hub.nextSeq(file) peeks the seq the next append will get; build(seq)
+  // returns the event object. Both must run in the same synchronous block as the append.
+  const seqs = new Map(); // file → { seq, size }
+  const current = (file) => {
     let size = -1; try { size = fs.statSync(file).size; } catch {}
-    let c = seqs.get(id);
+    let c = seqs.get(file);
     if (!c || c.size !== size) c = { seq: lastSeq(file), size };
-    const seq = c.seq + 1;
-    const line = JSON.stringify({ type: "send", seq, at: new Date().toISOString(), session: dir, actions }) + "\n";
+    return c;
+  };
+  hub.nextSeq = (file) => current(file).seq + 1;
+  hub.appendEvent = (file, build) => {
+    const c = current(file), seq = c.seq + 1;
+    const line = JSON.stringify(build(seq)) + "\n";
     fs.appendFileSync(file, line);
-    seqs.set(id, { seq, size: (size < 0 ? 0 : size) + Buffer.byteLength(line) });
+    seqs.set(file, { seq, size: (c.size < 0 ? 0 : c.size) + Buffer.byteLength(line) });
     return seq;
   };
+  hub.appendSend = (id, dir, actions) =>
+    hub.appendEvent(eventsFile(dir), (seq) => ({ type: "send", seq, at: new Date().toISOString(), session: dir, actions }));
 
   const notFoundPage = (res) => send(res, 404, "<!doctype html><meta charset=\"utf-8\"><title>No such grill</title><p>No such grill.</p>", HTML);
   const servePage = (res, id, layout) => {
@@ -493,4 +501,67 @@ function addMapRoutes(hub) {
     return h(req, res, key, url);
   };
   hub.routes.push(["GET", MAP_ROUTE, route("GET")], ["POST", MAP_ROUTE, route("POST")]);
+}
+
+// ---- claims and board actions (plan T33; spec §4a Actions, Work this ticket, Concurrency; D4, D10) ----
+//   POST /m/<key>/claim {ticket}              board "Work this ticket": token + Origin → compare-and-set
+//        on map.json (claim(): frontier and no hubClaim) with hubClaim.agentId = the fresh
+//        listener's agentId, else "queued"; appends {type:"work", seq, at, ticket} to events.jsonl
+//        → 200 {ok, seq, hubClaim}
+//   POST /m/<key>/claim {ticket, agentId}     an agent's own claim (hub.mjs claim): same CAS, no
+//        event, hubClaim {agentId, at} → 200 {ok, hubClaim}; also adopts a queued board claim
+//   POST /m/<key>/claim {ticket, agentId, release: true}   → 200 {ok, released: bool}
+//   Errors: 404 {error} (no map.json or unknown ticket), 409 {error, conflict: {ticket, state,
+//   hubClaim?, assignee?}}, 400 bad body, 401/403 token/Origin.
+//   POST /m/<key>/action {type:"refresh"}     appends {type:"refresh", seq, at} → 200 {ok, seq}
+// Board events share one seq counter per map (hub.appendEvent). Each claim is one synchronous
+// block from the map.json read to the event append: no await, so the event loop serializes
+// concurrent claims and exactly one wins (D4). The map write and the append each fire an `m` ping
+// (debounced into one).
+function addClaimRoutes(hub) {
+  const str = (v) => typeof v === "string" && v !== "";
+  const fresh = (l) => { const t = isObj(l) ? Date.parse(l.heartbeat) : NaN; return Number.isFinite(t) && Date.now() - t < hub.freshMs && t - Date.now() <= FUTURE_SKEW_MS; };
+  const mustMap = (key) => { const dir = hub.mapDir(key); if (!dir) throw httpError(404, "no such map"); return dir; };
+  hub.mapHandlers.POST.claim = async (req, res, key) => {
+    const dir = mustMap(key);
+    hub.checkMapPost(req, dir);
+    const body = await readJsonBody(req);
+    if (!str(body.ticket)) throw httpError(400, "ticket must be a non-empty string (a ticket title)");
+    if ("agentId" in body && !str(body.agentId)) throw httpError(400, "agentId must be a non-empty string");
+    if ("release" in body && typeof body.release !== "boolean") throw httpError(400, "release must be true or false");
+    if (body.release && !("agentId" in body)) throw httpError(400, "release needs the claimant's agentId");
+    // synchronous from here: read → claim → write → append
+    const map = hub.readMap(dir);
+    const now = new Date().toISOString(), events = mapEventsFile(dir);
+    try {
+      if (!map) throw new ClaimError(404, "no map yet (map-patch it first)");
+      if (body.release) {
+        const next = release(map, body.ticket, body.agentId);
+        if (next !== map) hub.writeMap(key, dir, next);
+        return json(res, 200, { ok: true, released: next !== map });
+      }
+      if (str(body.agentId)) {
+        const next = claim(map, body.ticket, body.agentId, now);
+        if (next !== map) hub.writeMap(key, dir, next);
+        return json(res, 200, { ok: true, hubClaim: next.tickets.find((t) => t.title === body.ticket).hubClaim });
+      }
+      const who = fresh(map.listener) ? map.listener.agentId : QUEUED;
+      const next = claim(map, body.ticket, who, now, hub.nextSeq(events));
+      hub.writeMap(key, dir, next);
+      const seq = hub.appendEvent(events, (n) => ({ type: "work", seq: n, at: now, ticket: body.ticket }));
+      json(res, 200, { ok: true, seq, hubClaim: next.tickets.find((t) => t.title === body.ticket).hubClaim });
+    } catch (e) {
+      if (e instanceof ClaimError) return json(res, e.status, { error: e.message, ...(e.conflict ? { conflict: e.conflict } : {}) });
+      throw e;
+    }
+  };
+  hub.mapHandlers.POST.action = async (req, res, key) => {
+    const dir = mustMap(key);
+    hub.checkMapPost(req, dir);
+    const body = await readJsonBody(req);
+    if (body.type !== "refresh") throw httpError(400, 'type must be "refresh" (Work this ticket is POST claim)');
+    const seq = hub.appendEvent(mapEventsFile(dir), (n) => ({ type: "refresh", seq: n, at: new Date().toISOString() }));
+    hub.ping("m", key);
+    json(res, 200, { ok: true, seq });
+  };
 }

@@ -126,6 +126,58 @@ export function validateMap(m) {
 
 export { PatchError };
 
+// ---- claims (plan T33; spec §4a Work this ticket, Concurrency; D4, D10) ----
+// Pure: they return a new map (or the same map object when nothing changes) and throw ClaimError
+// {status 404|409, conflict?}. Both write through applyMapPatch(…, { hub: true }), the only path
+// that may set tickets[].hubClaim. Neither is an agent step, so map.at (the board's "Updated …"
+// stamp) is kept as it was.
+export const QUEUED = "queued"; // hubClaim.agentId of a board click made while no agent listens
+export class ClaimError extends Error {
+  constructor(status, message, conflict) { super(message); this.status = status; if (conflict) this.conflict = conflict; }
+}
+const ticketOf = (map, title) => {
+  const t = isObj(map) && Array.isArray(map.tickets) ? map.tickets.find((x) => isObj(x) && x.title === title) : undefined;
+  if (!t) throw new ClaimError(404, `no ticket ${JSON.stringify(title)} on this map`);
+  return t;
+};
+const conflictOf = (t) => ({ ticket: t.title, state: t.state, ...(isObj(t.hubClaim) ? { hubClaim: t.hubClaim } : {}), ...(t.assignee ? { assignee: t.assignee } : {}) });
+const hubWrite = (map, entry, now) => {
+  const out = applyMapPatch(map, { tickets: [entry] }, now, { hub: true });
+  if ("at" in map) out.at = map.at; else delete out.at;
+  return out;
+};
+
+// claim(map, title, who, now, seq?): compare-and-set. Succeeds for a `frontier` ticket with no
+// hubClaim → state "claimed", hubClaim {agentId: who, at: now, seq?} (seq = the board `work`
+// event; an agent's own CLI claim has none). An agent's own claim (no seq) also adopts a queued
+// board claim, keeping its seq, and is a no-op returning `map` itself when `who` already holds it.
+// A board claim (seq given) never is: it is a strict compare-and-set.
+// Otherwise 409 with {conflict: {ticket, state, hubClaim?, assignee?}}; unknown ticket 404.
+export function claim(map, title, who, now, seq) {
+  const t = ticketOf(map, title);
+  const hc = isObj(t.hubClaim) ? t.hubClaim : null;
+  const agent = seq === undefined && who !== QUEUED; // an agent's own claim, not a board click
+  if (agent && hc && hc.agentId === who) return map;
+  const adopt = agent && hc && hc.agentId === QUEUED;
+  if (!adopt && (hc || t.state !== "frontier")) {
+    const by = hc ? hc.agentId : t.assignee;
+    throw new ClaimError(409, `ticket ${JSON.stringify(title)} is ${by ? `already claimed by ${by}` : t.state}`, conflictOf(t));
+  }
+  const s = adopt ? hc.seq : seq;
+  return hubWrite(map, { title, state: "claimed", hubClaim: { agentId: who, at: now, ...(Number.isInteger(s) ? { seq: s } : {}) } }, now);
+}
+
+// release(map, title, agentId): drops the hub claim and puts the ticket back on the frontier.
+// Allowed for the claimant, or for anyone on a queued claim (the agent that drained it and found
+// another assignee on the tracker). No hubClaim → no-op (a tracker claim is not the hub's).
+export function release(map, title, agentId) {
+  const t = ticketOf(map, title);
+  const hc = isObj(t.hubClaim) ? t.hubClaim : null;
+  if (!hc) return map;
+  if (hc.agentId !== agentId && hc.agentId !== QUEUED) throw new ClaimError(409, `ticket ${JSON.stringify(title)} is claimed by ${hc.agentId}, not ${agentId}`, conflictOf(t));
+  return hubWrite(map, { title, state: "frontier", hubClaim: null }, new Date().toISOString());
+}
+
 // ---- storage (plan T14; spec §4a Data, <mapKey>; D2, D4) ----
 //   maps/<projectKey>/<slug>/
 //     map.json      written only by the hub (POST /m/<key>/patch, heartbeat, claims)
@@ -203,4 +255,35 @@ export async function mapHubOrDie(env) {
   const { ensureHub, EnsureError } = await import("./lifecycle.mjs");
   const { HomeError } = await import("./home.mjs");
   try { return await ensureHub(env); } catch (e) { die(e instanceof HomeError || e instanceof EnsureError ? e.message : `ensure failed: ${oneLine(e.message)}`, 1); }
+}
+
+// ---- CLI: claim --map KEY --ticket TITLE --agent-id ID [--release] (plan T33, D10) ----
+// An agent's own work-mode claim: the same compare-and-set as a board click, without a board
+// event. Prints {ok, ticket, hubClaim} (or {ok, ticket, released}) and exits 0; a conflict prints
+// {"conflict": {ticket, state, hubClaim?, assignee?}} on stdout and exits 5; an unknown map or
+// ticket exits 4; bad input 2; hub failure 1.
+export async function cmdClaim(o, env = process.env) {
+  if (!o.map || o.map === true) die("--map <slug|projectKey/slug> is required");
+  if (!o.ticket || o.ticket === true) die("--ticket <title> is required");
+  if (!o["agent-id"] || o["agent-id"] === true) die("--agent-id <id> is required (printed by new or resume)");
+  const ticket = String(o.ticket), agentId = String(o["agent-id"]), rel = o.release === true;
+  let key;
+  try { key = mapKeyOf(String(o.map)); } catch (e) { die(e instanceof MapKeyError ? e.message : `cannot read the project: ${e.code || oneLine(e.message)}`, e instanceof MapKeyError ? 2 : 1); }
+  const hub = await mapHubOrDie(env);
+  const dir = mapDirOf(hub.home, key), token = readMapMeta(dir)?.token;
+  if (typeof token !== "string") die(`no such map ${key} (map-patch it first)`, 4);
+  let r, reply;
+  try {
+    r = await fetch(`http://127.0.0.1:${hub.port}/m/${key}/claim`, {
+      method: "POST", headers: { "content-type": "application/json", "x-grill-token": token },
+      body: JSON.stringify({ ticket, agentId, ...(rel ? { release: true } : {}) }), signal: AbortSignal.timeout(10_000),
+    });
+    reply = await r.json().catch(() => ({}));
+  } catch (e) { die(`claim failed: the hub did not answer (${oneLine(e.message)})`, 1); }
+  if (r.status === 409) { print({ conflict: reply.conflict ?? { ticket, error: reply.error } }); return process.stdout.write("", () => process.exit(5)); }
+  if (r.status === 404) die(`${oneLine(reply.error ?? "not found")} (map ${key})`, 4);
+  if (r.status === 400) die(`claim rejected: ${oneLine(reply.error ?? "bad request")}`);
+  if (!r.ok) die(`claim failed (HTTP ${r.status}): ${oneLine(reply.error ?? "")}`, 1);
+  print(rel ? { ok: true, ticket, released: reply.released } : { ok: true, ticket, hubClaim: reply.hubClaim });
+  process.stdout.write("", () => process.exit(0));
 }

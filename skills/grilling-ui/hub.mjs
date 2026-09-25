@@ -32,6 +32,7 @@ const cmds = {
   watch: async (o) => (await import("./lib/events.mjs")).cmdWatch(o),
   wait: async (o) => (await import("./lib/events.mjs")).cmdWait(o),
   "map-patch": async (o) => (await import("./lib/maps.mjs")).cmdMapPatch(o),
+  claim: async (o) => (await import("./lib/maps.mjs")).cmdClaim(o),
   url: async (o) => (await import("./lib/open.mjs")).cmdUrl(o),
   open: async (o) => (await import("./lib/open.mjs")).cmdOpen(o),
   "agent-profile": async (o) => (await import("./lib/profile.mjs")).cmdAgentProfile(o),
