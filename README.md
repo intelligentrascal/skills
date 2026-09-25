@@ -30,7 +30,9 @@ claude plugin marketplace add intelligentrascal/skills
 claude plugin install intelligentrascal@intelligentrascal
 ```
 
-This installs Pocock's `mattpocock-skills` plugin too, as a dependency. Then, in Claude Code:
+The first line is required: it lets Claude Code find Pocock's `mattpocock-skills` plugin, which
+this plugin installs as a dependency (without it, this plugin fails to load with "Dependency
+mattpocock-skills@mattpocock is not installed"). Then, in Claude Code:
 `/intelligentrascal:grill-me-ui <topic>`. If Pocock's plugin is disabled, Claude Code disables
 this one too. Update later with `claude plugin marketplace update intelligentrascal` and
 `claude plugin update intelligentrascal`.
