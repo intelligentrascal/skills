@@ -93,7 +93,7 @@ export function profile(agent, { skill = "<skill>", session, map, mapTitle, agen
     const bg = effectBool(env.OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS) ?? effectBool(env.OPENCODE_EXPERIMENTAL) ?? false;
     return {
       ...base,
-      listen: { tool: "bash", params: { command: wait(540), timeout: 600000 } },
+      listen: { tool: "bash", params: { command: wait(110), timeout: 120000 } }, // 110 s fits OpenCode's 2-min default even when the model drops `timeout` (T29)
       repeat: waitRepeat,
       draw: { tool: "task", background: bg },
       research: "subagent",

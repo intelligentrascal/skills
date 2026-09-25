@@ -110,13 +110,13 @@ test("codex: exec_command + write_stdin polling in 30 s steps, wait --timeout 28
   assert.equal(p.research, "subagent");
 });
 
-test("opencode: bash with timeout 600000, wait --timeout 540; task tool draws", () => {
+test("opencode: bash with timeout 120000, wait --timeout 110; task tool draws", () => {
   const p = profile("opencode", { ...CTX, env: {} });
   assert.deepEqual(p.listen, {
     tool: "bash",
     params: {
-      command: "node '/opt/skills/grilling-ui/hub.mjs' wait --session '/h/grill-sessions/p-1/20260925-120000-ab12' --after 7 --timeout 540 --agent-id a1b2c3d4e5f6",
-      timeout: 600000,
+      command: "node '/opt/skills/grilling-ui/hub.mjs' wait --session '/h/grill-sessions/p-1/20260925-120000-ab12' --after 7 --timeout 110 --agent-id a1b2c3d4e5f6",
+      timeout: 120000,
     },
   });
   assert.deepEqual(p.draw, { tool: "task", background: false });
@@ -160,7 +160,7 @@ test("every profile has the full shape and at most 3 notes", () => {
 test("CLI: agent-profile detects from env and honours --agent", () => {
   const out = JSON.parse(run(clean(ENV.opencode), ["agent-profile"]));
   assert.equal(out.agent, "opencode");
-  assert.equal(out.listen.params.timeout, 600000);
+  assert.equal(out.listen.params.timeout, 120000);
   // the skill path is the absolute folder of hub.mjs
   assert.ok(out.listen.params.command.startsWith(`node '${dirname(HUB)}/hub.mjs' wait`), out.listen.params.command);
   assert.equal(JSON.parse(run(clean(ENV.opencode), ["agent-profile", "--agent", "claude"])).mode, "monitor");
@@ -233,7 +233,7 @@ test("map: wait agents get wait --map with the same tools and timeouts as sessio
   const codex = profile("codex", MAPCTX);
   assert.deepEqual(codex.listen.params, { cmd: cmd("codex", 280), yield_time_ms: 30000 });
   assert.equal(codex.listen.poll.tool, "write_stdin");
-  assert.deepEqual(profile("opencode", { ...MAPCTX, env: {} }).listen, { tool: "bash", params: { command: cmd("opencode", 540), timeout: 600000 } });
+  assert.deepEqual(profile("opencode", { ...MAPCTX, env: {} }).listen, { tool: "bash", params: { command: cmd("opencode", 110), timeout: 120000 } });
   assert.deepEqual(profile("pi", MAPCTX).listen, { tool: "bash", params: { command: cmd("pi", 900) } });
   assert.deepEqual(profile("unknown", MAPCTX).listen, { tool: "shell", params: { command: cmd("unknown", 480) } });
   for (const a of ["codex", "opencode", "pi", "unknown"]) {

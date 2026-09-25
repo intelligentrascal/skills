@@ -396,8 +396,9 @@ skill follows verbatim. Push adapters are out of scope (§12).
   - Exec yields after 30 s, so the model polls the same terminal in ≤ 30 s steps until it
     exits. This is Jason's "poll in bounded steps" rule.
   - Exit 3 means start a new wait.
-- **OpenCode (`wait`):** `hub.mjs wait --after N --timeout 540` with the shell tool's
-  `timeout: 600000` (10 minutes; the source has no hard max, but 10 minutes keeps turns short).
+- **OpenCode (`wait`):** `hub.mjs wait --after N --timeout 110` with the shell tool's
+  `timeout: 120000`. 110 s fits OpenCode's 2-minute default, so a model that drops the
+  `timeout` parameter (seen in the T29 smoke run) still gets a clean exit 3, not a kill.
 - **Pi (`wait`):** `hub.mjs wait --after N --timeout 900` with no tool timeout. Pressing Esc
   kills only the wait; the hub survives because it is double-forked.
 - **All wait modes:** this is Jason's listener contract, kept.

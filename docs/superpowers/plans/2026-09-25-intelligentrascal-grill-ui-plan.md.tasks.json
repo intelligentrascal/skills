@@ -233,7 +233,7 @@
     {
       "id": 25,
       "subject": "Task 26: Dogfood — two concurrent grills + Monitor wake — HUMAN GATE",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Prove the Claude Code path end to end and verify the override table is obeyed.\n\n**Depends on:** T25\n\n**Verify:** the verification file lists every box with the user's ✓ and date.\n\nSee plan section \"Task 26\".\n\n```json:metadata\n{\"files\":[\"docs/superpowers/verification/2026-milestone-5-dogfood.md\"],\"verifyCommand\":\"the verification file lists every box with the user's ✓ and date.\",\"acceptanceCriteria\":[\"In project A: `/intelligentrascal:grill-me-ui <topic>`; in project B (different repo) at the same time: `/intelligentrascal:grill-docs-ui <topic>`. One hub (`cat ~/.intelligentrascal/hub.json` pid constant; `ps` shows one `hub.mjs serve`), two `watch` processes.\",\"The browser opened by itself for each; the URL line was also printed.\",\"Round 1 contained the whole frontier; the terminal shows only one status line per send (no ❓/➡️ rounds).\",\"A Send made while the Claude turn is idle wakes it (Monitor event) and is handled; leaving it idle past the Monitor timeout (temporarily set `timeout_ms` to 60 000 via a patched profile env `GRILL_MONITOR_MS=60000` supported by `agent-profile`) produces an expiry notice that re-arms with the current `handled`.\",\"Tabs show `<project> · <topic>` and status favicons; closing Claude in project B flips its page to \\\"no agent listening\\\" within 3 min; `/intelligentrascal:grill-docs-ui resume` picks it up and replays queued Sends.\",\"Finish in A writes `docs/<slug>-design.md` with all §4 sections; B updates `CONTEXT.md`/ADRs and its doc has \\\"see CONTEXT.md\\\" Terms and ADR-linked Locked decisions.\",\"Defects found are fixed (separate commits) before the gate is marked done.\"],\"humanGate\":true}\n```",
       "blockedBy": [
         24
@@ -261,12 +261,13 @@
     {
       "id": 28,
       "subject": "Task 29: Smoke runs on Codex, OpenCode, Pi — HUMAN GATE",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Verify install, listening discipline and the full grill loop on each non-Claude agent.\n\n**Depends on:** T27, T28\n\n**Verify:** verification file with per-agent ✓ and versions (`codex --version`, `opencode --version`, `pi --version`).\n\nSee plan section \"Task 29\".\n\n```json:metadata\n{\"files\":[\"docs/superpowers/verification/2026-milestone-6-smoke.md\"],\"verifyCommand\":\"verification file with per-agent ✓ and versions (codex --version, opencode --version, pi --version).\",\"acceptanceCriteria\":[\"`scripts/install-agents.sh` on a clean `~/.agents/skills` (move the old dir aside first) → links + pin recorded.\",\"**Codex** (with sandbox config): without the config, `grill-me-ui` fails with the exact T9 fix text; with it, the page opens, a Send is handled via `exec_command` wait + `write_stdin` polling, exit 3 re-waits, the turn is not ended while listening; `agent-profile` output matched what the model did.\",\"**OpenCode** (`OPENCODE=1`): wait with `timeout: 600000`; two Sends handled; Visualize draws via Task tool.\",\"**Pi**: wait with no timeout; Esc kills only the wait (hub still up: `curl 127.0.0.1:<port>/health`); resume replays queued Sends; Visualize draws inline; a wayfinder chart Finish leaves research tickets open and says so.\",\"Any parameter-name mismatch found is fixed in `lib/profile.mjs` + test (separate commit).\"],\"humanGate\":true}\n```",
       "blockedBy": [
         26,
         27
-      ]
+      ],
+      "note": "Pi skipped at Rahil's request; Codex + OpenCode verified"
     },
     {
       "id": 29,
@@ -352,7 +353,7 @@
     {
       "id": 37,
       "subject": "Task 38: README, licenses, final verification",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Document install/usage per agent, record provenance and licenses, and run the full suite.\n\n**Depends on:** all\n\n**Verify:** - `node --test skills/grilling-ui/test/*.test.mjs scripts/test/*.test.mjs` → all pass\n\nSee plan section \"Task 38\".\n\n```json:metadata\n{\"files\":[\"README.md\"],\"verifyCommand\":\"- node --test skills/grilling-ui/test/*.test.mjs scripts/test/*.test.mjs → all pass\",\"acceptanceCriteria\":[\"`LICENSES/jason-ku-grill-with-ui.MIT` = `$JASON/LICENSE` text + header line \\\"Forked once from https://github.com/jasonku09/grill-with-ui at commit daafa1e\\\". `LICENSES/matt-pocock-skills.MIT` = Pocock's LICENSE (`$POCOCK/LICENSE`) + \\\"Vendored: skills/wayfinder-ui/upstream/wayfinder.md\\\".\",\"README sections: What it is (3 skills + board); Install — Claude Code (`claude plugin marketplace add ~/code/skills`, `claude plugin install intelligentrascal@intelligentrascal`, `/reload-plugins` after edits; dependency on `mattpocock-skills@mattpocock`; \\\"if Pocock's plugin is disabled, Claude Code disables this one too\\\"); Codex / OpenCode / Pi (`scripts/install-agents.sh`, `npx skills add -g mattpocock/skills`, the exact Codex config block); Usage (commands, resume, board, keyboard `?`); Runtime (`~/.intelligentrascal`, one hub, env vars `GRILL_HOME GRILL_NO_OPEN GRILL_OPENER`, logs); Upstream sync (`scripts/sync-pocock.sh`); Development (test commands, e2e with `PLAYWRIGHT_PKG`); Provenance (Jason fork at `daafa1e`, one-time; Pocock tracked); Deferred (§12).\",\"Full suite green; e2e suites green with Playwright; `claude plugin validate .` clean.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         0,
@@ -395,5 +396,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T18:22:31.896Z"
+  "lastUpdated": "2026-09-25T19:22:50.405Z"
 }
