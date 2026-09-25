@@ -1,6 +1,6 @@
 # intelligentrascal grill UI plugin: design
 
-Date: 2026-09-25 · Status: draft for review · Owner: Rahil
+Date: 2026-09-25 · Status: draft for review (rev 2, after 3 adversarial reviews) · Owner: Rahil
 
 Browser-UI versions of Matt Pocock's `grill-me`, `grill-with-docs` and `wayfinder` skills,
 packaged as a Claude Code plugin. Started from a one-time fork of Jason Ku's
@@ -40,11 +40,12 @@ folded in below.
 
 ```
 .claude-plugin/
-  marketplace.json          marketplace "intelligentrascal" → plugin at ./
-  plugin.json               plugin "intelligentrascal"; dependencies: ["mattpocock-skills"]
+  marketplace.json          marketplace "intelligentrascal" → plugin at ./ (allows deps from "mattpocock")
+  plugin.json               plugin "intelligentrascal"; depends on mattpocock-skills@mattpocock
 skills/
   grilling-ui/              shared engine; user-invocable: false
     SKILL.md                transport protocol + override table (no interview method)
+    agents/openai.yaml      Codex: allow_implicit_invocation false
     hub.mjs                 the shared server (HTTP + SSE) and CLI
     lib/                    state.mjs (patch/validate), sessions.mjs, open.mjs
     page/
@@ -62,12 +63,13 @@ skills/
     upstream/wayfinder.md   vendored copy of Pocock's wayfinder SKILL.md (see §8)
 upstream.json               { pocock: { plugin: "mattpocock-skills", version, commit } }
 scripts/sync-pocock.sh
+scripts/install-agents.sh   Codex / OpenCode / Pi install (§5b)
 design/mockups/             static comparison mockups (build step 1)
 LICENSES/                   jason-ku-grill-with-ui.MIT, matt-pocock-skills.MIT
 README.md
 ```
 
-- Every command in a SKILL.md uses `${CLAUDE_SKILL_DIR}`.
+- Commands are only run by `grilling-ui`, as `node "$SKILL/hub.mjs" …` (`$SKILL` is defined portably, §5b).
 - The plugin is installed from the local marketplace. Edits go live after `/reload-plugins`.
 
 ## 3. Skill composition and instruction precedence
@@ -80,7 +82,7 @@ call them live.
 |---|---|
 | `grill-me-ui` | `mattpocock-skills:grilling` → `intelligentrascal:grilling-ui` |
 | `grill-docs-ui` | `grilling` → `mattpocock-skills:domain-modeling` → `grilling-ui` |
-| `wayfinder-ui` | reads `upstream/wayfinder.md` (vendored) → then at each grill point, `grilling` (+ `domain-modeling`) → `grilling-ui` |
+| `wayfinder-ui` | reads its own `upstream/wayfinder.md` (vendored, same folder) → then at each grill point, `grilling` (+ `domain-modeling`) → `grilling-ui` |
 
 `grilling-ui` always loads **last**. Its first section is an explicit override table:
 
@@ -93,9 +95,15 @@ call them live.
 | Done when the frontier is empty; don't act until the user confirms | Confirmation = the user's **Finish** send. Finish with open questions records them under Deferred / Open threads. |
 | `domain-modeling`: "call out conflicts immediately" | As a thread reply on the affected question, or by reopening it. Never as terminal prose. |
 
-**Preflight.** Each wrapper begins with: if the Skill tool reports a `mattpocock-skills:*`
-skill as unknown, stop and tell the user to run `claude plugin install
-mattpocock-skills@mattpocock`. Do not grill from memory.
+All loading is by name, following Pocock's convention: "Call the Skill tool with `grilling`
+(in Claude Code: `mattpocock-skills:grilling`)". See §5b.
+
+**Preflight.** Each wrapper begins by checking that Pocock's skills can be loaded. If
+`grilling` can't be loaded, the agent stops and tells the user how to install it:
+- Claude Code: `claude plugin install mattpocock-skills@mattpocock`
+- other agents: `npx skills add -g mattpocock/skills`
+
+It never grills from memory.
 
 **Descriptions.** Wrapper descriptions include "with ui" trigger phrases, so plain "grill me"
 still goes to Pocock's terminal skill. `grilling-ui` has no trigger phrases.
@@ -138,235 +146,304 @@ still goes to Pocock's terminal skill. `grilling-ui` has no trigger phrases.
 
 ### 4a. Wayfinder ticket board
 
-A page at `/m/<mapId>/` that lives as long as the map, independent of any single grill.
+A page at `/m/<mapKey>/` that lives as long as the map, independent of any single grill.
+**The board is only as fresh as the last agent step.** The agent is the only tracker client
+(§1 non-goal), so between agent runs the board shows the last snapshot, with its age in the
+header.
 
 - **Columns:** Frontier · In progress (claimed) · Blocked · Done. Fog and Out of scope sit
-  below the columns. Each card shows the title, a type chip, `blockedBy` titles, the assignee,
-  and a link. Done cards show the one-line gist from Decisions so far. The header shows the
-  destination and "Updated <time> · canonical: <link>".
-- **Data:** the agent is the only tracker client. It writes
-  `~/.intelligentrascal/maps/<map-key>/map.json` through `hub.mjs map-patch`, using the §4
-  `map` schema plus `closed` tickets. It does this after every Wayfinder step (chart, claim,
-  resolve, graduate fog, rule out of scope) and on a board **Refresh** request.
-  - `<map-key>` = project key + tracker map id.
-  - The hub pushes changes over SSE, exactly as it does for grills.
-- **Actions** (appended to `maps/<map-key>/events.jsonl`; the same event rule as grill sends):
-  - **Work this ticket** (frontier cards only) and **Refresh**.
-  - A listening agent handles **Work this ticket** by running Wayfinder work mode on that
-    ticket: claim it, then open a new grill session linked from the card ("grilling now →").
-  - When no agent is listening, the board says so and the action stays queued. Starting
-    `/wayfinder-ui <map>` drains the queue first.
-  - Concurrency: two agents taking the same ticket is prevented by Wayfinder's own claim
-    (assign first). The second agent sees it claimed on refresh and reports that on the card.
-- **Entry points:**
-  - `/wayfinder-ui board <map>` opens the board and listens for its actions.
-  - The end-of-grill Map screen links to it.
-  - `hub.mjs open --map <map-key>`.
+  below the columns.
+  - Each card shows the title, a type chip, `blockedBy` titles, the assignee, and a link.
+  - Done cards show their `gist`.
+  - The header shows the destination and "Updated <time> · canonical: <link>".
+- **`<mapKey>`:**
+  - For a GitHub or GitLab tracker: `<projectKey>/<tracker-map-id>`.
+  - For the local-markdown tracker: `<projectKey>/<effort-slug>`.
+- **Data:** `~/.intelligentrascal/maps/<mapKey>/map.json`, written only by the agent through
+  `hub.mjs map-patch` (same merge and validation rules as `patch`).
+  - The agent writes it after every Wayfinder step (chart, claim, resolve, graduate fog,
+    rule out of scope) and on a board **Refresh** request.
+  - The hub pushes changes over SSE.
+- **Actions** go to `maps/<mapKey>/events.jsonl` and follow the same event rule as grill sends:
+  - **Refresh** re-reads the tracker and re-patches.
+  - **Work this ticket** (frontier cards only).
+- **Board watcher.** `/wayfinder-ui board <map>` opens the board and arms a watcher on the
+  map's event log (Claude Code: a Monitor on `hub.mjs watch --map <mapKey>`; other agents:
+  `wait --map`). It records a heartbeat in `map.json.listener`, and the board shows
+  "agent listening" or "no agent listening: requests queue".
+- **Work this ticket is a hand-off, not a dispatch** (respects Wayfinder's "one ticket per
+  session"):
+  1. Clicking queues a request.
+  2. The hub does an atomic claim: compare-and-set on `map.json`
+     (`POST /m/<mapKey>/claim`, first request wins). The card shows "claimed by <agentId>"
+     at once.
+  3. The listening agent that drains it runs Wayfinder work mode on **exactly one** ticket:
+     it claims it on the tracker, then opens a new grill session linked from the card
+     ("grilling now →").
+  4. Further clicks stay queued and are shown as such. The next `/wayfinder-ui board` or
+     `/wayfinder-ui <map>` session takes the next one.
+- **Concurrency.**
+  - The hub's compare-and-set is authoritative for claims started from the board, because
+    two worktrees on the local-markdown tracker have separate copies of the map file and
+    could otherwise both claim.
+  - For GitHub and GitLab, the tracker assignee remains the canonical claim. A losing agent
+    sees the conflict on refresh and releases its hub claim.
+- **Entry points:** `/wayfinder-ui board <map>`, a link from the end-of-grill Map screen,
+  and `hub.mjs open --map <mapKey>`.
 
-`map` snapshot (an index, never a store; validated by the hub):
+`map` (an index, never a store; validated by the hub):
 
 ```jsonc
 "map": { "title": "…", "link": "url-or-path", "at": "ISO",
   "destination": "…", "notes": "…",
   "decisions": [{ "title": "…", "link": "…", "gist": "…" }],
   "tickets":   [{ "title": "…", "link": "…", "type": "research|prototype|grilling|task",
-                  "state": "frontier|blocked|claimed", "blockedBy": ["title"] }],
-  "fog": ["…"], "outOfScope": [{ "gist": "…", "link": "…" }] }
+                  "state": "frontier|blocked|claimed", "blockedBy": ["title"],
+                  "assignee": "…", "hubClaim": { "agentId": "…", "at": "ISO" } }],
+  "closed":    [{ "title": "…", "link": "…", "gist": "…" }],
+  "fog": ["…"], "outOfScope": [{ "gist": "…", "link": "…" }],
+  "listener": { "agentId": "…", "heartbeat": "ISO" } }
 ```
 
-The Map screen always shows "Snapshot at <time> · canonical: <link>". Local file paths render
-as plain text.
+The end-of-grill Map screen uses the same data and always shows
+"Snapshot at <time> · canonical: <link>". Local file paths render as plain text.
 
 ## 5. Runtime: one shared hub, many grills
 
-### Processes
+### Root and processes
 
-- **Hub (`hub.mjs serve`).** One per user per plugin version.
+- **One root:** `GRILL_HOME`, default `~/.intelligentrascal/`. There is no silent fallback
+  location. If the root isn't writable (e.g. the Codex sandbox), commands fail with the exact
+  fix (§5b).
+  - `hub.json`: `{port, pid, version, started}`
+  - `hub.lock`
+  - `logs/hub.log`: rotated at 1 MB, 3 files kept
+  - `grill-sessions/`
+  - `maps/`
+- **Hub (`hub.mjs serve`).** Exactly one per user.
   - Node, no dependencies.
-  - Binds `127.0.0.1` on a port remembered in `~/.intelligentrascal/hub.json`
-    (`{port, pid, version, started}`).
-  - Serves every session at `/s/<sessionId>/` (and `/s/<id>/brief`, `/s/<id>/studio`).
-- **Per-agent watcher.** A Monitor whose command is `tail -n0 -F <session>/events.jsonl`,
-  with `timeout_ms: 1800000`, described as `grill: <project> · <topic>`. It costs almost
-  nothing. On expiry the agent runs `hub.mjs pending` (to drain anything missed) and re-arms.
+  - Binds `127.0.0.1` on the port remembered in `hub.json`. The first start picks a free
+    port and remembers it.
+  - Serves grills at `/s/<sessionId>/[brief|studio]` and boards at `/m/<mapKey>/`.
+  - It is started double-forked (`setsid` / detached + `unref`, with stdio redirected), so
+    it outlives the agent's command, the agent itself, and agents that kill their children's
+    process tree (Pi on Esc).
+- **Per-agent watcher (Claude Code).** A Monitor running
+  `node hub.mjs watch --session DIR --after <handled>`, with `timeout_ms: 1800000`, described
+  as `grill: <project> · <topic>`.
+  - `watch` is a few lines: it prints any sends after `<handled>` that are already in the
+    log, then tails the file for new lines. There is no gap between the drain and the tail.
+  - On expiry the agent re-arms it with its current `handled`.
 - No per-grill server process.
 
 ### Hub lifecycle
 
-- `hub.mjs ensure`:
-  1. Reads `hub.json`.
-  2. If the hub pid is alive, answers `GET /health` and has the same `version`, it reuses it.
-  3. Otherwise it takes an exclusive lock (`O_EXCL` on `hub.lock`, stale after 10 s), spawns
-     the hub detached with its output going to `hub.log`, and waits for `/health`.
+- **`hub.mjs ensure`:**
+  1. Reads `hub.json`, then calls `GET /health` on that port. It reuses the hub only if the
+     response echoes the same `{pid, started}` as `hub.json` (this protects against a reused
+     pid or port).
+  2. Otherwise it takes `hub.lock` (`O_EXCL`, contents = its own pid). The lock counts as
+     stale only if that pid is dead.
+  3. It spawns the hub on the remembered port and waits up to 10 s for `/health`.
 
   Two agents starting at once therefore get one hub.
-- **Version skew.** A newer plugin version starts its own hub on a new port and rewrites
-  `hub.json`. The old hub keeps serving its sessions and exits when idle.
-- **Idle exit.** The hub exits when no session has been active for 30 minutes. A session
-  counts as active if it has an SSE client, a `patch`/`send` event, or an unfinished status
-  touched in the last 30 minutes.
-- **Crash recovery.** Any CLI call (`patch`, `url`, `open`) first runs `ensure`. The page
-  reconnects its SSE on its own, and state lives on disk.
+- **Version change (plugin update).** `ensure` sees `version` differ, calls
+  `POST /admin/handoff` on the old hub (loopback only, with the admin token from
+  `hub.json`), and the old hub exits. The new hub binds the **same port**. SSE clients
+  reconnect by themselves, and URLs never change mid-grill.
+- **Idle exit.** The hub exits after 30 minutes with no SSE client **and** no fresh agent
+  heartbeat in any unfinished session or map listener. It never exits while an agent is
+  waiting or watching, because watchers heartbeat through the hub (see ownership).
+- **Crash recovery.**
+  - Every CLI call (`patch`, `map-patch`, `url`, `open`, `watch`, `wait`) runs `ensure` first.
+  - The page shows "hub down — reconnecting…" and retries `/health` every 5 s.
+  - It reconnects on the same port. State lives on disk.
 
 ### Session identity and ownership
 
-- **Folder:** `~/.intelligentrascal/grill-sessions/<project-key>/<YYYYMMDD-HHMMSS>-<rand4>/`.
-  `GRILL_HOME` overrides the root.
-- **`<project-key>`** is the git common root with slashes turned into dashes (worktrees share
-  it). Outside git it is the working directory.
-- **`state.json`** records `cwd`, `branch`, and `owner: { sessionAgent: <claude session id if
-  available, else agent pid>, heartbeat }`. The agent refreshes the heartbeat on every patch.
-  The hub treats a session with a heartbeat under 30 minutes old, or with a live watcher, as
-  **in use**.
+- **Folder:** `grill-sessions/<projectKey>/<YYYYMMDD-HHMMSS>-<rand4>/`.
+- **`<projectKey>`:** the basename of the git common root, `-`, then the first 8 hex of the
+  sha256 of its absolute path, so different paths can't collide. Worktrees share it. Outside
+  git it uses the working directory.
+- **`state.json`:**
+  - Records `cwd`, `branch`, and `owner: { agentId, agent: "claude|codex|opencode|pi", heartbeat }`.
+  - `agentId` is a random id minted by `new`/`resume` and passed on every later command. An
+    agent can't reliably read its own session id.
+  - `watch` and `wait` refresh the heartbeat every 60 s through the hub, and so does every
+    `patch`.
+- **In use:** a heartbeat under 3 minutes old.
+  - After an agent crash, a session stays "in use" for at most 3 minutes.
+  - `resume --take` lets the user override the flag explicitly.
 - **Resume:**
   - Lists unfinished sessions for this project with topic, branch, cwd, age, open/answered
-    counts, and an **in use** flag.
-  - Auto-picks only when there is exactly one session and it is not in use.
-  - Otherwise asks.
-  - Never silently attaches to a session another live agent owns.
+    counts, and the in-use flag.
+  - Auto-picks only when there is exactly one session and it is not in use. Otherwise it asks.
+
+### Security
+
+- Each session and map gets a random **token**, created by `new` and stored in `state.json`.
+  The served page embeds it, and CLI calls read it from disk.
+- `POST /s/<id>/send`, `/m/<key>/…` and `/admin/*` require the token header and a matching
+  Origin (Jason's check, kept).
+- An unrelated local process or web page can't inject sends or claims.
 
 ### Updates to the page
 
-- The hub watches each session's `state.json` (`fs.watch`, with a 2 s stat fallback) and
-  pushes `state` events over SSE (`/s/<id>/events`). No 1-second polling.
-- The page falls back to a 5 s poll only if SSE fails.
-- Sends go by `POST /s/<id>/send`. The hub appends to that session's `events.jsonl`. Jason's
-  Origin check (reject cross-origin and `null`) is kept.
+- The hub watches each session's **folder** (`fs.watch` on the directory, filtered by
+  filename). Jason's atomic rename replaces the file's inode, which breaks a file-level
+  watch on macOS.
+- It pushes `state` events over SSE (`/s/<id>/events`). There is no 1-second polling.
+- **Connection cap.** HTTP/1.1 allows about 6 connections per origin, and all tabs share the
+  hub's origin.
+  - Tabs of the same browser share **one** EventSource through `BroadcastChannel` (a leader
+    tab relays to the others).
+  - Any tab whose EventSource fails 3 times falls back to a 5 s poll.
+- Sends go by `POST /s/<id>/send`; the hub appends to that session's `events.jsonl`.
 
 ### Tabs
 
 - Title: `<project> · <topic>`.
-- Favicon: an SVG dot for status (waiting, working, finished).
-- The header shows the project, the branch and the doc path.
+- Favicon: an SVG status dot (waiting, working, finished).
+- The header shows the project, the branch, the doc path, and the listener state.
 
 ### Resource budget
 
-One hub at about 40 MB RSS total, whatever the number of grills. One `tail` per active grill.
-Idle tabs cost nothing.
+One hub at about 40 MB RSS total, whatever the number of grills. One small `watch` process
+per active Claude Code grill. Idle tabs cost nothing.
 
 ## 5b. Multi-agent support: Claude Code, Codex, OpenCode, Pi
 
-Research summary (primary sources, September 2026):
+Verified against each agent's source (September 2026):
 
 | | Claude Code | Codex CLI | OpenCode | Pi |
 |---|---|---|---|---|
-| Reads `~/.agents/skills` | no (plugin / `~/.claude/skills`) | yes | yes (also `~/.claude/skills`) | yes (not `~/.claude/skills`) |
-| Loading a skill | Skill tool, `plugin:name` namespace | SKILL.md injected; `$name` mention or model reads file | `skill` tool, flat names | model reads the file; `/skill:name` |
-| Skill directory exposed as | `${CLAUDE_SKILL_DIR}` | `<path>` of SKILL.md in context | "Base directory for this skill: …" | `<location>` of SKILL.md |
-| Blocking command limit | Bash max 10 min | exec default 10 s, `timeout_ms` overridable; background terminal 5 min | shell default 2 min, overridable | no default timeout |
-| Wakes on an external event | Monitor (≤ 30 min, re-arm) | no (app-server `turn/start` via SDK only) | server API `session.prompt` | RPC mode / extension |
-| Background sub-agent | Agent tool | `spawn_agent` / `wait_agent` | Task tool | none (example extension) |
-| Sandbox | optional | Seatbelt / Landlock (workspace-write): loopback allowed, writes outside the workspace blocked | none | none |
+| Skill discovery | plugin / `~/.claude/skills` | `~/.agents/skills`, project `.agents/skills` | `~/.agents/skills`, `~/.claude/skills`, `~/.config/opencode/skills` | `~/.agents/skills`, `~/.pi/agent/skills` |
+| `npx skills add -g` puts Pocock's skills in | n/a (use the plugin) | `~/.agents/skills` | `~/.agents/skills` | `~/.pi/agent/skills` |
+| Loading a skill | Skill tool | `skills.read` / `$name` | `skill` tool | model reads the file; `/skill:name` |
+| Skill dir exposed as | `${CLAUDE_SKILL_DIR}` | `<path>` of SKILL.md | "Base directory for this skill" | `location` of SKILL.md |
+| Model command limits | Bash ≤ 10 min | exec default 10 s, yields at 30 s; background terminal ≤ 5 min | default 2 min, hard max 10 min; no model background jobs | no default timeout; Esc kills the process tree |
+| Wake on external event | Monitor (≤ 30 min, re-arm) | none | none built in (server API needs `opencode serve`) | none built in |
+| Background sub-agent | Agent tool | `spawn_agent` | Task tool | none |
+| Sandbox | optional | Seatbelt/Landlock; **localhost blocked by default** | none | none |
 
 ### Installation
 
-- **Claude Code:** the plugin, via the local marketplace. Pocock's skills come from his plugin.
-- **Codex, OpenCode, Pi:** `scripts/install-agents.sh` symlinks the four skill folders into
-  `~/.agents/skills/` (one location all three read). Pocock's skills are installed there with
-  `npx skills add mattpocock/skills`, which gives them flat names (`grilling`,
-  `domain-modeling`). The script checks for them and prints the command if they're missing.
-- **Avoiding duplicates:** OpenCode also reads `~/.claude/skills`, but we never install there,
-  so there are no duplicate names.
-- Codex extras (`allow_implicit_invocation: false` for `grilling-ui`, display names) go in
-  `agents/openai.yaml` sidecars, following Pocock's convention.
+- **Claude Code:** the plugin, installed from the local marketplace.
+  - `plugin.json` declares `{"name":"mattpocock-skills","marketplace":"mattpocock"}` as a
+    dependency.
+  - Our `marketplace.json` sets `allowCrossMarketplaceDependenciesOn: ["mattpocock"]`.
+  - If Pocock's plugin is disabled, Claude Code disables ours too; the README says so.
+- **Codex, OpenCode, Pi:** `scripts/install-agents.sh`:
+  1. Symlinks the **whole** `skills/` set (all four folders together, never one wrapper on
+     its own) into `~/.agents/skills/`, which all three agents read.
+  2. Checks that Pocock's `grilling` and `domain-modeling` are discoverable (in
+     `~/.agents/skills` or `~/.pi/agent/skills`). If not, it prints
+     `npx skills add -g mattpocock/skills`.
+  3. Records the version it found in `upstream.json.agents` (§8).
+  4. For Codex, prints the sandbox config below and checks whether it's present.
+- Codex sidecars (`agents/openai.yaml`) set `policy.allow_implicit_invocation: false` on
+  `grilling-ui` and give display names, following Pocock's convention. Codex parses and
+  enforces these.
 
 ### Portable SKILL.md conventions
 
-1. **The skill's own directory.** Written once at the top of every SKILL.md:
-   "`$SKILL` = the folder containing this SKILL.md (Claude Code: `${CLAUDE_SKILL_DIR}`;
-   otherwise the directory of the SKILL.md path shown to you)." All commands use
-   `node "$SKILL/../grilling-ui/hub.mjs" …`. The four folders are always installed side by
-   side, so `../grilling-ui` resolves in both layouts.
-2. **Loading another skill.** Wrappers say "load the `grilling` skill: Claude Code
-   `mattpocock-skills:grilling`; OpenCode's `skill` tool with `grilling`; otherwise read
-   `grilling/SKILL.md` from your skills list." `grilling-ui` is loaded **by path**
-   (`$SKILL/../grilling-ui/SKILL.md`) everywhere, so it can be hidden from model
-   auto-invocation on every agent.
-3. **Frontmatter:** only `name` and `description` are portable. `user-invocable: false`
-   (Claude Code) and `disable-model-invocation: true` (Pi) on `grilling-ui` are harmless where
-   they're ignored.
+1. **Loading another skill, always by name.** Use Pocock's own convention: *"Call the Skill
+   tool with `grilling`."* One skill per instruction. This includes `grilling-ui`: nothing
+   loads by path.
+   - Claude Code resolves plugin names on its own; the wrappers name
+     `mattpocock-skills:grilling` there, and the flat name everywhere else.
+   - The single sentence covers both: *"Call the Skill tool with `grilling` (in Claude Code:
+     `mattpocock-skills:grilling`)."*
+2. **The skill's own directory.** Each SKILL.md defines it once:
+   - "`$SKILL` = the folder containing this SKILL.md: `${CLAUDE_SKILL_DIR}` in Claude Code,
+     otherwise the directory of the path you were shown for this file."
+   - Only `grilling-ui` runs commands, and always as `node "$SKILL/hub.mjs" …` inside its own
+     folder. There are no `../` paths.
+3. **Frontmatter:** only `name` and `description` are portable.
+   - Hiding `grilling-ui` from auto-invocation uses `user-invocable: false` (Claude Code),
+     the `openai.yaml` policy (Codex), and a trigger-free description (OpenCode, Pi).
+   - It stays loadable by name everywhere.
 
-### Listening: one contract, three transports
+### Listening
 
-The hub's event log is the source of truth everywhere. How an agent hears about a Send is chosen
-at start by `hub.mjs agent-profile` (detects the agent from env or an explicit `--agent`) and
-recorded in `state.agent.transport`:
+The hub's event log is the source of truth. `hub.mjs agent-profile [--agent X]` detects the
+agent (from env, or the explicit flag) and prints **exact** tool-call parameters, which the
+skill follows verbatim. Push adapters are out of scope (§12).
 
-- **`monitor` (Claude Code):** as in §5. `tail -F` Monitor, re-armed on expiry, and a
-  `pending` drain on every re-arm.
-- **`wait` (Codex, Pi, and OpenCode's baseline):** Jason's wait-mode contract, kept
-  verbatim. `hub.mjs wait --after N --timeout S` blocks until the next send.
-  - S is set per agent by the profile: Codex 240 s with `timeout_ms: 300000`; OpenCode 100 s
-    under its 2-minute default, or longer when the call passes `timeout`; Pi 480 s.
-  - Exit 3 means re-issue the wait.
-  - The agent keeps the turn alive and never ends it while listening.
-  - If it has to stop, it says the listener is inactive; Sends queue up and are replayed on
-    resume.
-- **`push` (OpenCode, optional adapter):** when OpenCode's server port and session id are
-  known, the hub also POSTs each Send to `/api/session/<id>/prompt` with `delivery: "queue"`,
-  so the agent doesn't have to hold a turn open. Wait mode stays as the fallback.
-- **Pi:** a small Pi extension (`adapters/pi/`) that calls `session.prompt` on a Send is the
-  equivalent push path. It is an optional adapter, built after the baseline.
+- **Claude Code (`monitor`):** a Monitor on `hub.mjs watch` (§5), re-armed on expiry.
+- **Codex (`wait`, background terminal):**
+  - Start `hub.mjs wait --after N --timeout 280` with `timeout_ms: 300000`.
+  - Exec yields after 30 s, so the model polls the same terminal in ≤ 30 s steps until it
+    exits. This is Jason's "poll in bounded steps" rule.
+  - Exit 3 means start a new wait.
+- **OpenCode (`wait`):** `hub.mjs wait --after N --timeout 540` with the shell tool's
+  `timeout: 600000` (the 10-minute hard max).
+- **Pi (`wait`):** `hub.mjs wait --after N --timeout 900` with no tool timeout. Pressing Esc
+  kills only the wait; the hub survives because it is double-forked.
+- **All wait modes:** this is Jason's listener contract, kept.
+  - Keep the turn alive and never end it while listening.
+  - If the agent must stop, it says the listener is inactive; Sends queue up and are
+    replayed on resume.
+- **The page** shows the listener state from the heartbeat: "agent listening (Codex)" or
+  "no agent listening: Sends will queue".
 
-The page shows the transport and whether a listener is live ("agent listening" / "agent not
-listening: Sends will queue"), taken from the watcher heartbeat or the wait process.
+### Codex sandbox (one-time setup; documented and detected)
 
-### Per-agent differences handled in `grilling-ui`
+- The hub needs loopback networking and write access to `GRILL_HOME`, and Codex's
+  `workspace-write` sandbox denies both by default.
+- `install-agents.sh` and the README give the exact `~/.codex/config.toml` lines:
+  `[sandbox_workspace_write] network_access = true` plus `writable_roots` including
+  `~/.intelligentrascal`.
+- `ensure` catches `EPERM`/`EACCES` on bind or write and prints those lines, instead of
+  failing obscurely.
+
+### Other per-agent differences (handled in `grilling-ui`)
 
 - **Visualize draws:** the Agent tool (Claude Code), the Task tool (OpenCode) or
-  `spawn_agent` (Codex) runs in the background. Pi has no sub-agent, so it draws inline,
-  following Jason's existing rule.
-- **Codex sandbox:** `workspace-write` blocks writes to `~/.intelligentrascal`.
-  - `hub.mjs ensure` probes whether it can write there. If not, it uses
-    `$TMPDIR/intelligentrascal-$USER`, which is writable under the sandbox, and warns once
-    that sessions there don't survive a reboot.
-  - The README documents adding `~/.intelligentrascal` to Codex's `writable_roots`.
-  - A detached hub may be killed when Codex's command ends. The profile then runs `serve` in
-    a Codex background terminal and re-ensures it on every wait loop.
-- **Auto-open under a sandbox:** best effort (§6). The URL is always printed.
-- **Keyboard, board and layouts:** agent-independent (page only).
+  `spawn_agent` (Codex) in the background. Pi draws inline (Jason's existing rule).
+- **Wayfinder research tickets at Finish:** background sub-agents where they exist. On Pi
+  they are left as open `research` tickets for a later session, and the terminal says so.
+- **Auto-open:** best effort (§6). The URL is always printed.
+- **Layouts, keyboard and board:** agent-independent.
 
-### Testing across agents
-
-- A scripted smoke test per agent, run manually: start a grill, send twice from the page,
-  check the agent handled both, run Visualize, then Finish.
-- `agent-profile` unit tests use env fixtures.
-- The Codex sandbox fallback is tested with an unwritable `GRILL_HOME`.
-
-## 6. Auto-open (`hub.mjs open --session DIR [--ui inbox|brief|studio]`)
+## 6. Auto-open (`hub.mjs open --session DIR [--ui inbox|brief|studio] | --map KEY`)
 
 1. Skip and print `{"opened":false,"reason":…}` when:
    - `GRILL_NO_OPEN=1` is set;
    - `SSH_CONNECTION` is set;
    - on Linux, neither `DISPLAY` nor `WAYLAND_DISPLAY` is set.
-2. Ask the hub `GET /s/<id>/clients` → `{count, lastSeen}`. If a tab is connected, or one was
-   seen in the last 120 s, don't open (this covers resume). After a hub restart, wait up to 3 s
-   for an existing tab to reconnect before deciding.
-3. Validate the URL against `^http://127\.0\.0\.1:\d+/s/[\w-]+/(brief|studio)?$`.
+2. Ask the hub `GET /s/<id>/clients` (or `/m/<key>/clients`) → `{count, lastSeen}`. If a tab
+   is connected, or one was seen in the last 120 s, don't open. After a hub restart, wait up
+   to 3 s for an existing tab to reconnect before deciding.
+3. Validate the URL against
+   `^http://127\.0\.0\.1:\d+/(s/[A-Za-z0-9-]+/(brief|studio)?|m/[A-Za-z0-9/-]+/)$`.
 4. Spawn without a shell, with a 5 s time limit:
    - macOS: `open <url>`
    - Linux: `xdg-open <url>`
    - Windows: `cmd /c start "" <url>`
 
-   The spawn command can be overridden with `GRILL_OPENER` (used by the tests).
+   The spawn command can be overridden with `GRILL_OPENER` (tests).
 5. The skill always prints the URL line as well.
+
+**Layout precedence:** an explicit `--ui` beats the layout last used (remembered in
+localStorage), which beats Inbox.
 
 ## 7. The page: three layouts on one core
 
 - **Shared core (`core.js`, taken from Jason's page.html).** It covers:
-  - the SSE client;
+  - the SSE client (a shared EventSource plus poll fallback, §5);
   - staging in localStorage, keyed `grill:<sessionId>` so switching layouts mid-session
     keeps staged work;
   - Send, disabled while the agent works, with the 5-minute stuck-agent re-enable;
-  - `explore` and `visualize` sent immediately;
+  - `explore` and `visualize` sent immediately (Jason's semantics);
   - the Finish confirm;
-  - the header, status, footer and finished banner.
+  - the header, status, listener state, footer, finished banner, and the hub-down state;
+  - the keyboard layer.
 
   All three layouts share Jason's semantics: staging survives reload, one Send = one turn,
   the updated/rec-changed marker, deferred and reopened questions.
-- **Switching layouts.** By path, with a header switch. The last choice is remembered in
-  localStorage. Nothing is written to state.
-- **One token set (`tokens.css`).**
+- **Switching layouts:** by path, with a header switch. Nothing is written to state.
+- **One token set (`tokens.css`), used by all layouts and the board.**
   - System fonts: serif headings, sans body.
   - No network.
   - Contrast checked on the real pairings.
@@ -380,38 +457,49 @@ listening: Sends will queue"), taken from the watcher heartbeat or the wait proc
 |---|---|---|
 | **Inbox** | Queue | Jason's list \| card \| discussion. Added: hovering a question highlights its `data-q` regions in the visual. |
 | **Brief** | Document | One column (~68ch), with sections derived from dep roots (each section is titled by its root question). Answered question = one prose line `title → chosen option` with a reopen control. Open or reopened question = a compact block: heading, full-text options as a vertical list, the recommendation dashed and pre-selected, the why in one line, a free-text field always visible, and the thread collapsed to bold first lines that expand inline. Deferred questions get their own section. At 1100 px and wider there is a left jump rail and the visual as a sticky figure on the right; below that the figure sits under the header. Also used for the Wayfinder Map screen. |
-| **Studio** | Visual-first conversation | The visual iframe takes about 60%. A conversation rail shows everything in one timeline, grouped under sticky round headers: question cards in full, answered cards collapsed to one line, thread messages placed by `at`, and visual feedback in the same stream. One composer with a target chip (`@q15` / `visual`). Hovering a card highlights its regions; clicking a region selects its card. Before the first draw, the main area shows "agreed so far" (derived from the answers) and a Visualize call to action. |
+| **Studio** | Visual-first conversation | The visual iframe takes about 60%. A conversation rail shows everything in one timeline, grouped under sticky round headers: question cards in full, answered cards collapsed to one line, thread messages placed by `at`, and visual feedback in the same stream. One composer with a target chip (`@qN thread`, `@qN answer`, `visual`). Hovering a card highlights its regions; clicking a region selects its card. Before the first draw, the main area shows "agreed so far" (derived from the answers) and a Visualize call to action. |
 
 ### Keyboard shortcuts (all layouts and the board)
 
-Linear/Gmail style. Shortcuts are inactive while focus is in a text field, apart from ⌘↵
-and Esc. `?` opens a cheatsheet overlay.
+Linear/Gmail style.
+
+**Where they apply:**
+- A single `keydown` listener on `document`.
+- Ignored while focus is in an `input`, `textarea` or `[contenteditable]`, apart from ⌘↵
+  and Esc.
+- Ignored during IME composition (`isComposing`), and when Ctrl or Alt is held (browser and
+  OS shortcuts win).
+- `1`–`4` only map to options that exist.
+- `?` opens a cheatsheet overlay. The cheatsheet has an off switch for screen-reader users,
+  remembered in localStorage.
 
 | Keys | Action |
 |---|---|
 | `j` / `k` | Next / previous question (board: card) |
 | `1`–`4` | Pick option A–D (staged) |
-| `a` | Accept the recommendation |
-| `r` | Focus the thread composer for this question |
-| `f` | Focus free-text answer |
-| `d` / `o` | Defer / reopen |
-| `e` | Explore deeper (sends immediately) |
+| `a` | Accept the recommendation (staged) |
+| `r` | Thread composer for this question (Studio: chip `@qN thread`) |
+| `f` | Free-text answer (Studio: chip `@qN answer`) |
+| `d` / `o` | Defer / reopen (staged) |
+| `e` | Explore deeper (sends immediately, like the button; shows a 3 s undo toast first) |
 | `v` | Toggle the visual / Visualize |
 | `g` then `i` / `b` / `s` / `m` | Switch to Inbox / Brief / Studio / Map board |
 | `u` | Unstage this question's staged action |
-| `⌘↵` | Send (from anywhere) |
-| `Esc` | Leave the text field / close the overlay |
+| `⌘↵` / `Ctrl↵` | Send, from anywhere, including while focus is inside the visual (forwarded, see below) |
+| `Esc` | Leave the text field / close the overlay / return focus from the visual |
 | `w` (board) | Work this ticket |
 
 ### Visual linkage
 
-The only visual-brief addition is:
+The visual-brief additions are:
 
 - Regions carry `data-q="qN"`.
-- The visual includes a verbatim listener of about 12 lines:
+- The visual includes a verbatim listener of about 15 lines:
   - parent → child: `{highlight:[ids]}`
-  - child → parent: `{clicked:id}`
-- The parent filters `e.source === frame.contentWindow` and treats payloads as ids only.
+  - child → parent: `{clicked:id}` and `{key:"send"|"escape"}`. A sandboxed iframe traps
+    keydown, so ⌘↵ and Esc have to be forwarded out.
+- The parent filters `e.source === frame.contentWindow` and treats payloads as ids or keys
+  only.
 
 If the subagent forgets the tags, linking silently does nothing.
 
@@ -423,23 +511,29 @@ If the subagent forgets the tags, linking silently does nothing.
 
 ## 8. Upstream sync (Pocock only)
 
-- `upstream.json` pins the installed `mattpocock-skills` **version** (from
-  `~/.claude/plugins/installed_plugins.json`) and its commit.
-- `scripts/sync-pocock.sh`:
-  1. Reads the installed version. If it differs from the pin, diffs `grilling`,
-     `domain-modeling`, `grill-me`, `grill-with-docs` and `wayfinder` between the pinned
-     cache (or a git checkout of the pinned commit) and the installed version, and prints it.
-  2. Warns if upstream `main` is ahead of the installed release (a
-     `claude plugin update mattpocock-skills` is available).
+- **`upstream.json`:**
+  - `claude`: the installed `mattpocock-skills` plugin version (from
+    `~/.claude/plugins/installed_plugins.json`) and its commit. This is authoritative for
+    Claude Code.
+  - `agents`: the version/commit of the `npx skills` copy that `install-agents.sh` found,
+    used by Codex, OpenCode and Pi.
+  - The two can diverge. The script reports both, and editing the `npx skills` copy is
+    unsupported.
+- **`scripts/sync-pocock.sh`:**
+  1. For each install (Claude plugin, agents copy): if it differs from its pin, diffs
+     `grilling`, `domain-modeling`, `grill-me`, `grill-with-docs` and `wayfinder` between
+     the pinned and the installed version, and prints it.
+  2. Warns if upstream `main` is ahead of the installed releases.
   3. Fails loudly if a delegated skill was renamed or removed, or if `grilling` or
-     `domain-modeling` gained `disable-model-invocation`.
+     `domain-modeling` gained `disable-model-invocation` or
+     `allow_implicit_invocation: false`.
   4. Wayfinder: runs a three-way `git merge-file` of our `upstream/wayfinder.md` (ours),
      Pocock's pinned version (base) and his new version (theirs). Conflicts are left marked.
-  5. Runs the tests, bumps the pin, and leaves everything uncommitted for review.
+  5. Runs the tests, bumps the pins, and leaves everything uncommitted for review.
 - Jason's code is a one-time fork. Its provenance (commit `daafa1e`) is recorded in
   `LICENSES/` and the README only.
 
-## 9. Delivery order
+## 9. Delivery order (one plan, milestones in order)
 
 1. **Comparison mockups (cheap).**
    - Static `design/mockups/{inbox,brief,studio}.html` driven by one `data.js`: Jason's real
@@ -452,40 +546,72 @@ If the subagent forgets the tags, linking silently does nothing.
      3. Find which part of the visual Q15 changes.
      4. Push back on Q16 in free text.
    - We build only what wins. Inbox is always built.
-2. Hub + CLI (`ensure`, `new`, `patch`, `url`, `open`, `pending`, `sessions`, `wait`), with tests.
-3. `core.js` + Inbox, reaching parity with Jason's e2e test.
-4. `grilling-ui` SKILL.md (override table, listening, Visualize, Finish), then the three wrappers.
-5. Brief and/or Studio (per step 1), the Map screen, the ticket board, and keyboard shortcuts.
-6. `sync-pocock.sh`, the README, licenses, local marketplace install, and `install-agents.sh`.
-6b. Multi-agent profiles (`agent-profile`, wait-mode tuning, Codex sandbox fallback), then the optional OpenCode and Pi push adapters.
-7. A live dogfood grill in two projects at once, plus a smoke run on Codex, OpenCode and Pi.
+2. **Hub + CLI:** `ensure`, `new`, `resume`, `patch`, `map-patch`, `url`, `open`, `pending`,
+   `sessions`, `watch`, `wait`, `agent-profile`. Covers tokens, handoff, idle exit and
+   directory watch, with tests.
+3. **`core.js` + Inbox**, reaching parity with Jason's e2e test, plus the keyboard layer.
+4. **`grilling-ui` SKILL.md** (override table, listening per agent profile, Visualize,
+   Finish), then the three wrappers, including the Wayfinder phases and the Map screen.
+5. **Claude Code install:** plugin and marketplace manifests. Dogfood: two concurrent grills
+   in two projects.
+6. **Multi-agent:** `install-agents.sh`, the `openai.yaml` sidecars, Codex sandbox detection,
+   and smoke runs on Codex, OpenCode and Pi.
+7. **Brief and/or Studio** (per milestone 1).
+8. **Ticket board:** board page, board watcher, claim compare-and-set, Work/Refresh actions.
+9. **`sync-pocock.sh`, README, licenses.**
 
 ## 10. Testing
 
-- **Unit** (`node --test`): patch/validate (including `map`, `phase`, `owner`), hub `ensure`
-  racing (two parallel ensures give one hub), idle exit, version skew, `/clients`, `open`
-  skip rules and URL validation with `GRILL_OPENER`, session ownership and resume selection,
-  SSE push on patch.
-- **E2E** (Playwright, opt-in via `PLAYWRIGHT_PKG`): staging survives reload, send, working
-  state, hub restart with SSE reconnect, finished state, the Map screen, and one flow per
-  built layout.
-- **Concurrency:** 5 sessions across 2 fake projects on one hub. Check sends land in the
-  right `events.jsonl` and that RSS stays under 80 MB.
-- **Manual:** confirm that a `tail -F` Monitor event wakes an idle Claude Code turn on the
-  current build, and that a Monitor expiry notice does too.
+- **Unit** (`node --test`):
+  - patch and map-patch validation (including `map`, `closed`, `phase`, `owner`);
+  - `ensure` races (two parallel ensures give one hub), a reused pid or port, and the
+    version handoff keeping the same port;
+  - idle exit is blocked by an agent heartbeat;
+  - directory watch still sees changes after an atomic rename;
+  - token auth rejects a missing or wrong token and a foreign Origin;
+  - `/clients`;
+  - `open`: skip rules, URL validation (session and map URLs), `GRILL_OPENER`;
+  - ownership and resume selection (including `--take`);
+  - `watch` has no gap between drain and tail;
+  - `agent-profile` output per agent, using env fixtures;
+  - a clear message on an unwritable `GRILL_HOME` or a denied bind;
+  - claim compare-and-set: two concurrent claims give one winner.
+- **E2E** (Playwright, opt-in via `PLAYWRIGHT_PKG`):
+  - staging survives reload, send, working state, finished state;
+  - hub restart and handoff with SSE reconnect;
+  - the shared EventSource across 8 tabs, with poll fallback;
+  - keyboard: each shortcut, ignored in text fields, ⌘↵ forwarded from the visual;
+  - the Map screen, and the board (render, Refresh, Work → claimed);
+  - one flow per built layout.
+- **Concurrency:** 5 sessions and 1 board across 2 fake projects on one hub. Check sends
+  land in the right `events.jsonl` and RSS stays under 80 MB.
+- **Manual:**
+  - a `watch` Monitor event wakes an idle Claude Code turn, and a Monitor expiry notice
+    does too;
+  - smoke runs on Codex (with sandbox config), OpenCode and Pi;
+  - `install-agents.sh` on a clean `~/.agents/skills`.
 
 ## 11. Risks
 
-- **Monitor semantics may change again.** Mitigation: the watcher is a plain `tail`, the
-  `pending` drain runs on every re-arm, and the `wait` fallback remains.
+- **Codex sandbox networking.** The hub doesn't work under Codex's default sandbox.
+  Mitigation: a documented one-time config change and exact error messages. If the user
+  can't change the config, Codex is unsupported.
+- **Monitor semantics may change again.** Mitigation: `watch` has no gap, is re-armed on
+  expiry, and wait mode remains.
+- **Wait-mode discipline on non-Claude agents.** Models may end the turn instead of
+  re-waiting. Mitigation: `agent-profile` prints the exact calls, and Jason's listener
+  contract is kept verbatim. Verify in the smoke runs.
 - **Pocock restructures his skills.** The sync script fails loudly, and the wrappers'
   preflight stops rather than improvises.
 - **The agent ignores the override table.** Mitigation: `grilling-ui` loads last, and each
   row is concrete. Verify this in the dogfood grill.
-- **SSE through a corporate proxy or extension.** Poll fallback.
-- **Graceful degradation of `data-q` tagging** depends on the drawing subagent following the brief.
+- **The board is stale between agent runs.** By design; the header shows its age.
+- **Graceful degradation of `data-q` tagging** depends on the drawing subagent following the
+  brief.
 
 ## 12. Deferred
 
 - A dark theme.
+- Push adapters (OpenCode `prompt_async` via `opencode serve`, a Pi extension). Wait mode
+  covers these agents; revisit if it feels clunky.
 - Publishing the plugin to a public marketplace.
