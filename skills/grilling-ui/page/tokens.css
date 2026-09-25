@@ -1,28 +1,35 @@
 /* grilling-ui — the one token set.
-   Used by every page layout (inbox, brief, studio), the board and the design mockups.
+   Used by every page layout (inbox, studio), the board and the design mockups.
    Light only (no dark mode: spec §1 non-goal). System fonts only, no network.
 
-   Contrast (checked by test/tokens.test.mjs, WCAG 2.x):
-     --ink    on --bg / --panel      >= 4.5
-     --ink-2  on --bg / --panel      >= 4.5
-     --accent on --panel, #fff on --accent  >= 4.5
-     --ok     on --ok-soft           >= 4.5
-     --stage  on --stage-soft        >= 4.5   (darkened from Jason's #b8791f, which was 3.1)
-     --ink-3  on --panel             >= 3.0   secondary meta text ONLY (timestamps, counts,
-                                              hints) — never body copy or anything the user
-                                              must read to act. Darkened from #9a9285 so it
-                                              also clears 3.0 on --bg. */
+   Colour and font tokens are Jason Ku's page.html:8-13 values, exactly. Rahil chose Jason's
+   look for the Inbox over the darkened values T1 first shipped (plan execution note E1), so a
+   few real pairings are below WCAG AA. test/tokens.test.mjs asserts every pairing and lists
+   these as documented exceptions, so a change to any of them is noticed:
+
+     --ink    on --bg / --panel      15.5 / 17.0
+     --ink-2  on --bg / --panel       6.1 /  6.7
+     --accent on --panel, #fff on --accent   7.0
+     --ok     on --ok-soft            5.2
+     --ink-3  on --panel              3.1   secondary meta text only (timestamps, counts, hints)
+   Exceptions (Jason's exact look; below 4.5 or 3.0):
+     --stage  on --stage-soft         3.1   staged messages / staged option
+     --stage  on --panel              3.6   "Staged: …" line, working status spinner text
+     --ink-3  on --bg                 2.8   question ids and round labels in the list
+     #ffffff  on --ink-3              3.1   disabled buttons only (WCAG exempts disabled controls)
+
+   Studio (theme-studio.css) re-points these variables at its own palette. */
 :root {
   --bg: #f7f4ee;
   --panel: #ffffff;
   --ink: #1f1c18;
   --ink-2: #625b51;
-  --ink-3: #8a8276;
+  --ink-3: #9a9285;
   --rule: #e6e0d4;
   --accent: #9a3a26;
   --ok: #3d6b4a;
   --ok-soft: #e3eee5;
-  --stage: #8a5a12;
+  --stage: #b8791f;
   --stage-soft: #f8ecd2;
   --warn-soft: #fbe9e4;
   --focus: #2a5db0;
@@ -52,16 +59,6 @@ body {
   background: var(--bg);
 }
 
-/* Serif headings, sans body. Never italic. */
-h1, h2, h3, h4 {
-  font-family: var(--serif);
-  font-style: normal;
-  font-weight: 600;
-  line-height: 1.25;
-  color: var(--ink);
-  margin: 0 0 var(--s2);
-}
-
 code, kbd, pre { font-family: var(--mono); font-size: 0.9em; }
 kbd {
   padding: 0 var(--s1);
@@ -74,110 +71,129 @@ kbd {
 
 .meta { color: var(--ink-3); font-size: 13px; } /* secondary meta text only (see contrast note) */
 
-/* ---------------------------------------------------------------------------
-   Control states: default, hover, active, focus-visible, disabled,
-   selected / [aria-pressed=true], staged (.staged), pending (.pending)
-   on button, .opt, textarea, a.
-   --------------------------------------------------------------------------- */
-
-/* default */
-button, .opt {
-  font: inherit;
-  color: var(--ink);
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: var(--r1);
-  padding: var(--s1) var(--s3);
-  cursor: pointer;
-  text-align: left;
-  transition: background-color .12s ease, border-color .12s ease, color .12s ease;
-}
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-button.ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
-.opt { display: block; width: 100%; padding: var(--s2) var(--s3); }
-textarea {
-  font: inherit;
-  color: var(--ink);
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: var(--r1);
-  padding: var(--s2);
-  width: 100%;
-  resize: vertical;
-}
-a { color: var(--accent); text-underline-offset: 2px; }
-
-/* hover */
-button:hover, .opt:hover { border-color: var(--ink-3); background: var(--bg); }
-button.primary:hover { background: #82301f; border-color: #82301f; }
-button.ghost:hover { background: var(--bg); color: var(--ink); }
-textarea:hover { border-color: var(--ink-3); }
-a:hover { text-decoration-thickness: 2px; }
-
-/* active */
-button:active, .opt:active { transform: translateY(1px); background: var(--rule); }
-button.primary:active { background: #6e2819; }
-a:active { color: var(--ink); }
-
-/* focus-visible: 2px --focus outline, offset 2px */
+/* focus-visible: 2px --focus outline, offset 2px. Keyboard focus only, so it never shows in
+   Jason's pointer-driven look; his `textarea:focus { outline: none }` still wins on textareas. */
 button:focus-visible, .opt:focus-visible, textarea:focus-visible, a:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 button:focus:not(:focus-visible), .opt:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
-textarea:focus { border-color: var(--focus); }
 
-/* disabled */
-button:disabled, button[aria-disabled="true"], .opt[aria-disabled="true"], textarea:disabled {
-  cursor: not-allowed;
-  color: var(--ink-3);
-  background: var(--bg);
-  border-color: var(--rule);
-  transform: none;
-}
-button.primary:disabled { background: var(--rule); border-color: var(--rule); color: var(--ink-2); }
-a[aria-disabled="true"] { color: var(--ink-3); pointer-events: none; text-decoration: none; }
+/* ---------------------------------------------------------------------------
+   Base headings and control states (default, hover, active, disabled,
+   selected / [aria-pressed=true], staged (.staged), pending (.pending)) for
+   button, .opt, textarea, a.
 
-/* selected / pressed */
-button[aria-pressed="true"], .opt[aria-pressed="true"], .opt.selected, button.selected,
-a[aria-current], a.selected {
-  border-color: var(--ink);
-  background: var(--panel);
-  box-shadow: inset 3px 0 0 var(--ink);
-  color: var(--ink);
-}
-a[aria-current], a.selected { font-weight: 600; box-shadow: none; }
+   Scoped away from pages that declare <html data-look="jason"> (the Inbox):
+   Jason's CSS styles those elements itself, and several of these rules would
+   leak into it (serif panel headings, hover fills, a " · staged" suffix, a
+   pending spinner, transitions). Studio, the board and the mockups keep them.
+   @scope does not change the specificity of the rules inside it.
+   --------------------------------------------------------------------------- */
+@scope (html:not([data-look="jason"])) {
+  /* Serif headings, sans body. Never italic. */
+  h1, h2, h3, h4 {
+    font-family: var(--serif);
+    font-style: normal;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--ink);
+    margin: 0 0 var(--s2);
+  }
 
-/* staged: chosen locally, not yet sent */
-button.staged, .opt.staged, textarea.staged, a.staged {
-  border-color: var(--stage);
-  background: var(--stage-soft);
-  color: var(--stage);
-}
-.opt.staged { box-shadow: inset 3px 0 0 var(--stage); color: var(--ink); }
-.opt.staged::after { content: " · staged"; color: var(--stage); font-size: 13px; }
+  /* default */
+  button, .opt {
+    font: inherit;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: var(--r1);
+    padding: var(--s1) var(--s3);
+    cursor: pointer;
+    text-align: left;
+    transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
+  .opt { display: block; width: 100%; padding: var(--s2) var(--s3); }
+  textarea {
+    font: inherit;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: var(--r1);
+    padding: var(--s2);
+    width: 100%;
+    resize: vertical;
+  }
+  a { color: var(--accent); text-underline-offset: 2px; }
 
-/* pending: sent, waiting on the agent */
-button.pending, .opt.pending, textarea.pending, a.pending {
-  cursor: progress;
-  border-style: dashed;
-  border-color: var(--ink-3);
-  color: var(--ink-2);
-}
-button.pending::after, .opt.pending::after {
-  content: "";
-  display: inline-block;
-  width: .7em; height: .7em;
-  margin-left: var(--s2);
-  vertical-align: -1px;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: spin .8s linear infinite;
+  /* hover */
+  button:hover, .opt:hover { border-color: var(--ink-3); background: var(--bg); }
+  button.primary:hover { background: #82301f; border-color: #82301f; }
+  button.ghost:hover { background: var(--bg); color: var(--ink); }
+  textarea:hover { border-color: var(--ink-3); }
+  a:hover { text-decoration-thickness: 2px; }
+
+  /* active */
+  button:active, .opt:active { transform: translateY(1px); background: var(--rule); }
+  button.primary:active { background: #6e2819; }
+  a:active { color: var(--ink); }
+
+  textarea:focus { border-color: var(--focus); }
+
+  /* disabled */
+  button:disabled, button[aria-disabled="true"], .opt[aria-disabled="true"], textarea:disabled {
+    cursor: not-allowed;
+    color: var(--ink-3);
+    background: var(--bg);
+    border-color: var(--rule);
+    transform: none;
+  }
+  button.primary:disabled { background: var(--rule); border-color: var(--rule); color: var(--ink-2); }
+  a[aria-disabled="true"] { color: var(--ink-3); pointer-events: none; text-decoration: none; }
+
+  /* selected / pressed */
+  button[aria-pressed="true"], .opt[aria-pressed="true"], .opt.selected, button.selected,
+  a[aria-current], a.selected {
+    border-color: var(--ink);
+    background: var(--panel);
+    box-shadow: inset 3px 0 0 var(--ink);
+    color: var(--ink);
+  }
+  a[aria-current], a.selected { font-weight: 600; box-shadow: none; }
+
+  /* staged: chosen locally, not yet sent */
+  button.staged, .opt.staged, textarea.staged, a.staged {
+    border-color: var(--stage);
+    background: var(--stage-soft);
+    color: var(--stage);
+  }
+  .opt.staged { box-shadow: inset 3px 0 0 var(--stage); color: var(--ink); }
+  .opt.staged::after { content: " · staged"; color: var(--stage); font-size: 13px; }
+
+  /* pending: sent, waiting on the agent */
+  button.pending, .opt.pending, textarea.pending, a.pending {
+    cursor: progress;
+    border-style: dashed;
+    border-color: var(--ink-3);
+    color: var(--ink-2);
+  }
+  button.pending::after, .opt.pending::after {
+    content: "";
+    display: inline-block;
+    width: .7em; height: .7em;
+    margin-left: var(--s2);
+    vertical-align: -1px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
 }
 
-/* shared progress indicators */
+/* shared progress indicators (Jason's own .spin, later in the Inbox, wins there) */
 .spin {
   display: inline-block;
   width: 12px; height: 12px;

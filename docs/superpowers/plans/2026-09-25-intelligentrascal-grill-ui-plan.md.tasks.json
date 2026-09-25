@@ -145,7 +145,7 @@
     {
       "id": 16,
       "subject": "Task 17: core.js + Inbox at parity with Jason's e2e",
-      "status": "in_progress",
+      "status": "completed",
       "description": "**Goal:** Split Jason's `page.html` into `core.js` (shared) and `inbox.html` (layout), on the hub (SSE instead of 1 s polling), keyed staging, token sends; port Jason's e2e to pass unchanged in behaviour.\n\n**Depends on:** T1, T12\n\n**Verify:** `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/page.e2e.mjs` → `PASS n/n` (n ≥ 102), exit 0; units still pass.\n\nSee plan section \"Task 17\".\n\n```json:metadata\n{\"files\":[\"page/core.js\",\"test/page.e2e.mjs\",\"page/inbox.html\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=… node skills/grilling-ui/test/page.e2e.mjs → PASS n/n (n ≥ 102), exit 0; units still pass.\",\"acceptanceCriteria\":[\"`core.js` (IIFE, `\\\"use strict\\\"`, exposes `window.Grill`) contains the port of `$JASON/page.html:231-377` (helpers, staging, pending, `sendState`, `post`, `send`, `finishNow`, `visualize`, `explore`) and `378-433, 456-466, 591-628` (render wrapper, `withInputs`, `withThreadScroll`, banner, header, status, footer, send button) with these changes:\",\"`inbox.html`: markup `$JASON/page.html:208-229`, CSS `14-205` minus tokens (links `/assets/tokens.css`), inline script with renders `435-455, 467-590` registered via `Grill.mount`. Loads `/assets/core.js`. Contains `<!--GRILL_BOOT-->` before the scripts.\",\"`test/page.e2e.mjs`: port `$JASON/test/page.e2e.mjs` — `new` + write fixture state (lines 20–33) + open `url`; all checks at lines 59–352 kept; \\\"restart reuses the port\\\" (335) becomes: `POST /admin/shutdown`, see hub-down banner, `hub.mjs ensure`, banner clears on the same URL; \\\"system fonts only\\\" also asserts no request leaves 127.0.0.1. Sends are read from `events.jsonl` (no stdout); add checks: title `<project> · <topic>`, favicon changes to working, listener text flips when `meta.json` heartbeat is made stale.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         0,
@@ -393,5 +393,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T15:31:07.642Z"
+  "lastUpdated": "2026-09-25T15:39:29.784Z"
 }
