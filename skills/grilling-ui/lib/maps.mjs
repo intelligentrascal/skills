@@ -14,7 +14,11 @@
 //   handled: only increases; a lower value (or null) is ignored
 //   any other key (fog, outOfScope, title, …): replaced whole
 //   at: always stamped with `now`
-import { isObj } from "./util.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import crypto from "node:crypto";
+import { die, isObj, oneLine, print, rand, readJson } from "./util.mjs";
+import { projectKey } from "./home.mjs";
 import { PatchError, bad, clean, fieldsOf, mergeOne } from "./state.mjs";
 
 const TYPES = ["research", "prototype", "grilling", "task"];
@@ -121,3 +125,82 @@ export function validateMap(m) {
 }
 
 export { PatchError };
+
+// ---- storage (plan T14; spec §4a Data, <mapKey>; D2, D4) ----
+//   maps/<projectKey>/<slug>/
+//     map.json      written only by the hub (POST /m/<key>/patch, heartbeat, claims)
+//     meta.json     { token } (0600), created once by the first map-patch
+//     events.jsonl  board actions (refresh, work), appended by the hub (T33)
+// mapKey = "<projectKey>/<slug>", both parts [a-z0-9-]+.
+export const MAPS_DIR = "maps";
+export const MAP_PART = /^[a-z0-9-]+$/;
+export const mapFile = (dir) => path.join(dir, "map.json");
+export const mapMetaFile = (dir) => path.join(dir, "meta.json");
+export const mapEventsFile = (dir) => path.join(dir, "events.jsonl");
+export const mapUrl = (port, key) => `http://127.0.0.1:${port}/m/${key}/`;
+// The folder of a (valid) map key. Never touches the disk.
+export const mapDirOf = (home, key) => path.join(home, MAPS_DIR, ...key.split("/"));
+export class MapKeyError extends Error {}
+// D2: a tracker map id or effort slug, lower-cased, every run of non-[a-z0-9] → "-".
+const slugPart = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, "");
+// "<projectKey>/<slug>" from a --map argument: a bare slug is prefixed with the projectKey of
+// `cwd`; a full key's projectKey part must already be a key ([a-z0-9-]+). Throws MapKeyError.
+export function mapKeyOf(arg, cwd = process.cwd()) {
+  const parts = typeof arg === "string" ? arg.split("/") : [];
+  if (!arg || parts.length > 2) throw new MapKeyError(`bad map key ${JSON.stringify(arg)}: use <slug> or <projectKey>/<slug>`);
+  const [pk, raw] = parts.length === 2 ? parts : [projectKey(cwd), parts[0]];
+  const slug = slugPart(raw);
+  if (!MAP_PART.test(pk) || !slug) throw new MapKeyError(`bad map key ${JSON.stringify(arg)}: use <slug> or <projectKey>/<slug> ([a-z0-9-])`);
+  return `${pk}/${slug}`;
+}
+export const readMapMeta = (dir) => { const m = readJson(mapMetaFile(dir)); return isObj(m) ? m : null; };
+// Creates the map folder, meta.json {token} and an empty events.jsonl if absent; returns the dir.
+// meta.json is written to a temp file and hard-linked into place, so two first map-patches race
+// safely: exactly one token wins and nobody ever reads a half-written file.
+export function ensureMapDir(home, key) {
+  const dir = mapDirOf(home, key);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const meta = mapMetaFile(dir);
+  if (!fs.existsSync(meta)) {
+    const tmp = `${meta}.${process.pid}.${crypto.randomBytes(3).toString("hex")}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify({ token: rand(32) }, null, 2) + "\n", { mode: 0o600 });
+    try { fs.linkSync(tmp, meta); } catch (e) { if (e.code !== "EEXIST") throw e; } finally { fs.rmSync(tmp, { force: true }); }
+  }
+  fs.closeSync(fs.openSync(mapEventsFile(dir), "a"));
+  return dir;
+}
+
+// ---- CLI: map-patch --map KEY|SLUG [--agent-id ID] [--file P] ----
+// Exit codes: 0 ok; 1 hub/home/write failure; 2 bad input or a rejected patch.
+export async function cmdMapPatch(o, env = process.env) {
+  if (!o.map || o.map === true) die("--map <slug|projectKey/slug> is required");
+  if (o["agent-id"] === true) die("--agent-id needs a value");
+  let key;
+  try { key = mapKeyOf(String(o.map)); } catch (e) { die(e instanceof MapKeyError ? e.message : `cannot read the project: ${e.code || oneLine(e.message)}`, e instanceof MapKeyError ? 2 : 1); }
+  const { readPatchText } = await import("./sessions.mjs");
+  const text = readPatchText(o, "map.json");
+  let patch;
+  try { patch = JSON.parse(text); } catch (e) { die(`the map patch is not valid JSON (map.json unchanged): ${oneLine(e.message)}`); }
+  if (!isObj(patch)) die("the map patch must be a JSON object shaped like map.json (map.json unchanged)");
+  const hub = await mapHubOrDie(env);
+  let dir;
+  try { dir = ensureMapDir(hub.home, key); } catch (e) { die(`could not create the map folder: ${e.code || oneLine(e.message)}`, 1); }
+  const body = { patch, ...(typeof o["agent-id"] === "string" ? { agentId: o["agent-id"] } : {}) };
+  let r, reply;
+  try {
+    r = await fetch(`http://127.0.0.1:${hub.port}/m/${key}/patch`, {
+      method: "POST", headers: { "content-type": "application/json", "x-grill-token": readMapMeta(dir)?.token ?? "" },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(10_000),
+    });
+    reply = await r.json().catch(() => ({}));
+  } catch (e) { die(`map-patch failed: the hub did not answer (${oneLine(e.message)}); map.json unchanged`, 1); }
+  if (r.status === 400) die(`map-patch rejected (map.json unchanged): ${oneLine(reply.error ?? "bad patch")}`);
+  if (!r.ok) die(`map-patch failed (HTTP ${r.status}): ${oneLine(reply.error ?? "")}`, 1);
+  print({ ok: true, tickets: reply.tickets, url: mapUrl(hub.port, key) });
+  process.stdout.write("", () => process.exit(0));
+}
+export async function mapHubOrDie(env) {
+  const { ensureHub, EnsureError } = await import("./lifecycle.mjs");
+  const { HomeError } = await import("./home.mjs");
+  try { return await ensureHub(env); } catch (e) { die(e instanceof HomeError || e instanceof EnsureError ? e.message : `ensure failed: ${oneLine(e.message)}`, 1); }
+}

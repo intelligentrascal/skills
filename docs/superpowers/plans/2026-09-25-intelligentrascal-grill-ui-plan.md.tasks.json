@@ -99,7 +99,7 @@
     {
       "id": 11,
       "subject": "Task 12: SSE, directory watch, presence and /clients",
-      "status": "in_progress",
+      "status": "completed",
       "description": "**Goal:** Push `state` changes over the hub-wide SSE stream using a directory watch that survives atomic renames; presence tracking and `/clients`.\n\n**Depends on:** T11\n\n**Verify:** `node --test skills/grilling-ui/test/sse.test.mjs` → pass.\n\nSee plan section \"Task 12\".\n\n```json:metadata\n{\"files\":[\"lib/server.mjs\",\"test/sse.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/sse.test.mjs → pass.\",\"acceptanceCriteria\":[\"`GET /events` (SSE, `text/event-stream`, `retry: 2000`): sends `event: hello` `{pid, started}` on connect, then `event: s` `{\\\"id\\\"}` per session change and `event: m` `{\\\"key\\\"}` per map change; comment keep-alive every 25 s.\",\"Session watchers attach lazily on the first request touching `/s/<id>/…` (`fs.watch(dir)`; filter `state.json|meta.json|visual.html`; 30 ms debounce per id).\",\"`GET /s/<id>/presence?tab=<t>` → 204, records `tab → now`. `GET /s/<id>/clients` → `{count, lastSeen, hubStarted}` per D6.\",\"Tests: an EventSource-like reader (`fetch` streaming body, parse `event:`/`data:`) sees `s` pings after two consecutive `hub.mjs patch` calls (two atomic renames); presence counts two tabs, drops after `GRILL_PRESENCE_MS` (test override 300 ms).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         10
@@ -117,7 +117,7 @@
     {
       "id": 13,
       "subject": "Task 14: Map storage on the hub and `map-patch`",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Maps live under `maps/<projectKey>/<slug>/`; `map-patch` sends patches through the hub (single writer, D4); `/m/<key>/map` and SSE `m` pings.\n\n**Depends on:** T8, T11\n\n**Verify:** `node --test skills/grilling-ui/test/maps-hub.test.mjs` → pass.\n\nSee plan section \"Task 14\".\n\n```json:metadata\n{\"files\":[\"lib/server.mjs\",\"hub.mjs\",\"test/maps-hub.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/maps-hub.test.mjs → pass.\",\"acceptanceCriteria\":[\"`map-patch --map KEY|SLUG`: a bare slug is prefixed with the cwd's `projectKey`; creates `maps/<key>/` with `meta.json {token}` and empty `events.jsonl` if absent (CLI side, then the hub picks it up); reads patch from stdin/`--file`; `POST /m/<key>/patch` with token; prints `{ok, tickets, url}`; validation errors → one line, exit 2 (hub returns 400 with the message).\",\"Hub routes: `GET /m/<key>/` (board HTML; placeholder until T34), `GET /m/<key>/map` (map.json or 404), `POST /m/<key>/patch` (token + Origin; `applyMapPatch` + `validateMap`, atomic write, `m` ping), `POST /m/<key>/heartbeat {agentId}` (sets `listener {agentId, heartbeat}`), `GET /m/<key>/presence`, `GET /m/<key>/clients`.\",\"Key parsing: `/m/([a-z0-9-]+)/([a-z0-9-]+)/(map|patch|heartbeat|presence|clients|claim|action)?$`.\",\"Tests: create, patch twice (merge), invalid patch rejected with state unchanged, listener heartbeat shows in `/map`, bad token 401.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         7,
@@ -127,7 +127,7 @@
     {
       "id": 14,
       "subject": "Task 15: `url` and `open`",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Best-effort auto-open with the §6 skip rules, tab detection, URL validation and a no-shell spawn.\n\n**Depends on:** T12\n\n**Verify:** `node --test skills/grilling-ui/test/open.test.mjs` → pass.\n\nSee plan section \"Task 15\".\n\n```json:metadata\n{\"files\":[\"lib/open.mjs\",\"test/open.test.mjs\",\"hub.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/open.test.mjs → pass.\",\"acceptanceCriteria\":[\"`skipReason(env, platform)` → `\\\"GRILL_NO_OPEN\\\"`, `\\\"ssh\\\"`, `\\\"no-display\\\"` (linux without `DISPLAY`/`WAYLAND_DISPLAY`), or `null`.\",\"`URL_RE` per D1; `url` prints the URL (session: `…/s/<id>/` or `…/s/<id>/<ui>`; map: `…/m/<key>/`).\",\"`open`: skip → `{\\\"opened\\\":false,\\\"reason\\\":…,\\\"url\\\"}`; `/clients` count > 0 or `lastSeen` within 120 s → `{\\\"opened\\\":false,\\\"reason\\\":\\\"tab-open\\\"}`; if `hubStarted` < 3 s ago and count 0, poll `/clients` up to 3 s first; invalid URL → `reason: \\\"invalid-url\\\"`; spawn `[opener, url]` with `shell: false`, killed after 5 s: macOS `open`, Linux `xdg-open`, Windows `cmd /c start \\\"\\\" <url>`; `GRILL_OPENER` = executable path overriding the opener.\",\"Tests: each skip rule; regex accepts `/s/abc-1/`, `/s/abc-1/studio`, `/m/proj-1a2b3c4d/42/` and rejects `/s/../`, `/s/a/b/`, `javascript:`, `http://127.0.0.1:1/s/a/brief?x`; `GRILL_OPENER` script writes argv to a file; a present tab (presence ping) prevents opening.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         11
@@ -393,5 +393,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T15:22:56.123Z"
+  "lastUpdated": "2026-09-25T15:24:30.233Z"
 }

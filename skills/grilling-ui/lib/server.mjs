@@ -9,7 +9,8 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { envMs, isObj, rand, readJson } from "./util.mjs";
+import { envMs, isObj, rand, readJson, writeJson } from "./util.mjs";
+import { PatchError, applyMapPatch, mapDirOf, mapFile, mapMetaFile, readMapMeta, validateMap } from "./maps.mjs";
 import { eventsFile, lastSeq, publicOwner, readMeta, sessionDirById, stateFile, touchHeartbeat } from "./sessions.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -129,6 +130,8 @@ export function createHub({ home, version, codeTime = 0, log = () => {}, env = p
     ["POST", /^\/admin\/shutdown$/, admin("shutdown")],
   );
   addSessionRoutes(hub);
+  addLiveRoutes(hub);
+  addMapRoutes(hub);
 
   hub.server = http.createServer(async (req, res) => {
     hub.lastBusy = Date.now(); // any request (ensure's /health included) restarts the idle clock
@@ -290,4 +293,204 @@ function addSessionRoutes(hub) {
       json(res, 200, { ok: true, heartbeat: now.toISOString() });
     }],
   );
+}
+
+// ---- SSE, directory watch, presence (plan T12; spec §5 Updates to the page, §6 step 2; D5, D6) ----
+//   GET /events                     hub-wide SSE: `retry: 2000`, `event: hello {pid, started}` on
+//                                   connect, then `event: s {"id"}` / `event: m {"key"}` pings; a
+//                                   `: keep-alive` comment every GRILL_SSE_KEEPALIVE_MS (25 s)
+//   GET /s/<id>/presence?tab=<t>    204; records tab → now
+//   GET /s/<id>/clients             {count: tabs seen in the last GRILL_PRESENCE_MS (45 s), lastSeen, hubStarted}
+//
+// hub gains: broadcast(event, obj), watchDir(kind, key, dir, files) (lazy fs.watch on a folder,
+// filtered by file name, 30 ms debounce per key, pings `kind` with {id|key}), ping(kind, key)
+// (the same debounced ping, for the hub's own writes), watchers (Map "kind:key" → watcher),
+// presence (Map "kind:key" → {tabs: Map tab → ms, lastSeen}), touchPresence(kind, key, tab),
+// clientsOf(kind, key).
+export const SESSION_WATCH = ["state.json", "meta.json", "visual.html"];
+export const DEBOUNCE_MS = 30;
+const TAB_RE = /^[A-Za-z0-9_-]{1,64}$/;
+function addLiveRoutes(hub) {
+  const keepAliveMs = envMs("GRILL_SSE_KEEPALIVE_MS", 25_000, hub.env);
+  const presenceMs = envMs("GRILL_PRESENCE_MS", 45_000, hub.env);
+
+  hub.broadcast = (event, obj) => {
+    const frame = `event: ${event}\ndata: ${JSON.stringify(obj)}\n\n`;
+    for (const r of hub.sse) { try { r.write(frame); } catch { /* closed; removed on "close" */ } }
+  };
+
+  // One pending timer per "kind:key": a burst of file events (temp write, rename, meta.json
+  // heartbeat) inside DEBOUNCE_MS is one ping.
+  const timers = new Map();
+  hub.ping = (kind, key) => {
+    const k = `${kind}:${key}`;
+    if (timers.has(k)) return;
+    timers.set(k, setTimeout(() => { timers.delete(k); hub.broadcast(kind, kind === "s" ? { id: key } : { key }); }, DEBOUNCE_MS));
+  };
+
+  // fs.watch on the folder, not the file: an atomic rename swaps the file's inode, which ends a
+  // file-level watch on macOS (spec §5). A watcher that errors (folder removed) is dropped and
+  // re-attached by the next request that resolves the folder.
+  hub.watchers = new Map();
+  hub.watchDir = (kind, key, dir, files) => {
+    const k = `${kind}:${key}`;
+    const cur = hub.watchers.get(k);
+    if (cur && cur.dir === dir) return;
+    if (cur) { try { cur.w.close(); } catch {} hub.watchers.delete(k); }
+    let w;
+    try {
+      w = fs.watch(dir, { persistent: false }, (_, name) => {
+        // No name (some platforms): assume it mattered.
+        if (!name || files.includes(String(name))) hub.ping(kind, key);
+      });
+    } catch (e) { hub.log(`watch ${dir}:`, e.code || e.message); return; }
+    w.on("error", (e) => { hub.log(`watch ${dir} ended:`, e.code || e.message); try { w.close(); } catch {} if (hub.watchers.get(k)?.w === w) hub.watchers.delete(k); });
+    hub.watchers.set(k, { dir, w });
+  };
+  hub.onSession.push((id, dir) => hub.watchDir("s", id, dir, SESSION_WATCH));
+
+  hub.presence = new Map();
+  hub.touchPresence = (kind, key, tab) => {
+    const k = `${kind}:${key}`;
+    let p = hub.presence.get(k);
+    if (!p) hub.presence.set(k, (p = { tabs: new Map(), lastSeen: 0 }));
+    const now = Date.now();
+    p.tabs.set(tab, now); p.lastSeen = now;
+  };
+  hub.clientsOf = (kind, key) => {
+    const p = hub.presence.get(`${kind}:${key}`), now = Date.now();
+    let count = 0;
+    if (p) for (const [tab, t] of p.tabs) { if (now - t < presenceMs) count++; else p.tabs.delete(tab); }
+    return { count, lastSeen: p?.lastSeen ? new Date(p.lastSeen).toISOString() : null, hubStarted: hub.started };
+  };
+  // Shared by /s and /m presence routes; `resolve` 404s an unknown session/map.
+  hub.presenceRoute = (kind, resolve) => (req, res, m, url) => {
+    const key = resolve(m);
+    const tab = url.searchParams.get("tab");
+    if (!tab || !TAB_RE.test(tab)) throw httpError(400, "tab must be 1-64 of [A-Za-z0-9_-]");
+    hub.touchPresence(kind, key, tab);
+    res.writeHead(204, { "cache-control": "no-store" }); res.end();
+  };
+  hub.clientsRoute = (kind, resolve) => (req, res, m) => json(res, 200, hub.clientsOf(kind, resolve(m)));
+
+  const sessionKey = (m) => { if (!hub.sessionDir(m[1])) throw httpError(404, "no such grill"); return m[1]; };
+  hub.routes.push(
+    ["GET", /^\/events$/, (req, res) => {
+      res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", connection: "keep-alive", "x-accel-buffering": "no" });
+      res.write(`retry: 2000\n\nevent: hello\ndata: ${JSON.stringify({ pid: hub.pid, started: hub.started })}\n\n`);
+      hub.sse.add(res);
+      const ka = setInterval(() => { try { res.write(": keep-alive\n\n"); } catch {} }, keepAliveMs);
+      ka.unref();
+      req.socket.setTimeout(0);
+      res.on("close", () => { clearInterval(ka); hub.sse.delete(res); hub.lastBusy = Date.now(); });
+    }],
+    ["GET", /^\/s\/([A-Za-z0-9-]+)\/presence$/, hub.presenceRoute("s", sessionKey)],
+    ["GET", /^\/s\/([A-Za-z0-9-]+)\/clients$/, hub.clientsRoute("s", sessionKey)],
+  );
+}
+
+// ---- map routes (plan T14; spec §4a; D4: the hub is the only writer of map.json) ----
+//   GET  /m/<key>                    302 → /m/<key>/
+//   GET  /m/<key>/                   board page (page/board.html, placeholder until T34) with the
+//                                    boot script {kind:"map", key, token, base}
+//   GET  /m/<key>/map                map.json (last-good fallback) or 404
+//   POST /m/<key>/patch  {patch, agentId?}   token + Origin → applyMapPatch + validateMap, atomic
+//                                    write, `m` ping → {ok, tickets, handled, at}; 400 {error} on a
+//                                    rejected patch. agentId equal to listener.agentId refreshes
+//                                    the listener heartbeat.
+//   POST /m/<key>/heartbeat {agentId} token + Origin → map.json listener {agentId, heartbeat}
+//                                    (the latest watcher wins; a map with no map.json yet gets a
+//                                    stub {title:"", listener})
+//   GET  /m/<key>/presence?tab=<t>, /m/<key>/clients   as for sessions (D6)
+// A map exists once its folder has meta.json (created by the first map-patch).
+//
+// hub gains: mapDir(key) (resolves + attaches the lazy watch), checkMapPost(req, dir),
+// readMap(dir) (null when absent; 500 when unparseable), writeMap(key, dir, map) (atomic + ping).
+// Every read-modify-write of map.json runs in one synchronous block (no await between the read
+// and the write), so concurrent patches, heartbeats and claims (T33) never lose an update.
+export const MAP_WATCH = ["map.json", "events.jsonl"];
+// m[3]: "/" + sub (or just "/" for the board page); undefined for the bare key (→ 302).
+export const MAP_ROUTE = /^\/m\/([a-z0-9-]+)\/([a-z0-9-]+)(\/(map|patch|heartbeat|presence|clients|claim|action)?)?$/;
+const BOARD_PLACEHOLDER = `<!doctype html><meta charset="utf-8"><title>Board</title>${BOOT_MARK}<p>board</p>`;
+function addMapRoutes(hub) {
+  hub.mapDir = (key) => {
+    const dir = mapDirOf(hub.home, key);
+    if (!fs.existsSync(mapMetaFile(dir))) return null;
+    hub.watchDir("m", key, dir, MAP_WATCH);
+    return dir;
+  };
+  const mustMap = (key) => { const dir = hub.mapDir(key); if (!dir) throw httpError(404, "no such map"); return dir; };
+  hub.checkMapPost = (req, dir) => {
+    if (!hub.originOk(req)) throw httpError(403, "cross-origin request rejected");
+    if (!tokenOk(readMapMeta(dir)?.token, req.headers["x-grill-token"])) throw httpError(401, "map token required");
+  };
+  hub.readMap = (dir) => {
+    let text; try { text = fs.readFileSync(mapFile(dir), "utf8"); } catch (e) { if (e.code === "ENOENT") return null; throw e; }
+    let m; try { m = JSON.parse(text); } catch { m = null; }
+    if (!isObj(m)) throw httpError(500, "map.json is not a JSON object; fix it or delete it");
+    return m;
+  };
+  hub.writeMap = (key, dir, map) => { writeJson(mapFile(dir), map); hub.ping("m", key); };
+
+  const lastGood = new Map();
+  const handlers = {
+    GET: {
+      "": (req, res, key) => {
+        const dir = hub.mapDir(key);
+        if (!dir) return send(res, 404, "<!doctype html><meta charset=\"utf-8\"><title>No such board</title><p>No such board.</p>", HTML);
+        let html; try { html = fs.readFileSync(path.join(hub.pageDir, "board.html"), "utf8"); } catch { html = BOARD_PLACEHOLDER; }
+        const boot = bootScript({ kind: "map", key, token: readMapMeta(dir)?.token ?? "", base: `/m/${key}/` });
+        send(res, 200, html.replace(BOOT_MARK, () => boot), HTML);
+      },
+      map: (req, res, key) => {
+        const dir = mustMap(key);
+        try { const text = fs.readFileSync(mapFile(dir), "utf8"); if (isObj(JSON.parse(text))) lastGood.set(key, text); } catch { /* keep the last good one */ }
+        const raw = lastGood.get(key);
+        if (raw === undefined) return json(res, 404, { error: "no map yet" });
+        send(res, 200, raw, "application/json");
+      },
+      presence: hub.presenceRoute("m", (m) => (mustMap(m.key), m.key)),
+      clients: hub.clientsRoute("m", (m) => (mustMap(m.key), m.key)),
+    },
+    POST: {
+      patch: async (req, res, key) => {
+        const dir = mustMap(key);
+        hub.checkMapPost(req, dir);
+        const body = await readJsonBody(req);
+        if (!isObj(body.patch)) throw httpError(400, "body must be {\"patch\": {…map fields…}}");
+        // synchronous from here: read → merge → validate → write
+        const now = new Date().toISOString();
+        let next;
+        try {
+          next = applyMapPatch(hub.readMap(dir) ?? {}, body.patch, now);
+          validateMap(next);
+        } catch (e) { if (e instanceof PatchError) return json(res, 400, { error: e.message }); throw e; }
+        if (typeof body.agentId === "string" && body.agentId && isObj(next.listener) && next.listener.agentId === body.agentId) next.listener = { ...next.listener, heartbeat: now };
+        hub.writeMap(key, dir, next);
+        json(res, 200, { ok: true, tickets: Array.isArray(next.tickets) ? next.tickets.length : 0, handled: next.handled ?? 0, at: now });
+      },
+      heartbeat: async (req, res, key) => {
+        const dir = mustMap(key);
+        hub.checkMapPost(req, dir);
+        const body = await readJsonBody(req);
+        if (typeof body.agentId !== "string" || !body.agentId) throw httpError(400, "agentId must be a non-empty string");
+        const heartbeat = new Date().toISOString();
+        const cur = hub.readMap(dir) ?? { title: "" };
+        hub.writeMap(key, dir, { ...cur, listener: { agentId: body.agentId, heartbeat } });
+        json(res, 200, { ok: true, heartbeat });
+      },
+    },
+  };
+  // Routes on the same prefix registered later (T33: claim, action) go in `hub.mapHandlers`.
+  hub.mapHandlers = handlers;
+  const route = (method) => async (req, res, m, url) => {
+    const key = `${m[1]}/${m[2]}`, sub = m[4] ?? "";
+    if (m[3] === undefined) return method === "GET" ? send(res, 302, "", "text/plain", { location: `/m/${key}/` }) : json(res, 404, { error: "not found" });
+    const h = Object.hasOwn(handlers[method], sub) ? handlers[method][sub] : null;
+    if (!h) return json(res, 404, { error: "not found" });
+    // presence/clients take (req, res, match, url) with match.key
+    if (sub === "presence" || sub === "clients") return h(req, res, { key }, url);
+    return h(req, res, key, url);
+  };
+  hub.routes.push(["GET", MAP_ROUTE, route("GET")], ["POST", MAP_ROUTE, route("POST")]);
 }

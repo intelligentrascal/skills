@@ -16,6 +16,7 @@ import tty from "node:tty";
 import { die, envMs, isObj, oneLine, print, rand as randHex, readJson, writeJson } from "./util.mjs";
 import { branchOf, grillHome, projectKeyOf, projectRoot } from "./home.mjs";
 import { PatchError, applyPatch, isOpen, validateState } from "./state.mjs";
+import { readEvents, lastSeq } from "./events.mjs";
 
 export const SESSIONS_DIR = "grill-sessions";
 const ID_RE = /^\d{8}-\d{6}-[0-9a-f]{4}$/;
@@ -45,17 +46,8 @@ export function agentFromEnv(env = process.env) {
 }
 const agentName = (flag, env) => (typeof flag === "string" && flag.trim() ? flag.trim().toLowerCase() : agentFromEnv(env));
 
-// ---- events.jsonl (readEvents/lastSeq port $JASON/server.mjs:90-99; T13's events.mjs may re-export) ----
-export function readEvents(file) {
-  let text; try { text = fs.readFileSync(file, "utf8"); } catch { return []; }
-  const out = [];
-  for (const line of text.split("\n")) {
-    if (!line.trim()) continue;
-    try { out.push({ line, ev: JSON.parse(line) }); } catch { /* partial or corrupt line: skip */ }
-  }
-  return out;
-}
-export const lastSeq = (file) => readEvents(file).reduce((m, { ev }) => Math.max(m, Number(ev?.seq) || 0), 0);
+// ---- events.jsonl (readEvents/lastSeq live in events.mjs, re-exported here) ----
+export { readEvents, lastSeq } from "./events.mjs";
 export const handledOf = (st) => Number(isObj(st) && isObj(st.agent) && st.agent.handled) || 0;
 export const pendingEvents = (dir, handled) => readEvents(eventsFile(dir)).filter(({ ev }) => (Number(ev?.seq) || 0) > handled);
 
@@ -260,16 +252,8 @@ export function cmdPending(o) {
   for (const { line } of pendingEvents(session, handled)) process.stdout.write(line + "\n");
 }
 
-export async function cmdPatch(o, env = process.env) {
-  const session = mustSession(o);
-  if (!o["agent-id"] || o["agent-id"] === true) die("--agent-id <id> is required (printed by new or resume)");
-  const agentId = String(o["agent-id"]);
-  // Best effort (spec §5 Crash recovery): the patch is a file write and must not depend on the hub.
-  try {
-    const { ensureHub } = await import("./lifecycle.mjs");
-    await ensureHub(env);
-  } catch (e) { process.stderr.write(`grill: warning: the hub is not running (${oneLine(e.message)}); the patch still applies\n`); }
-  const file = stateFile(session);
+// The patch text from --file or stdin (exit 2 on a missing/empty patch). Shared with map-patch.
+export function readPatchText(o, shape = "state.json") {
   let text;
   if (o.file !== undefined) {
     if (o.file === true) die("--file needs a path");
@@ -280,7 +264,21 @@ export async function cmdPatch(o, env = process.env) {
     if (tty.isatty(0)) die("no patch: pipe a JSON patch on stdin or pass --file <path>");
     try { text = fs.readFileSync(0, "utf8"); } catch (e) { die(`cannot read the patch from stdin: ${e.code || oneLine(e.message)}`); }
   }
-  if (!text.trim()) die("empty patch: send a JSON object shaped like state.json");
+  if (!text.trim()) die(`empty patch: send a JSON object shaped like ${shape}`);
+  return text;
+}
+
+export async function cmdPatch(o, env = process.env) {
+  const session = mustSession(o);
+  if (!o["agent-id"] || o["agent-id"] === true) die("--agent-id <id> is required (printed by new or resume)");
+  const agentId = String(o["agent-id"]);
+  // Best effort (spec §5 Crash recovery): the patch is a file write and must not depend on the hub.
+  try {
+    const { ensureHub } = await import("./lifecycle.mjs");
+    await ensureHub(env);
+  } catch (e) { process.stderr.write(`grill: warning: the hub is not running (${oneLine(e.message)}); the patch still applies\n`); }
+  const file = stateFile(session);
+  const text = readPatchText(o, "state.json");
   let p;
   try { p = JSON.parse(text); } catch (e) { die(`the patch is not valid JSON (state.json unchanged): ${oneLine(e.message)}`); }
   if (!fs.existsSync(file)) die(`no state.json in ${session}; \`new\` creates it`);

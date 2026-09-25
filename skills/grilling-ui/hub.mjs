@@ -29,6 +29,11 @@ const cmds = {
   resume: async (o) => (await import("./lib/sessions.mjs")).cmdResume(o),
   patch: async (o) => (await import("./lib/sessions.mjs")).cmdPatch(o),
   pending: async (o) => (await import("./lib/sessions.mjs")).cmdPending(o),
+  watch: async (o) => (await import("./lib/events.mjs")).cmdWatch(o),
+  wait: async (o) => (await import("./lib/events.mjs")).cmdWait(o),
+  "map-patch": async (o) => (await import("./lib/maps.mjs")).cmdMapPatch(o),
+  url: async (o) => (await import("./lib/open.mjs")).cmdUrl(o),
+  open: async (o) => (await import("./lib/open.mjs")).cmdOpen(o),
   "agent-profile": async (o) => (await import("./lib/profile.mjs")).cmdAgentProfile(o),
 };
 
