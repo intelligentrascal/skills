@@ -182,7 +182,7 @@
     {
       "id": 20,
       "subject": "Task 21: `grilling-ui` SKILL.md (engine)",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** The shared engine skill: override table first, transport protocol, per-agent listening from `agent-profile`, Visualize, Finish profiles, resume, schema. No interview method.\n\n**Depends on:** T13, T15, T16, T17\n\n**Verify:** `node --test skills/grilling-ui/test/skills.test.mjs` → pass.\n\nSee plan section \"Task 21\".\n\n```json:metadata\n{\"files\":[\"skills/grilling-ui/SKILL.md\",\"skills/grilling-ui/test/skills.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/skills.test.mjs → pass.\",\"acceptanceCriteria\":[\"Frontmatter: `name: grilling-ui`, `description:` trigger-free (\\\"Browser transport for the -ui grill skills: publishes rounds to a local page and listens for Sends. Loaded by grill-me-ui, grill-docs-ui and wayfinder-ui.\\\"), `user-invocable: false`.\",\"Sections in order:\",\"`skills.test.mjs` asserts: frontmatter keys; the override table contains all six left-column phrases from §3; every `node \\\"$SKILL/hub.mjs\\\" <cmd>` mentioned is a real subcommand (parse `hub.mjs` usage); no `../` paths; no \\\"Call the Skill tool with\\\" lines (the engine loads nothing).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         12,
@@ -194,7 +194,7 @@
     {
       "id": 21,
       "subject": "Task 22: `grill-me-ui` and `grill-docs-ui` wrappers",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Two thin wrappers: preflight, load order, finish profile.\n\n**Depends on:** T21\n\n**Verify:** `node --test skills/grilling-ui/test/skills.test.mjs` → pass.\n\nSee plan section \"Task 22\".\n\n```json:metadata\n{\"files\":[\"skills/grill-me-ui/SKILL.md\",\"skills/grill-docs-ui/SKILL.md\",\"test/skills.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/skills.test.mjs → pass.\",\"acceptanceCriteria\":[\"`grill-me-ui/SKILL.md` (full text; adapt only wording, not steps):\",\"`grill-docs-ui/SKILL.md`: same shape; description \\\"Grill with docs, with ui …\\\" triggers (\\\"grill with docs ui\\\", \\\"grill-docs-ui\\\", \\\"grill with docs in the browser\\\"); step 1 loads `grilling` then `domain-modeling` (in Claude Code: `mattpocock-skills:domain-modeling`) as **two calls**; preflight checks both; finish profile **docs**; adds: \\\"After every `CONTEXT.md` edit, patch the page `terms` with the terms touched in this grill only.\\\"\",\"Descriptions contain \\\"ui\\\" trigger phrases and do not contain bare \\\"grill me\\\" as a standalone trigger (test: every quoted trigger phrase contains \\\"ui\\\" or \\\"browser\\\").\",\"Tests extended: load order (grilling line precedes grilling-ui line), both name forms present, no `../`.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         20
@@ -203,7 +203,7 @@
     {
       "id": 22,
       "subject": "Task 23: `wayfinder-ui` (chart + work mode), vendored wayfinder, upstream pin",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Wayfinder wrapper reading its vendored copy, with chart-mode phases, work mode (one ticket = one session), Finish tracker writes then map snapshot.\n\n**Depends on:** T21\n\n**Verify:** `node --test skills/grilling-ui/test/skills.test.mjs` → pass; `cmp skills/wayfinder-ui/upstream/wayfinder.md ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.3/skills/engineering/wayfinder/SKILL.md` → no output.\n\nSee plan section \"Task 23\".\n\n```json:metadata\n{\"files\":[\"skills/wayfinder-ui/SKILL.md\",\"skills/wayfinder-ui/upstream/wayfinder.md\",\"upstream.json\",\"test/skills.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/skills.test.mjs → pass; cmp skills/wayfinder-ui/upstream/wayfinder.md ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.3/skills/engineering/wayfinder/SKILL.md → no output.\",\"acceptanceCriteria\":[\"`upstream/wayfinder.md` = byte copy of `$POCOCK_PIN/skills/engineering/wayfinder/SKILL.md` (pinned 1.2.3 / `3cca18b`).\",\"`upstream.json`:\",\"`wayfinder-ui/SKILL.md`: description triggers \\\"wayfinder ui\\\", \\\"wayfind with ui\\\", \\\"/wayfinder-ui\\\", \\\"/wayfinder-ui board <map>\\\"; `$SKILL` line; preflight as T22 (grilling + domain-modeling); \\\"Read `$SKILL/upstream/wayfinder.md` (same folder) and follow it, with these changes:\\\"\",\"Tests: vendored file equals the pinned file (skip if `$POCOCK_PIN` absent); upstream.json shape; SKILL.md mentions `--phase destination`, `finished`, `map-patch`, \\\"one ticket\\\".\"],\"humanGate\":false}\n```",
       "blockedBy": [
         20
@@ -393,5 +393,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T15:39:29.784Z"
+  "lastUpdated": "2026-09-25T15:47:29.488Z"
 }
