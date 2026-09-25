@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en" data-look="jason">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>board</title>
+<link rel="icon" href="data:," />
+<!-- Wayfinder ticket board (spec §4a, plan T34) at /m/<mapKey>/. Jason Ku's look, as in the Inbox:
+     tokens.css is his :root, and every rule below reuses inbox.html's vocabulary (header bar, serif
+     headings, the round label's small caps, .opt cards with rule + 8px radius, pending = dashed
+     --stage, the footer action bar, toast and cheatsheet). No new colours or fonts.
+     data-look="jason" keeps tokens.css's base control rules off. Behaviour is in board.js. -->
+<link rel="stylesheet" href="/assets/tokens.css" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: var(--sans); font-size: 15px; line-height: 1.5; color: var(--ink); background: var(--bg);
+    display: grid; grid-template-rows: auto auto 1fr auto; grid-template-columns: minmax(0, 1fr); height: 100vh;
+  }
+  a { color: var(--accent); }
+  #banner { grid-row: 1; display: none; padding: 9px 24px; font-size: 14px; background: var(--warn-soft); color: var(--accent); border-bottom: 1px solid var(--rule); }
+  #banner.show { display: block; }
+
+  /* header: inbox.html's bar */
+  header { grid-row: 2; display: flex; align-items: center; gap: 14px; padding: 12px 24px; border-bottom: 1px solid var(--rule); background: var(--panel); min-width: 0; }
+  header h1 { font-family: var(--serif); font-weight: 500; font-size: 20px; margin: 0; }
+  header .path { color: var(--ink-3); font-size: 13px; }
+  header .phase { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  header .status { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+  header .status .off { color: var(--accent); }
+  header .back { font-size: 13px; color: var(--ink-3); text-decoration: none; } header .back:hover { color: var(--accent); }
+  header .back[hidden] { display: none; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex-shrink: 0; }
+  .dot.off, .dot.gone { background: var(--ink-3); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .spin { display: inline-block; width: 11px; height: 11px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -1px; flex-shrink: 0; }
+
+  /* the board: the destination as the card's serif h2, then the columns */
+  main { grid-row: 3; overflow-y: auto; padding: 32px 44px 60px; min-width: 0; }
+  .board-head { max-width: 760px; margin-bottom: 28px; }
+  .kicker, .col h2, .below h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin: 0; }
+  .dest { font-family: var(--serif); font-weight: 500; font-size: 30px; line-height: 1.15; margin: 8px 0 10px; }
+  .notes { font-size: 15px; color: var(--ink-2); max-width: 62ch; margin: 0 0 8px; white-space: pre-line; }
+  .fresh { font-size: 12px; color: var(--ink-3); } .fresh a { color: var(--accent); }
+  .loading { font-size: 14px; color: var(--ink-3); margin: 8px 0 0; }
+  .path-text { color: var(--ink-3); font-size: 12px; overflow-wrap: anywhere; }
+
+  .cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; align-items: start; }
+  .col h2 { display: flex; justify-content: space-between; padding: 0 2px 8px; border-bottom: 1px solid var(--rule); margin-bottom: 10px; }
+  .col[data-col="frontier"] h2 { color: var(--accent); }
+  .col h2 .n { font-weight: 400; }
+  .col .list { display: grid; gap: 8px; }
+  .col .empty, .below .empty { font-size: 13px; color: var(--ink-3); padding: 4px 2px; }
+
+  /* a ticket: inbox.html's .opt card */
+  .tk { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 8px; background: var(--panel); cursor: pointer; min-width: 0; }
+  .tk:hover { border-color: var(--ink-3); }
+  .tk:focus { outline: none; }
+  .tk:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .tk.sel { border-color: var(--ink-3); box-shadow: inset 3px 0 0 var(--accent); }
+  .tk .chip { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+  .tk .t { font-size: 14px; overflow-wrap: anywhere; }
+  .tk .t a { color: var(--ink); text-decoration-color: var(--rule); text-underline-offset: 3px; } .tk .t a:hover { color: var(--accent); text-decoration-color: currentColor; }
+  .tk .meta { font-size: 12px; color: var(--ink-3); overflow-wrap: anywhere; }
+  .tk .meta b { font-weight: 600; color: var(--ink-2); }
+  .tk .gist { font-size: 13px; color: var(--ink-2); white-space: pre-line; }
+  .tk .claim { font-size: 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .tk .claim.queued { color: var(--stage); }
+  .tk .claim.claimed { color: var(--ok); }
+  .tk .claim svg { width: 12px; height: 12px; display: block; }
+  .tk .claim a { font-weight: 500; text-decoration: none; } .tk .claim a:hover { text-decoration: underline; }
+  .tk.queued { border-color: var(--stage); border-style: dashed; }
+  .tk.done .t, .tk.done .t a { color: var(--ink-2); }
+  .tk .act { margin-top: 6px; }
+
+  /* Fog and Out of scope sit below the columns: map-view's rule-separated rows */
+  .below { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 40px; }
+  .below h2 { display: flex; gap: 8px; margin-bottom: 4px; } .below h2 .n { font-weight: 400; }
+  .below ul { list-style: none; margin: 0; padding: 0; }
+  .below li { padding: 10px 0; border-top: 1px solid var(--rule); font-size: 14px; color: var(--ink-2); overflow-wrap: anywhere; }
+
+  button { font-family: var(--sans); font-weight: 500; font-size: 14px; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--rule); background: var(--panel); color: var(--ink); cursor: pointer; white-space: nowrap; }
+  button:hover { border-color: var(--ink-3); }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  button:disabled { background: var(--panel); border-color: var(--rule); color: var(--ink-3); cursor: default; }
+  button .spin { width: 9px; height: 9px; margin-right: 6px; }
+  .tk .act button { font-size: 12px; padding: 4px 10px; }
+
+  /* footer: inbox.html's action bar */
+  footer { grid-row: 4; display: flex; align-items: center; gap: 14px; padding: 12px 24px; border-top: 1px solid var(--rule); background: var(--panel); }
+  footer .queue { font-size: 13px; color: var(--ink-2); flex: 1; min-width: 0; } footer .queue b { color: var(--stage); }
+  footer .queue .sent { color: var(--stage); display: inline-flex; align-items: center; gap: 6px; }
+  footer .hint { font-size: 12px; color: var(--ink-3); text-decoration: none; } footer .hint:hover { color: var(--accent); }
+
+  /* toast and cheatsheet: inbox.html's, verbatim */
+  .toast { position: fixed; right: 24px; bottom: 72px; display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--ink); color: #fff; font-size: 13px; border-radius: 6px; opacity: 0; transform: translateY(6px); transition: opacity .25s, transform .25s; pointer-events: none; z-index: 6; }
+  .toast.show { opacity: 1; transform: none; pointer-events: auto; }
+  .toast button, .toast button:hover { padding: 0; border: 0; background: none; color: #fff; font-size: 13px; text-decoration: underline; }
+  .toast button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .keys-sheet { position: fixed; inset: 0; z-index: 7; display: flex; align-items: flex-start; justify-content: center; padding: 12vh 16px 16px; }
+  .keys-sheet[hidden] { display: none; }
+  .keys-panel { width: 480px; max-width: 100%; max-height: 76vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 20px 16px; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+  .keys-panel:focus { outline: none; }
+  .keys-panel h2 { margin: 0 0 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  .keys-panel table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .keys-panel td { padding: 7px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  .keys-panel td:first-child { width: 160px; padding-right: 12px; color: var(--ink-3); font-size: 12px; white-space: nowrap; }
+  .keys-panel kbd { font-family: var(--sans); font-size: 12px; padding: 1px 6px; border: 1px solid var(--rule); border-radius: 4px; background: var(--bg); color: var(--ink); }
+  .keys-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 13px; color: var(--ink-2); }
+  .keys-foot label { display: flex; align-items: center; gap: 8px; cursor: pointer; } .keys-foot input { accent-color: var(--accent); margin: 0; }
+  .keys-foot .keys-note { color: var(--ink-3); font-size: 12px; }
+  .keys-foot button { font-size: 12px; padding: 4px 10px; }
+
+  /* two columns on a laptop-narrow window */
+  @media (max-width: 1100px) and (min-width: 761px) { .cols { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 32px; } }
+  /* phones: inbox.html's stacking — one scrolling page, sticky action bar */
+  @media (max-width: 760px) {
+    body { grid-template-rows: none; height: auto; min-height: 100vh; }
+    #banner, header, main, footer { grid-row: auto; }
+    header { flex-wrap: wrap; gap: 6px 12px; padding: 10px 16px; }
+    header h1 { font-size: 17px; flex-basis: 100%; }
+    header .status { margin-left: 0; }
+    main { overflow-y: visible; padding: 20px 16px 28px; }
+    .dest { font-size: 22px; }
+    .cols, .below { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    .below { margin-top: 32px; }
+    footer { position: sticky; bottom: 0; z-index: 4; flex-wrap: wrap; gap: 8px 12px; padding: 10px 16px; }
+    footer .queue .wide { display: none; }
+    .toast { left: 16px; right: 16px; top: 12px; bottom: auto; transform: translateY(-6px); }
+    .keys-panel td:first-child { width: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .toast { transition-duration: .01ms; }
+    .spin { animation: pulse 1.6s ease-in-out infinite; border-right-color: currentColor; }
+  }
+</style>
+</head>
+<body>
+<div id="banner" role="status"></div>
+<header>
+  <h1 id="title">Board</h1>
+  <span class="path" id="where"></span>
+  <span class="phase">Board</span>
+  <a class="back" id="back" href="#" hidden>← Back to the grill</a>
+  <span class="status" id="status"><span class="dot off" id="listen-dot"></span><span id="listener">connecting…</span></span>
+</header>
+<main id="main" aria-busy="true">
+  <div class="board-head" id="head"><div class="kicker">Wayfinder board</div><p class="loading">Connecting…</p></div>
+  <div id="board"></div>
+</main>
+<footer>
+  <span class="queue" id="queue" role="status"></span>
+  <a href="#" class="hint" id="keys-help" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" aria-keyshortcuts="?">? shortcuts</a>
+  <button id="refresh" type="button" disabled>Refresh</button>
+</footer>
+<!--GRILL_BOOT-->
+<script src="/assets/core.js"></script>
+<script src="/assets/board.js"></script>
+</body>
+</html>

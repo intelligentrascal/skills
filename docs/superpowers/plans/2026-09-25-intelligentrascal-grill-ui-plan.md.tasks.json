@@ -313,7 +313,7 @@
     {
       "id": 33,
       "subject": "Task 34: Board page",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** `/m/<mapKey>/` board with columns, freshness header, listener state, Refresh and Work actions, keyboard.\n\n**Depends on:** T33, T24 (map-view shared styles)\n\n**Verify:** covered by T36 e2e; manual check at 1440/390.\n\nSee plan section \"Task 34\".\n\n```json:metadata\n{\"files\":[\"page/board.html\",\"page/board.js\",\"page/core.js\",\"board.js\",\"Grill.transport\",\"Grill.keys\",\"lib/server.mjs\",\"board.html\"],\"verifyCommand\":\"covered by T36 e2e; manual check at 1440/390.\",\"acceptanceCriteria\":[\"Columns: Frontier · In progress (claimed) · Blocked · Done; Fog and Out of scope below. Card: title, type chip, blockedBy titles, assignee, link (http(s) only as anchor); Done cards show `gist`.\",\"Header: destination; \\\"Updated <relative time> · canonical: <link>\\\" (age re-rendered every 30 s); listener state from `listener.heartbeat` (< 180 s).\",\"Frontier card: \\\"Work this ticket\\\" button (+ `w`) → `POST claim`; on 200 the card moves to In progress showing \\\"queued\\\" until `seq <= map.handled`, then \\\"claimed by <agentId>\\\"; if the ticket later carries a `session` link (`tickets[].session` URL, allowed by `validateMap` as an http URL) show \\\"grilling now →\\\". 409 → toast \\\"Already claimed by …\\\".\",\"Refresh button → `POST action refresh`, shows \\\"refresh requested\\\" until the next map update.\",\"Title `<project> · <map title>`; favicon; SSE + presence via shared transport; `j/k`, `w`, `g i/b/s` (back to last grill session if `?from=<id>`), `?` cheatsheet.\",\"Map screen (T24) links to the board: \\\"Open board →\\\".\"],\"humanGate\":false}\n```",
       "blockedBy": [
         32,
@@ -333,7 +333,7 @@
     {
       "id": 35,
       "subject": "Task 36: Board e2e and concurrency test",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Board render/Refresh/Work e2e; 5 sessions + 1 board on one hub with RSS budget.\n\n**Depends on:** T35\n\n**Verify:** `node --test skills/grilling-ui/test/concurrency.test.mjs` → pass; `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/board.e2e.mjs` → PASS.\n\nSee plan section \"Task 36\".\n\n```json:metadata\n{\"files\":[\"test/board.e2e.mjs\",\"test/concurrency.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/concurrency.test.mjs → pass; PLAYWRIGHT_PKG=… node skills/grilling-ui/test/board.e2e.mjs → PASS.\",\"acceptanceCriteria\":[\"E2E: map with 2 frontier, 1 blocked, 1 closed, fog, out-of-scope → columns correct; Refresh appends a `refresh` event; `w` on a frontier card → card in In progress \\\"queued\\\" → simulated agent `map-patch` with `handled` → \\\"claimed by <agentId>\\\"; second tab clicking the same ticket gets the conflict toast; listener text flips with heartbeat age; local path link is plain text.\",\"Concurrency (unit, no browser): 2 temp projects, 5 sessions (`new`), 1 map; 50 sends spread randomly with correct tokens in parallel → each `events.jsonl` has exactly its own sends with contiguous seqs; 8 SSE readers connected; `GET /admin/stats` `rss` < 80 MB.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         34
@@ -395,5 +395,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T18:16:57.450Z"
+  "lastUpdated": "2026-09-25T18:22:31.896Z"
 }

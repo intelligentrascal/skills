@@ -75,8 +75,8 @@ try {
   check("closed shows its gist", (await sec("closed").textContent()).includes("Spike on taxes") && (await sec("closed").textContent()).includes("Tax service handles it"));
   check("fog and out of scope", (await sec("fog").textContent()).includes("How refunds flow back") && (await sec("out").textContent()).includes("Mobile app checkout"));
   check("a javascript: link is plain text", await sec("out").locator("a").count() === 0 && (await sec("out").textContent()).includes("javascript:alert(1)"));
-  check("every anchor on the Map screen is http(s) or the board", (await page.locator("#map-screen a").evaluateAll((as) => as.map((a) => a.getAttribute("href")))).every((h) => /^https?:\/\//.test(h) || h === `/m/${MAP_KEY}/`));
-  check("\"Open board →\" links to /m/<mapKey>/", (await page.locator("#open-board").textContent()) === "Open board →" && (await page.locator("#open-board").getAttribute("href")) === `/m/${MAP_KEY}/`);
+  check("every anchor on the Map screen is http(s) or the board", (await page.locator("#map-screen a").evaluateAll((as) => as.map((a) => a.getAttribute("href")))).every((h) => /^https?:\/\//.test(h) || h === `/m/${MAP_KEY}/?from=${withMap.id}`));
+  check("\"Open board →\" links to /m/<mapKey>/", (await page.locator("#open-board").textContent()) === "Open board →" && (await page.locator("#open-board").getAttribute("href")) === `/m/${MAP_KEY}/?from=${withMap.id}`);
   check("phase label in the header", await page.locator("#phase").isVisible() && (await page.locator("#phase").textContent()) === "Frontier");
   check("finished banner names the map", (await page.locator("#banner").textContent()).includes("Wayfinder map") && await page.locator("#banner.done").count() === 1);
 
@@ -105,7 +105,7 @@ try {
   await page.locator("#map-back").click(); await page.locator("h1").click();
   await page.keyboard.press("g"); await page.keyboard.press("m");
   await page.waitForURL(/\/m\//, { timeout: 5000 }).catch(() => {});
-  check("g m goes to the board", new URL(page.url()).pathname === `/m/${MAP_KEY}/`, page.url());
+  check("g m goes to the board (with ?from=<session>)", new URL(page.url()).pathname === `/m/${MAP_KEY}/` && new URL(page.url()).searchParams.get("from") === withMap.id, page.url());
 
   // no-map
   await page.goto(noMap.url); await page.locator(".item").first().waitFor();

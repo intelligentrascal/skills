@@ -73,7 +73,8 @@
   const mapReady = () => !!(S && S.finished && S.finished.kind === "map" && S.map && typeof S.map === "object");
   const mapShown = () => mapReady() && local.mapView !== "questions";
   const MAP_KEY_RE = /^[a-z0-9-]+\/[a-z0-9-]+$/;
-  const boardUrl = () => (S && typeof S.mapKey === "string" && MAP_KEY_RE.test(S.mapKey) ? `/m/${S.mapKey}/` : null);
+  // ?from=<this session> lets the board's `g i/b/s` and "← Back to the grill" come back here (plan T34).
+  const boardUrl = () => (S && typeof S.mapKey === "string" && MAP_KEY_RE.test(S.mapKey) ? `/m/${S.mapKey}/${G.id ? "?from=" + encodeURIComponent(G.id) : ""}` : null);
   const timeOf = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
   const fmtMs = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`; };
   const baseName = (p) => String(p || "").replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "";
