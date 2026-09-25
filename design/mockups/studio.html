@@ -1,0 +1,1683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>grill · Studio</title>
+<link rel="stylesheet" href="../../skills/grilling-ui/page/tokens.css" />
+<link rel="stylesheet" href="theme-studio.css" />
+<style>
+  /* Studio — visual-first conversation (spec §7 Studio row). Theme: theme-studio.css, tokens only; no network. */
+  html, body { height: 100%; }
+  body { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100vh; height: 100dvh; overflow: hidden; }
+
+  /* ---------- header: material bar ---------- */
+  .top {
+    position: relative; z-index: var(--z-sticky);
+    display: flex; align-items: center; gap: var(--sp-3) var(--sp-4); flex-wrap: wrap;
+    min-height: 56px; padding: var(--sp-2) var(--sp-6);
+    background: var(--material);
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--hairline);
+    min-width: 0;
+  }
+  .top h1 { font-family: var(--font-ui); font-size: var(--t-body); font-weight: 600; letter-spacing: var(--track-ui); margin: 0; white-space: nowrap; }
+  .top .doc { padding: 2px 8px; border-radius: var(--r-chip); background: var(--paper-2); white-space: nowrap; }
+  /* segmented control */
+  .switch { display: inline-flex; padding: 2px; gap: 2px; border-radius: var(--r-pill); background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--hairline); }
+  .switch a {
+    padding: 2px 14px; border-radius: var(--r-pill);
+    font-size: var(--t-footnote); line-height: 20px; color: var(--ink-2); text-decoration: none;
+    transition: background-color var(--dur-hover) var(--ease-out), color var(--dur-hover) var(--ease-out);
+  }
+  @media (hover: hover) { .switch a:hover { color: var(--ink); text-decoration: none; } }
+  .switch a[aria-current] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--hairline-2); }
+  .top .spacer { flex: 1; }
+  /* switch: an Apple toggle, ink when on */
+  .toggle { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--t-footnote); color: var(--ink-2); padding: 4px 10px 4px 6px; }
+  .toggle .sw { width: 30px; height: 18px; border-radius: var(--r-pill); background: var(--hairline-2); position: relative; flex: none; transition: background-color var(--dur-hover) var(--ease-out); }
+  .toggle .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); box-shadow: 0 0 0 0.5px var(--hairline-2); transition: transform var(--dur-hover) var(--ease-out); }
+  .toggle[aria-pressed="true"] { border-color: transparent; background: transparent; color: var(--ink); }
+  .toggle[aria-pressed="true"] .sw { background: var(--pill); }
+  .toggle[aria-pressed="true"] .sw::after { transform: translateX(12px); }
+  .status { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--t-footnote); color: var(--ink-2); white-space: nowrap; }
+
+  /* ---------- studio grid ---------- */
+  .studio { display: grid; grid-template-columns: minmax(0, 3fr) minmax(380px, 2fr); min-height: 0; }
+
+  /* ---------- visual pane: the product on the paper ---------- */
+  .visual { display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-height: 0; min-width: 0; background: var(--paper); }
+  .vbar { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; padding: var(--sp-4) var(--sp-6) var(--sp-3); font-size: var(--t-footnote); color: var(--ink-3); min-width: 0; }
+  .vbar b { font-size: var(--t-body); color: var(--ink); font-weight: 600; }
+  .vbar .linked { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .vbar .linked .meta { font-size: var(--t-caption); margin-right: 2px; }
+  .qchip {
+    font-size: var(--t-caption); font-weight: 500; letter-spacing: 0; font-variant-numeric: tabular-nums;
+    padding: 0 10px; line-height: 22px; border-radius: var(--r-pill);
+    color: var(--ink-2); background: var(--surface); border: 1px solid var(--hairline);
+  }
+  @media (hover: hover) { .qchip:hover { color: var(--ink); background: var(--surface); border-color: var(--hairline-2); } }
+  .qchip.on { border-color: var(--butter); color: var(--butter-ink); background: var(--butter); }
+  .stale {
+    display: flex; align-items: center; gap: var(--sp-3); margin: 0 var(--sp-6) var(--sp-3);
+    padding: 8px 8px 8px 16px; background: var(--peach); border-radius: var(--r-tile);
+    font-size: var(--t-footnote); color: var(--peach-ink);
+  }
+  .stale .msgtxt { flex: 1; min-width: 0; }
+  .stale strong { font-weight: 600; }
+  .stale button { font-size: var(--t-caption); padding: 4px 14px; flex: none; border-color: transparent; background: var(--surface); color: var(--ink); font-weight: 600; }
+  .frame-wrap { padding: 0 var(--sp-6) var(--sp-6); min-height: 0; display: flex; }
+  #visual-frame {
+    flex: 1; width: 100%; min-height: 0;
+    border: 1px solid var(--hairline); border-radius: var(--r-sheet);
+    background: var(--surface); box-shadow: var(--shadow-product);
+  }
+
+  /* empty state: before the first draw */
+  .empty { overflow-y: auto; padding: var(--sp-12) var(--sp-10); min-height: 0; }
+  .empty .inner { max-width: 60ch; margin: 0 auto; }
+  .empty h2 { font-size: var(--t-title1); line-height: 1.08; letter-spacing: var(--track-display); margin: 0 0 var(--sp-3); }
+  .empty .lede { font-size: var(--t-lead); line-height: 1.5; color: var(--ink-2); margin: 0 0 var(--sp-8); }
+  .agreed { list-style: none; margin: 0 0 var(--sp-8); padding: 0; border-top: 1px solid var(--hairline); }
+  .agreed li { display: grid; grid-template-columns: 18px 36px minmax(0, 1fr); gap: var(--sp-2); padding: 10px 0; border-bottom: 1px solid var(--hairline); font-size: var(--t-body); line-height: 1.5; }
+  .agreed li::before { content: "\2713"; color: var(--mint-ink); font-weight: 700; font-size: var(--t-footnote); padding-top: 1px; }
+  .agreed .id { font-size: var(--t-caption); font-weight: 500; font-variant-numeric: tabular-nums; color: var(--ink-3); padding-top: 3px; }
+  .agreed .t { font-weight: 600; }
+  .agreed .arrow { color: var(--ink-3); margin: 0 var(--sp-1); }
+  .agreed .a { color: var(--ink-2); }
+  .cta { display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap; }
+  .cta button.primary { font-size: var(--t-body); padding: 10px 24px; }
+
+  /* ---------- rail ---------- */
+  .rail {
+    display: grid; grid-template-rows: auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 1fr); min-height: 0; min-width: 0;
+    background: var(--surface); border-left: 1px solid var(--hairline);
+  }
+  .rhead { padding: var(--sp-4) var(--sp-5) var(--sp-3); border-bottom: 1px solid var(--hairline); display: grid; gap: var(--sp-2); }
+  .rhead .row { display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; font-size: var(--t-footnote); color: var(--ink-2); }
+  .rhead h2 { font-size: 24px; letter-spacing: var(--track-display); margin: 0 var(--sp-2) 0 0; }
+  .needs a { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .jump { display: flex; gap: 2px; flex-wrap: wrap; align-items: center; }
+  .jump button {
+    font-size: var(--t-caption); font-variant-numeric: tabular-nums; padding: 0; width: 26px; height: 26px; text-align: center;
+    border-radius: 50%; color: var(--ink-2); border-color: transparent; background: transparent;
+  }
+  @media (hover: hover) { .jump button:hover { background: var(--paper-2); border-color: transparent; } }
+  .jump button.cur { color: var(--on-ink); background: var(--pill); font-weight: 600; }
+  .jump .lbl { font-size: var(--t-caption); color: var(--ink-3); margin-right: var(--sp-1); }
+
+  .timeline { overflow-y: auto; min-height: 0; scroll-padding-top: 44px; }
+  .round-h {
+    position: sticky; top: 0; z-index: var(--z-raised);
+    display: flex; justify-content: space-between; align-items: center; gap: var(--sp-2);
+    margin: 0; padding: var(--sp-2) var(--sp-5);
+    background: var(--material-hi);
+    -webkit-backdrop-filter: saturate(180%) blur(16px); backdrop-filter: saturate(180%) blur(16px);
+    border-bottom: 1px solid var(--hairline);
+    font-family: var(--font-ui); font-size: var(--t-footnote); font-weight: 600; letter-spacing: var(--track-ui); line-height: 22px; color: var(--ink-2);
+  }
+  .round-h span + span { font-weight: 500; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .round-h.current { color: var(--ink); }
+  .round-h .n-open { background: var(--butter); color: var(--butter-ink); font-weight: 600; font-size: var(--t-caption); padding: 0 8px; border-radius: var(--r-chip); line-height: 20px; }
+  .round-body { padding: var(--sp-2) var(--sp-5) var(--sp-4); display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+
+  /* collapsed one-line card (answered / deferred) */
+  .line {
+    display: grid; grid-template-columns: 16px 34px auto minmax(0, 1fr); gap: var(--sp-2); align-items: baseline;
+    padding: var(--sp-2); margin: 0 calc(-1 * var(--sp-2)); width: calc(100% + 2 * var(--sp-2));
+    border: 0; border-radius: var(--r-row); background: transparent; font-size: var(--t-sub); text-align: left;
+  }
+  @media (hover: hover) { .line:hover { background: var(--paper); border: 0; } }
+  .line:active { transform: none; background: var(--paper-2); }
+  .line .ic { font-size: var(--t-caption); font-weight: 700; color: var(--mint-ink); }
+  .line.deferred .ic { color: var(--ink-3); }
+  .line .id { font-size: var(--t-caption); font-weight: 500; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+  .line .t { font-weight: 600; white-space: nowrap; }
+  .line .a { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .line .a .arrow { color: var(--ink-3); margin-right: var(--sp-1); }
+  .line.staged .a { color: var(--peri-ink); }
+  .line.linked .id { text-decoration: underline dotted var(--ochre); text-underline-offset: 3px; }
+
+  /* full card */
+  .card {
+    border: 1px solid var(--hairline); border-radius: var(--r-card); background: var(--surface);
+    padding: var(--sp-4) var(--sp-5); margin: var(--sp-2) 0; scroll-margin-top: 48px;
+    transition: border-color var(--dur-hover) var(--ease-out);
+  }
+  @media (hover: hover) { .card:hover { border-color: var(--hairline-2); } }
+  .card.selected { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
+  .card.flash { border-color: var(--butter-ink); box-shadow: 0 0 0 4px var(--butter); }
+  .card .meta-row { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--t-caption); color: var(--ink-3); flex-wrap: wrap; }
+  .card .meta-row .id { font-weight: 500; font-variant-numeric: tabular-nums; }
+  .invis { margin-left: auto; font-size: 11px; font-weight: 500; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; line-height: 20px; border-radius: var(--r-pill); border: 1px solid var(--hairline); }
+  .card:hover .invis, .card.selected .invis { color: var(--butter-ink); background: var(--butter-wash); border-color: var(--butter); }
+  .card h3 { font-size: var(--t-title3); line-height: 1.25; margin: var(--sp-2) 0 var(--sp-1); }
+  .card .body { font-size: var(--t-sub); color: var(--ink-2); margin: 0 0 var(--sp-3); }
+  .was { font-size: var(--t-footnote); color: var(--ink-2); margin: 0 0 var(--sp-3); }
+  .was b { color: var(--ink); font-weight: 600; }
+  .opts { display: grid; gap: 6px; margin: 0 0 var(--sp-3); }
+  .card .opt { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: var(--sp-3); align-items: start; font-size: var(--t-sub); line-height: 1.45; padding: var(--sp-2) var(--sp-3); }
+  .card .opt > span:last-child { padding-top: 1px; }
+  .card .opt .tag { font-size: var(--t-caption); font-weight: 600; color: var(--peri-ink); margin-left: var(--sp-2); white-space: nowrap; }
+  .card .opt.rec { border: 1px dashed var(--peri-ink); background: var(--peri-wash); }
+  .card .opt.rec .k { border-style: dashed; border-color: var(--peri-ink); color: var(--peri-ink); }
+  .card .opt.chosen { border-color: var(--mint-ink); background: var(--mint); }
+  .card .opt.chosen .k { background: var(--mint-ink); border-color: var(--mint-ink); color: var(--surface); }
+  /* .was-chosen: the "Was:" line above carries it; the option keeps its rec/staged look */
+  .card .opt.staged { border: 1px solid var(--peri-ink); background: var(--peri); }
+  .card .opt.staged .k { background: var(--peri-ink); border: 1px solid var(--peri-ink); color: var(--surface); }
+  .why { font-size: var(--t-footnote); color: var(--ink-2); margin: 0 0 var(--sp-3); }
+  .why b { color: var(--ink); font-weight: 600; }
+  .staged-text { font-size: var(--t-sub); padding: 10px 14px; border-radius: var(--r-tile); margin: 0 0 var(--sp-3); background: var(--peri); color: var(--ink); }
+  .staged-text .lbl { font-size: var(--t-caption); color: var(--peri-ink); font-weight: 600; display: block; margin-bottom: 2px; }
+  .acts { display: flex; gap: var(--sp-1); flex-wrap: wrap; align-items: center; }
+  .acts button { font-size: var(--t-footnote); padding: 4px 12px; }
+  .acts button[data-act="accept"] { border-color: var(--ink); font-weight: 600; }
+  .acts button[data-act="accept"].staged { border-color: var(--peri-ink); color: var(--peri-ink); }
+  .acts .sep { flex: 1; }
+
+  /* thread and visual feedback: message bubbles in the stream */
+  .msg {
+    display: block; justify-self: start; max-width: 92%; text-align: left;
+    font-size: var(--t-sub); line-height: 1.45; color: var(--ink);
+    padding: var(--sp-2) var(--sp-3); margin: 3px 0 3px var(--sp-4);
+    border: 1px solid transparent; border-radius: 16px 16px 16px 6px; background: var(--paper-2);
+  }
+  @media (hover: hover) { .msg:hover { background: var(--stone); border-color: transparent; } }
+  .msg:active { transform: none; }
+  .msg.user { justify-self: end; margin: 3px 0 3px var(--sp-10); border-radius: 16px 16px 6px 16px; background: var(--surface); border-color: var(--hairline-2); }
+  @media (hover: hover) { .msg.user:hover { background: var(--paper); border-color: var(--hairline-2); } }
+  .msg .who { display: block; font-size: 11px; font-weight: 600; color: var(--ink-3); margin-bottom: 1px; }
+  .msg .who .q { font-variant-numeric: tabular-nums; }
+  .msg .who .w { color: var(--ink-2); }
+  .msg.vis { background: var(--butter-wash); border-color: var(--butter); }
+  @media (hover: hover) { .msg.vis:hover { background: var(--butter); border-color: var(--butter); } }
+  .msg.vis .who .v { color: var(--butter-ink); }
+  .msg.staged { background: var(--peri); border: 1px dashed var(--peri-ink); }
+  @media (hover: hover) { .msg.staged:hover { background: var(--peri); border: 1px dashed var(--peri-ink); } }
+  .msg.staged .who, .msg.staged .who .w { color: var(--peri-ink); }
+  .msg .t { color: var(--ink); }
+
+  /* ---------- composer ---------- */
+  .composer { border-top: 1px solid var(--hairline); padding: var(--sp-3) var(--sp-5) var(--sp-4); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); background: var(--surface); }
+  .cbox { border: 1px solid var(--hairline-2); border-radius: var(--r-card); background: var(--surface); transition: border-color var(--dur-hover) var(--ease-out); }
+  .cbox:focus-within { transition: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-wash); }
+  .cbox .row1 { display: flex; align-items: center; gap: var(--sp-2); padding: 8px 10px 0; }
+  #chip {
+    display: inline-flex; align-items: center; gap: 6px; flex: none;
+    font-size: var(--t-caption); font-weight: 600; letter-spacing: 0; padding: 0 10px; line-height: 22px; border-radius: var(--r-pill);
+    background: var(--stone); border: 1px solid transparent; color: var(--stone-ink); white-space: nowrap;
+  }
+  #chip .cyc { font-weight: 400; opacity: .8; }
+  #chip.m-answer { background: var(--mint); color: var(--mint-ink); }
+  #chip.m-visual { background: var(--butter); color: var(--butter-ink); }
+  @media (hover: hover) { #chip:hover { border-color: currentColor; } }
+  .cbox .hint { font-size: var(--t-caption); color: var(--ink-3); margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #composer-in { border: 0; background: transparent; min-height: 48px; max-height: 160px; resize: none; padding: 6px 12px 12px; display: block; box-shadow: none; }
+  #composer-in:focus, #composer-in:focus-visible { outline: none; box-shadow: none; }
+  .sendrow { display: flex; align-items: center; gap: var(--sp-2); }
+  .sendrow .staged-list { flex: 1; min-width: 0; font-size: var(--t-footnote); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sendrow .staged-list b { color: var(--peri-ink); font-weight: 600; }
+  .sendrow button { font-size: var(--t-sub); padding: 8px 16px; white-space: nowrap; }
+  .sendrow button.primary { padding: 8px 20px; }
+
+  .toast { bottom: var(--sp-6); }
+
+  /* ---------- < 760 px: visual above rail, page scrolls ---------- */
+  @media (max-width: 759px) {
+    html, body { height: auto; }
+    body { display: block; height: auto; overflow: visible; }
+    .top { gap: var(--sp-2) var(--sp-3); padding: var(--sp-2) var(--sp-4); }
+    .top .doc { display: none; }
+    .top .spacer { display: none; }
+    .status { order: 5; }
+    .studio { display: block; }
+    section.visual { height: 60vh; }
+    .vbar { padding: var(--sp-3) var(--sp-4) var(--sp-2); }
+    .vbar .linked { margin-left: 0; }
+    .stale { margin: 0 var(--sp-4) var(--sp-2); }
+    .frame-wrap { padding: 0 var(--sp-4) var(--sp-4); }
+    #visual-frame { border-radius: var(--r-card); }
+    .empty { padding: var(--sp-6) var(--sp-4); }
+    .empty h2 { font-size: 30px; }
+    .empty .lede { font-size: var(--t-callout); }
+    .rail { display: block; border-left: 0; border-top: 1px solid var(--hairline); }
+    .rhead { padding: var(--sp-4); }
+    .timeline { overflow: visible; }
+    .round-body { padding: var(--sp-2) var(--sp-4) var(--sp-4); }
+    .round-h { padding: var(--sp-2) var(--sp-4); }
+    .line { grid-template-columns: 16px 32px minmax(0, 1fr); }
+    .line .a { grid-column: 3; }
+    .line .t { white-space: normal; }
+    .card { padding: var(--sp-4); }
+    .card, .line, .msg { scroll-margin-bottom: 180px; scroll-margin-top: 48px; }
+    .composer { position: sticky; bottom: 0; z-index: var(--z-sticky); padding: var(--sp-2) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom)); background: var(--material-hi); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); }
+    .cbox .hint { display: none; }
+    .toast { bottom: 150px; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>grill-with-ui skill</h1>
+  <span class="doc path" id="doc-path"></span>
+  <nav class="switch" aria-label="Layout">
+    <a href="inbox.html">Inbox</a><a href="brief.html">Brief</a><a href="studio.html" aria-current="page">Studio</a>
+  </nav>
+  <span class="spacer"></span>
+  <button type="button" class="toggle ghost" id="first-draw" aria-pressed="false" title="Preview the state before any visual has been drawn"><span class="sw" aria-hidden="true"></span>Before first draw</button>
+  <span class="status" role="status"><span class="dot" id="agent-dot"></span><span id="agent-status"></span></span>
+  <button type="button" id="finish">Finish</button>
+</header>
+
+<div class="studio">
+  <section class="visual" id="visual" aria-label="Visual"></section>
+
+  <section class="rail" aria-label="Conversation">
+    <div class="rhead" id="rhead"></div>
+    <div class="timeline" id="timeline"></div>
+    <div class="composer">
+      <div class="cbox">
+        <div class="row1">
+          <button type="button" id="chip" title="Change where this message goes (click to cycle)"></button>
+          <span class="hint">↵ stage · ⇧↵ newline · ⌘↵ send all</span>
+        </div>
+        <label for="composer-in" class="sr">Message</label>
+        <textarea id="composer-in" rows="2"></textarea>
+      </div>
+      <div class="sendrow">
+        <span class="staged-list" id="staged-list"></span>
+        <button type="button" id="stage-btn">Stage</button>
+        <button type="button" class="primary" id="send" disabled>Send to agent</button>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+// Mockup data for design/mockups (spec §9.1). Inlined into each *.template.html by build.mjs.
+// SESSION is in the real state.json shape (spec §4; Jason's schema, grill-with-ui SKILL.md:392-417):
+// questions is an ARRAY; rounds are derived from question.round.
+// Rounds 1–8 are Jason Ku's real grill-with-ui design session of 2026-09-06 (commit daafa1e,
+// design/mockups/data.js), text unchanged. Round 9 (q18–q25) is synthetic: 7 open + q23 deferred;
+// q15 and q16 were answered, then reopened (see their threads); the visual (v3) is stale.
+// VISUAL_HTML is the v3 prototype: regions carry data-q and it ends with the verbatim
+// grilling-ui linkage listener (plan Task 20). "<\/script>" keeps it safe when inlined in <script>.
+const SESSION = {
+  "topic": "grill-with-ui skill",
+  "doc": "docs/design.md",
+  "project": "~/Projects/grill-with-ui",
+  "created": "2026-09-06T21:00:00Z",
+  "agent": {
+    "status": "waiting",
+    "since": "2026-09-06T22:46:00Z",
+    "handled": 9
+  },
+  "note": "Round 9 is open. Q15 and Q16 were reopened by later answers; Q23 is deferred.",
+  "visual": {
+    "kind": "prototype",
+    "version": 3,
+    "at": "2026-09-06T22:31:00Z",
+    "stale": true,
+    "note": "v3: Inbox layout with the doc path in the send bar per Q9; stale since Q15 was reopened",
+    "thread": [
+      {
+        "who": "user",
+        "text": "Put the doc path next to Finish so I can see where it will write.",
+        "at": "2026-09-06T22:26:00Z"
+      },
+      {
+        "who": "agent",
+        "text": "Done in v3: the send bar shows → docs/design.md and the section order from Q16.",
+        "at": "2026-09-06T22:31:00Z"
+      }
+    ]
+  },
+  "terms": [
+    {
+      "term": "Round",
+      "def": "One agent turn's worth of new questions: the current frontier.",
+      "avoid": [
+        "batch",
+        "wave"
+      ]
+    },
+    {
+      "term": "Frontier",
+      "def": "Questions whose prerequisites are all settled and can be asked now.",
+      "avoid": [
+        "queue",
+        "next up"
+      ]
+    },
+    {
+      "term": "Send",
+      "def": "One press of Send to Agent: every staged action shipped as a single event.",
+      "avoid": [
+        "submit",
+        "reply"
+      ]
+    },
+    {
+      "term": "Durable decision",
+      "def": "Hard to reverse, surprising without context, a real trade-off. Goes under Locked decisions.",
+      "avoid": [
+        "ADR",
+        "big decision"
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "round": 1,
+      "deps": [],
+      "title": "UI surface",
+      "body": "What is the UI surface, and how does it talk to the running session? This is the root decision; state format, threads and resume all hang off it.",
+      "options": [
+        {
+          "k": "A",
+          "text": "Local browser app. A tiny bundled server serves a page and reads/writes one state file per session. Terminal stays a parallel input."
+        },
+        {
+          "k": "B",
+          "text": "Read-only side panel. Claude re-renders an HTML summary each turn; you still answer in the terminal by number."
+        },
+        {
+          "k": "C",
+          "text": "MCP app panel. Only if Claude Code renders it. Heavier to build and install."
+        },
+        {
+          "k": "D",
+          "text": "Terminal TUI. Doesn't solve scrollback. Listed to rule out."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Works in any terminal today, nothing to install, and the file protocol is agent-neutral so a Codex version is packaging, not a rewrite."
+      },
+      "status": "answered",
+      "durable": true,
+      "updated": false,
+      "answer": {
+        "kind": "accept",
+        "option": "A",
+        "text": "A is exactly what I was thinking"
+      },
+      "thread": []
+    },
+    {
+      "id": "q2",
+      "round": 2,
+      "deps": [
+        "q1"
+      ],
+      "title": "Transport",
+      "body": "How does a browser answer reach the running Claude session? Docs check: Monitor wakes an idle session; a background shell exiting does not; Channels need a launch flag.",
+      "options": [
+        {
+          "k": "A",
+          "text": "Persistent Monitor on the server's WebSocket. Every browser action is one event and one Claude turn."
+        },
+        {
+          "k": "B",
+          "text": "Claude Code Channels. Officially blessed, but needs a startup flag and a plugin."
+        },
+        {
+          "k": "C",
+          "text": "Manual nudge: answer in the browser, type 'go' in the terminal."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "No startup flags, works from inside the skill. Live test fired while idle: verified."
+      },
+      "status": "answered",
+      "durable": true,
+      "updated": false,
+      "answer": {
+        "kind": "text",
+        "text": "Simpler: the web app writes to a local JSON and the agent has a file-change watcher on it."
+      },
+      "thread": [
+        {
+          "who": "agent",
+          "text": "Yes, and simpler than what I proposed. Refinement: two files, not one. state.json written only by the agent; events.jsonl appended only by the web app, watched with plain tail -F.",
+          "at": "2026-09-06T21:11:00Z"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "round": 3,
+      "deps": [
+        "q2"
+      ],
+      "title": "Questions per turn",
+      "body": "When Claude replies to a batch, how many new questions does it post on top of the thread replies?",
+      "options": [
+        {
+          "k": "A",
+          "text": "Exactly one new primary question per turn. Keeps 'resolve dependencies one by one'."
+        },
+        {
+          "k": "B",
+          "text": "Up to a few new questions when they're independent. Fewer round trips; recommendations can go stale."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "You already batch on your side; keeping Claude to one at a time is what makes recommendations trustworthy."
+      },
+      "status": "answered",
+      "durable": false,
+      "updated": false,
+      "answer": {
+        "kind": "option",
+        "option": "B",
+        "text": ""
+      },
+      "thread": []
+    },
+    {
+      "id": "q4",
+      "round": 3,
+      "deps": [
+        "q1"
+      ],
+      "title": "Thread context",
+      "body": "What does 'chat more about a question without losing context' mean mechanically?",
+      "options": [
+        {
+          "k": "A",
+          "text": "One Claude session; threads are labeled messages. Nothing is separate under the hood."
+        },
+        {
+          "k": "B",
+          "text": "A subagent per thread, seeded with a summary. Isolation, but loses exactly the context you want."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "The thing you're missing is navigation, not isolation. The page provides that."
+      },
+      "status": "answered",
+      "durable": true,
+      "updated": false,
+      "answer": {
+        "kind": "accept",
+        "option": "A"
+      },
+      "thread": []
+    },
+    {
+      "id": "q5",
+      "round": 4,
+      "deps": [
+        "q4"
+      ],
+      "title": "Question card shape",
+      "body": "What does a question look like on the page, and how do you answer it? This fixes the state schema.",
+      "options": [
+        {
+          "k": "A",
+          "text": "Structured card: title, body, lettered options, a recommendation pointing at one, a rationale. Answer by option, Accept, or free text. Thread box separate."
+        },
+        {
+          "k": "B",
+          "text": "Free text everywhere. Simpler schema, no one-click accept."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Grilling already produces lettered options and a named recommendation, so structure costs nothing."
+      },
+      "status": "answered",
+      "durable": false,
+      "updated": false,
+      "answer": {
+        "kind": "accept",
+        "option": "A"
+      },
+      "thread": []
+    },
+    {
+      "id": "q6",
+      "round": 4,
+      "deps": [
+        "q1"
+      ],
+      "title": "Terminal role",
+      "body": "What does the terminal do while a grill runs in the page?",
+      "options": [
+        {
+          "k": "A",
+          "text": "One-line status per turn, plus the URL. Terminal typing still works and is recorded into state."
+        },
+        {
+          "k": "B",
+          "text": "Terminal goes silent. Launch only."
+        },
+        {
+          "k": "C",
+          "text": "Terminal mirrors the full text. Defeats the purpose."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Same scrollback cost as silence, and it gives you the 'Claude is waiting' signal where you're already looking."
+      },
+      "status": "answered",
+      "durable": false,
+      "updated": false,
+      "answer": {
+        "kind": "accept",
+        "option": "A"
+      },
+      "thread": []
+    },
+    {
+      "id": "q7",
+      "round": 4,
+      "deps": [
+        "q2"
+      ],
+      "title": "Server lifecycle",
+      "body": "Who starts and stops the local server, and how do we guarantee it dies? Orphaned processes have bitten this machine before.",
+      "options": [
+        {
+          "k": "A",
+          "text": "The server is the monitor. It lives exactly as long as the monitor: killed at session end or on Finish. Nothing to orphan."
+        },
+        {
+          "k": "B",
+          "text": "Server in the background, separate tail watcher. Needs its own shutdown story; every option is a way to leak."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Same file-based design, with writer and watcher collapsed into one process the harness already manages."
+      },
+      "status": "answered",
+      "durable": true,
+      "updated": false,
+      "answer": {
+        "kind": "accept",
+        "option": "A"
+      },
+      "thread": []
+    },
+    {
+      "id": "q8",
+      "round": 5,
+      "deps": [
+        "q5"
+      ],
+      "title": "Finish + deliverable",
+      "body": "How does a grill end, and what's the deliverable? Past grills all ended as design docs.",
+      "options": [
+        {
+          "k": "A",
+          "text": "Explicit Finish button; Claude writes a markdown decisions doc from state. Doc path asked once at start."
+        },
+        {
+          "k": "B",
+          "text": "No explicit end; the state file is the record."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Writing from a structured state file is more faithful than writing from a long transcript."
+      },
+      "status": "answered",
+      "durable": false,
+      "updated": false,
+      "answer": {
+        "kind": "accept",
+        "option": "A"
+      },
+      "thread": [
+        {
+          "who": "user",
+          "text": "Can you also look up Matt Pocock's grill-with-docs skill to see what we can borrow for the docs part, and compare it to the docs we already generate?",
+          "at": "2026-09-06T21:39:00Z"
+        },
+        {
+          "who": "agent",
+          "text": "Fetched it. It's one line: run grilling + domain-modeling. The docs part writes a repo-wide CONTEXT.md glossary and sparse ADRs gated on hard-to-reverse, surprising, real trade-off. Your docs are the opposite shape: one exhaustive topic doc builders consume as the spec. Turned into Q9.",
+          "at": "2026-09-06T21:41:00Z"
+        }
+      ]
+    },
+    {
+      "id": "q9",
+      "round": 5,
+      "deps": [
+        "q8"
+      ],
+      "title": "What Finish writes",
+      "body": "Your exhaustive topic doc, Matt's sparse ADRs and glossary, or both?",
+      "options": [
+        {
+          "k": "A",
+          "text": "Your design doc, with two borrows: a per-decision durable flag (Locked vs Routine sections) and a Terms section with Avoid lists."
+        },
+        {
+          "k": "B",
+          "text": "Your design doc plus ADRs in docs/adr and a root CONTEXT.md. Two places to keep in sync."
+        },
+        {
+          "k": "C",
+          "text": "Matt's files only. Rejected: builders need the exhaustive doc."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "The durable flag and the terms section fix two real problems; repo-wide files can be an opt-in flag later."
+      },
+      "status": "answered",
+      "durable": true,
+      "updated": false,
+      "answer": {
+        "kind": "accept",
+        "option": "A"
+      },
+      "thread": []
+    },
+    {
+      "id": "q10",
+      "round": 6,
+      "deps": [
+        "q7"
+      ],
+      "title": "State location + resume",
+      "body": "Where does session state live, and how does resume work? Several worktrees per project here.",
+      "options": [
+        {
+          "k": "A",
+          "text": "Per-session folder under home, keyed by git common root (working directory when not in git). Resume lists unfinished sessions for the project."
+        },
+        {
+          "k": "B",
+          "text": "Inside the repo, gitignored. Lives in one worktree; ws reset wipes it."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Worktree independence decides it here; for adopters it also means zero repo changes."
+      },
+      "status": "answered",
+      "durable": true,
+      "updated": false,
+      "answer": {
+        "kind": "accept",
+        "option": "A"
+      },
+      "thread": [
+        {
+          "who": "user",
+          "text": "Hm, what would be easier for other people to adopt?",
+          "at": "2026-09-06T21:52:00Z"
+        },
+        {
+          "who": "agent",
+          "text": "Outside the repo, by a wider margin: zero repo changes, one mental model, works outside git, resume is discoverable anyway. Only loss: sessions don't travel with a clone, which is a non-goal.",
+          "at": "2026-09-06T21:54:00Z"
+        }
+      ]
+    },
+    {
+      "id": "q11",
+      "round": 6,
+      "deps": [
+        "q10"
+      ],
+      "title": "Stack",
+      "body": "What is the server and page built with? Must run the moment the skill is installed.",
+      "options": [
+        {
+          "k": "A",
+          "text": "Plain Node, no dependencies, no build step. One server script, one self-contained HTML page."
+        },
+        {
+          "k": "B",
+          "text": "Bun. Nicer API, not on most machines."
+        },
+        {
+          "k": "C",
+          "text": "React with a build step."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Claude Code requires Node, so every adopter has it. Polish comes from CSS, not the framework."
+      },
+      "status": "answered",
+      "durable": false,
+      "updated": false,
+      "answer": {
+        "kind": "accept",
+        "option": "A"
+      },
+      "thread": []
+    },
+    {
+      "id": "q12",
+      "round": 7,
+      "deps": [
+        "q9"
+      ],
+      "title": "Relation to grilling skills",
+      "body": "How does grill-with-ui relate to the grilling and grill-me skills you already have?",
+      "options": [
+        {
+          "k": "A",
+          "text": "Self-contained new skill with its own interview prompt (frontier-per-round) plus the page protocol. Developed in its own repo, symlinked in."
+        },
+        {
+          "k": "B",
+          "text": "Composition, Matt-style: invoke grilling plus a protocol skill. Two skills fighting over output format."
+        },
+        {
+          "k": "C",
+          "text": "A flag on grill-me."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "One folder, one prompt, nothing to depend on. Publishable later without extraction."
+      },
+      "status": "answered",
+      "durable": false,
+      "updated": false,
+      "answer": {
+        "kind": "accept",
+        "option": "A"
+      },
+      "thread": []
+    },
+    {
+      "id": "q13",
+      "round": 7,
+      "deps": [
+        "q11"
+      ],
+      "title": "Agent neutrality",
+      "body": "Claude Code only, or agent-neutral from the start? Codex has no Monitor; Bedrock/Vertex Claude Code lacks it too.",
+      "options": [
+        {
+          "k": "A",
+          "text": "Add a blocking wait mode to the server now: blocks in the foreground until the next Send, prints it, exits. About twenty lines."
+        },
+        {
+          "k": "B",
+          "text": "Claude Code only for v1."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Cheap, also the fallback for Claude Code without Monitor, keeps the no-lock-in promise."
+      },
+      "status": "answered",
+      "durable": false,
+      "updated": false,
+      "answer": {
+        "kind": "accept",
+        "option": "A"
+      },
+      "thread": []
+    },
+    {
+      "id": "q14",
+      "round": 7,
+      "deps": [
+        "q13"
+      ],
+      "title": "Build order",
+      "body": "What gets built first? One assumption is unverified: the harness labels monitor events 'not user input'; the skill prompt says Send events are your answers.",
+      "options": [
+        {
+          "k": "A",
+          "text": "Spike the wake-up path first: minimal server, one-textarea page, stub prompt with only the event rule. One real round."
+        },
+        {
+          "k": "B",
+          "text": "Build everything, then test end to end."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "The only piece that can't be reasoned out from what we already know."
+      },
+      "status": "answered",
+      "durable": false,
+      "updated": false,
+      "answer": {
+        "kind": "accept",
+        "option": "A"
+      },
+      "thread": []
+    },
+    {
+      "id": "q15",
+      "round": 8,
+      "deps": [
+        "q11"
+      ],
+      "title": "Page visual direction",
+      "body": "Three mockups are on the table. Which layout carries forward into the spike page?",
+      "options": [
+        {
+          "k": "A",
+          "text": "Inbox: question list on the left, one detail card on the right, sticky send bar."
+        },
+        {
+          "k": "B",
+          "text": "Scroll: single column of cards grouped by round, outline rail for jumping."
+        },
+        {
+          "k": "C",
+          "text": "Tree + focus: dependency tree on the left, one focused card, thread drawer."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Best fit for 'go back to an earlier question' and it keeps the current question in view while you read history."
+      },
+      "status": "reopened",
+      "durable": false,
+      "updated": false,
+      "answer": {
+        "kind": "accept",
+        "option": "A"
+      },
+      "thread": [
+        {
+          "who": "agent",
+          "text": "Reopened: Q19 puts the visual in a sandboxed iframe that needs real width, and the Inbox has no room for it beside the card. The layout choice should be made against the three mockups with the visual in place, not before it existed.",
+          "at": "2026-09-06T22:44:00Z"
+        }
+      ]
+    },
+    {
+      "id": "q16",
+      "round": 8,
+      "deps": [
+        "q9"
+      ],
+      "title": "Doc template sections",
+      "body": "Section order for the generated design doc: Terms, Why, Locked decisions, Routine choices, Deferred, Follow-ups?",
+      "options": [
+        {
+          "k": "A",
+          "text": "That order, with the header carrying the locked-decision count and the date."
+        },
+        {
+          "k": "B",
+          "text": "Decisions first, Terms at the end as an appendix."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Terms first is what makes cold re-entry work; the header count is your existing convention."
+      },
+      "status": "reopened",
+      "durable": false,
+      "updated": true,
+      "answer": {
+        "kind": "accept",
+        "option": "A"
+      },
+      "thread": [
+        {
+          "who": "agent",
+          "text": "Reopened: Q24 lets Finish run with open questions, so the doc needs somewhere to list them. The accepted order has Deferred but no Open threads section. Proposed: add Open threads after Deferred, and a Verified facts section before Risks.",
+          "at": "2026-09-06T22:45:00Z"
+        }
+      ]
+    },
+    {
+      "id": "q17",
+      "round": 8,
+      "deps": [
+        "q15"
+      ],
+      "title": "Keyboard shortcuts",
+      "body": "j/k to move between questions, a/b/c to pick an option, enter to stage, cmd+enter to send?",
+      "options": [
+        {
+          "k": "A",
+          "text": "Yes, all of them, shown in a footer hint."
+        },
+        {
+          "k": "B",
+          "text": "Defer to after the spike."
+        }
+      ],
+      "rec": {
+        "option": "B",
+        "why": "Zero cost to add later; not on the critical path."
+      },
+      "status": "deferred",
+      "durable": false,
+      "updated": false,
+      "answer": null,
+      "thread": []
+    },
+    {
+      "id": "q18",
+      "round": 9,
+      "deps": [
+        "q9"
+      ],
+      "title": "Where does Finish save the visual?",
+      "body": "The visual lives in the session folder while the grill runs. When Finish writes the design doc, where does the final visual go?",
+      "options": [
+        {
+          "k": "A",
+          "text": "Copy it next to the doc as docs/<slug>-visual.html and link it from the doc header."
+        },
+        {
+          "k": "B",
+          "text": "Leave it in the session folder and link the absolute path."
+        },
+        {
+          "k": "C",
+          "text": "Inline a screenshot into the doc; drop the HTML."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "It travels with the doc in the repo and still opens offline. Costs one more file per design in docs/."
+      },
+      "status": "open",
+      "durable": false,
+      "updated": false,
+      "answer": null,
+      "thread": []
+    },
+    {
+      "id": "q19",
+      "round": 9,
+      "deps": [
+        "q15"
+      ],
+      "title": "Should the visual run sandboxed?",
+      "body": "The visual is agent-written HTML with scripts. How is it embedded in the page?",
+      "options": [
+        {
+          "k": "A",
+          "text": "iframe with sandbox=\"allow-scripts\" and no same-origin; talk to it only through postMessage."
+        },
+        {
+          "k": "B",
+          "text": "Same-origin iframe so the page can reach into its DOM for highlighting."
+        },
+        {
+          "k": "C",
+          "text": "Render it as a static screenshot; no scripts at all."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Agent-written scripts never touch the session token or state. Costs a small verbatim listener in every visual for highlighting and ⌘↵."
+      },
+      "status": "open",
+      "durable": false,
+      "updated": false,
+      "answer": null,
+      "thread": []
+    },
+    {
+      "id": "q20",
+      "round": 9,
+      "deps": [
+        "q19"
+      ],
+      "title": "When does a stale visual get redrawn?",
+      "body": "Ordinary decisions can make the visual out of date. Who triggers the redraw?",
+      "options": [
+        {
+          "k": "A",
+          "text": "Only the user, via Visualize. The page marks the visual stale until then."
+        },
+        {
+          "k": "B",
+          "text": "The agent redraws after every round that touches a drawn region."
+        },
+        {
+          "k": "C",
+          "text": "Redraw on a timer when stale for more than five minutes."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Draws are slow and burn a subagent each; a stale badge is cheap. The cost is that the user has to notice the badge."
+      },
+      "status": "open",
+      "durable": false,
+      "updated": false,
+      "answer": null,
+      "thread": []
+    },
+    {
+      "id": "q21",
+      "round": 9,
+      "deps": [
+        "q2"
+      ],
+      "title": "What if the agent looks stuck?",
+      "body": "Send is disabled while the agent works. If the agent never patches back, how does the user recover?",
+      "options": [
+        {
+          "k": "A",
+          "text": "Re-enable Send after 5 minutes with a 'still working?' note; staged work is kept."
+        },
+        {
+          "k": "B",
+          "text": "Keep Send disabled until the agent answers, however long."
+        },
+        {
+          "k": "C",
+          "text": "Show a Cancel button that writes a cancel event."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Nothing is lost and a genuinely slow agent just sees one extra send. Costs a possible duplicate turn if the agent was only slow."
+      },
+      "status": "open",
+      "durable": false,
+      "updated": false,
+      "answer": null,
+      "thread": []
+    },
+    {
+      "id": "q22",
+      "round": 9,
+      "deps": [
+        "q5"
+      ],
+      "title": "Should staged work survive a reload?",
+      "body": "A half-staged round is lost if the tab reloads or the hub restarts. Keep it?",
+      "options": [
+        {
+          "k": "A",
+          "text": "Stage into localStorage keyed by session id; clear on a successful send."
+        },
+        {
+          "k": "B",
+          "text": "Stage on the hub so any tab or device sees it."
+        },
+        {
+          "k": "C",
+          "text": "No persistence; reloading drops staged picks."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Survives reloads and layout switches with no server change. Staging does not follow you to another browser."
+      },
+      "status": "open",
+      "durable": false,
+      "updated": false,
+      "answer": null,
+      "thread": []
+    },
+    {
+      "id": "q23",
+      "round": 9,
+      "deps": [
+        "q4"
+      ],
+      "title": "Should threads accept file attachments?",
+      "body": "Users sometimes want to drop a screenshot or log into a thread message.",
+      "options": [
+        {
+          "k": "A",
+          "text": "Yes: store attachments in the session folder and pass paths to the agent."
+        },
+        {
+          "k": "B",
+          "text": "No for v1: paste text only."
+        }
+      ],
+      "rec": {
+        "option": "B",
+        "why": "Paths cover most cases and attachments need upload, size limits and cleanup. The cost is copying logs by hand."
+      },
+      "status": "deferred",
+      "durable": false,
+      "updated": false,
+      "answer": null,
+      "thread": []
+    },
+    {
+      "id": "q24",
+      "round": 9,
+      "deps": [
+        "q8"
+      ],
+      "title": "Can Finish run with open questions?",
+      "body": "The user presses Finish while some questions are still open or reopened.",
+      "options": [
+        {
+          "k": "A",
+          "text": "Allow it after a confirm; list the open ones under Open threads in the doc."
+        },
+        {
+          "k": "B",
+          "text": "Block Finish until every question is answered or deferred."
+        },
+        {
+          "k": "C",
+          "text": "Auto-defer every open question, then finish."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "The user decides when enough is enough, and nothing silently disappears. Costs a doc that may ship with loose ends."
+      },
+      "status": "open",
+      "durable": false,
+      "updated": false,
+      "answer": null,
+      "thread": []
+    },
+    {
+      "id": "q25",
+      "round": 9,
+      "deps": [
+        "q5"
+      ],
+      "title": "Who may reopen an answered question?",
+      "body": "Reopening sends a settled decision back to the frontier and can invalidate downstream answers.",
+      "options": [
+        {
+          "k": "A",
+          "text": "Both: the user from the page, the agent when a later answer conflicts, always with a thread note."
+        },
+        {
+          "k": "B",
+          "text": "Only the user."
+        },
+        {
+          "k": "C",
+          "text": "Only the agent."
+        },
+        {
+          "k": "D",
+          "text": "Nobody; ask a new question instead."
+        }
+      ],
+      "rec": {
+        "option": "A",
+        "why": "Conflicts found by the agent surface where the decision lives, not in the terminal. Costs some churn when the agent reopens too eagerly."
+      },
+      "status": "open",
+      "durable": false,
+      "updated": false,
+      "answer": null,
+      "thread": []
+    }
+  ]
+};
+
+const VISUAL_HTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>grill-with-ui v3</title>
+<style>
+  body { margin: 0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; color: #1f1c18; background: #f7f4ee; }
+  .chrome { display: flex; gap: 8px; align-items: center; padding: 6px 10px; background: #e6e0d4; font-size: 12px; color: #625b51; }
+  .url { flex: 1; background: #fff; border-radius: 4px; padding: 2px 8px; font-family: ui-monospace, Menlo, monospace; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #e6e0d4; background: #fff; }
+  header h1 { font: 600 16px/1.2 "Iowan Old Style", Charter, Georgia, serif; margin: 0; }
+  .chip { font-size: 12px; padding: 1px 8px; border: 1px solid #e6e0d4; border-radius: 99px; color: #625b51; }
+  .app { display: grid; grid-template-columns: 180px 1fr; min-height: 260px; }
+  nav { border-right: 1px solid #e6e0d4; padding: 10px; font-size: 13px; }
+  nav div { padding: 3px 6px; border-radius: 4px; }
+  nav .cur { background: #fff; box-shadow: inset 3px 0 0 #1f1c18; }
+  main { padding: 14px; }
+  .card { background: #fff; border: 1px solid #e6e0d4; border-radius: 8px; padding: 12px 14px; }
+  .card h2 { font: 600 15px/1.3 "Iowan Old Style", Charter, Georgia, serif; margin: 0 0 8px; }
+  .opt { border: 1px solid #e6e0d4; border-radius: 4px; padding: 6px 8px; margin: 4px 0; }
+  .opt.rec { border-style: dashed; border-color: #8a5a12; }
+  footer { display: flex; gap: 8px; justify-content: flex-end; align-items: center; padding: 8px 14px; border-top: 1px solid #e6e0d4; background: #fff; }
+  footer .doc { margin-right: auto; font-size: 12px; color: #625b51; font-family: ui-monospace, Menlo, monospace; }
+  button { font: inherit; padding: 4px 12px; border-radius: 4px; border: 1px solid #e6e0d4; background: #fff; }
+  button.primary { background: #9a3a26; border-color: #9a3a26; color: #fff; }
+  .term { background: #1f1c18; color: #e6e0d4; font: 12px/1.4 ui-monospace, Menlo, monospace; padding: 8px 12px; }
+  .assumed { position: relative; outline: 1px dashed #8a5a12; outline-offset: -1px; }
+  .assumed::before { content: attr(data-tag); position: absolute; top: -9px; right: 8px; background: #f8ecd2; color: #8a5a12; font-size: 11px; padding: 0 6px; border-radius: 3px; }
+  [data-q] { cursor: pointer; }
+</style>
+</head>
+<body>
+  <div class="chrome" data-q="q1"><span>●●●</span><span class="url">127.0.0.1:4317/s/20260906-210200-a3f9/</span><span>local browser app</span></div>
+  <header data-q="q12"><h1>grill-with-ui</h1><span class="chip">self-contained skill</span><span class="chip">round 9 · 7 open</span></header>
+  <div class="app assumed" data-q="q15" data-tag="assumed · Q15 open">
+    <nav>
+      <div>R1 · UI surface ✓</div><div>R2 · Transport ✓</div><div>R8 · Page visual direction ↺</div><div class="cur">R9 · Where does Finish save…</div><div>R9 · Should the visual run…</div>
+    </nav>
+    <main>
+      <div class="card" data-q="q5">
+        <h2>Where does Finish save the visual?</h2>
+        <div class="opt rec">A · Copy it next to the doc as docs/&lt;slug&gt;-visual.html</div>
+        <div class="opt">B · Leave it in the session folder</div>
+        <div class="opt">C · Inline a screenshot</div>
+      </div>
+    </main>
+  </div>
+  <footer data-q="q9"><span class="doc">→ docs/design.md · Terms · Locked · Routine</span><button>Finish grill</button><button class="primary">Send to Agent</button></footer>
+  <div class="term" data-q="q6">● grill-with-ui: round 9 posted · 7 open · waiting on the page</div>
+<script>
+/* grilling-ui linkage: copy verbatim */
+(() => {
+  const P = window.parent;
+  const st = document.createElement("style");
+  st.textContent = ".grill-hl{outline:2px solid #8a5a12;outline-offset:2px}";
+  document.head.appendChild(st);
+  addEventListener("message", (e) => {
+    if (e.source !== P || !e.data || !Array.isArray(e.data.highlight)) return;
+    const ids = e.data.highlight.filter((x) => /^q\\d+$/.test(x));
+    document.querySelectorAll("[data-q]").forEach((el) => el.classList.toggle("grill-hl", ids.includes(el.dataset.q)));
+  });
+  addEventListener("click", (e) => { const r = e.target.closest("[data-q]"); if (r) P.postMessage({ clicked: r.dataset.q }, "*"); });
+  addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); P.postMessage({ key: "send" }, "*"); }
+    else if (e.key === "Escape") P.postMessage({ key: "escape" }, "*");
+  });
+})();
+<\/script>
+</body>
+</html>
+`;
+
+</script>
+<script>
+(() => {
+  "use strict";
+  const S = SESSION;
+  const Q = S.questions;
+  const byId = Object.fromEntries(Q.map((q) => [q.id, q]));
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const QID = /^q\d+$/;
+  const up = (id) => id.toUpperCase();
+  const hhmm = (iso) => new Date(iso).toISOString().slice(11, 16);
+
+  // Which questions have a region in the visual (data-q in the drawn HTML).
+  const LINKED = [...new Set([...VISUAL_HTML.matchAll(/data-q="(q\d+)"/g)].map((m) => m[1]))]
+    .sort((a, b) => +a.slice(1) - +b.slice(1));
+
+  // ---------- state ----------
+  const staged = {};            // qid -> { answer?, thread?: [text], defer?, reopen? } ; "visual" -> { thread: [...] }
+  let selected = null;          // qid
+  let mode = "thread";          // thread | answer | visual
+  let firstDraw = false;        // "before first draw" preview
+  let expanded = new Set();     // answered/deferred ids shown as full cards
+  let clock = Date.parse(S.agent.since);
+  const now = () => new Date((clock += 60000)).toISOString();
+
+  // ---------- time model: round starts ----------
+  const rounds = [...new Set(Q.map((q) => q.round))].sort((a, b) => a - b);
+  const maxR = rounds[rounds.length - 1];
+  const t0 = Date.parse(S.created), t1 = Date.parse(S.agent.since);
+  const roundStart = {};
+  for (const r of rounds) {
+    const interp = t0 + (t1 - t0) * (r - 1) / Math.max(1, maxR - 1);
+    const firsts = Q.filter((q) => q.round === r && q.status === "answered").flatMap((q) => q.thread.map((m) => Date.parse(m.at)));
+    roundStart[r] = Math.min(interp, firsts.length ? Math.min(...firsts) - 60000 : Infinity);
+  }
+  const roundAt = (t) => rounds.filter((r) => roundStart[r] <= t).pop() || rounds[0];
+
+  // ---------- helpers ----------
+  const optText = (q, k) => (q.options.find((o) => o.k === k) || {}).text || "";
+  const short = (t, n = 96) => { const s = String(t).split(/(?<=\.)\s/)[0].replace(/\.$/, ""); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+  function answerLine(q, a) {
+    a = a || q.answer;
+    if (!a) return "";
+    if (a.kind === "text") return a.text;
+    return `${a.option} · ${short(optText(q, a.option))}`;
+  }
+  const isOpen = (q) => q.status === "open" || q.status === "reopened";
+  const stagedCount = () => Object.values(staged).reduce((n, s) => n + (s.answer ? 1 : 0) + (s.defer ? 1 : 0) + (s.reopen ? 1 : 0) + (s.thread ? s.thread.length : 0), 0);
+  function stageFor(id) { return (staged[id] = staged[id] || {}); }
+  function clean(id) { const s = staged[id]; if (s && !s.answer && !s.defer && !s.reopen && !(s.thread && s.thread.length)) delete staged[id]; }
+
+  // ---------- linkage (parent side of the Task 20 protocol) ----------
+  let frame = null;
+  function highlight(ids) {
+    if (!frame || !frame.contentWindow) return;
+    frame.contentWindow.postMessage({ highlight: ids.filter((x) => QID.test(x)) }, "*");
+    document.querySelectorAll(".qchip").forEach((c) => c.classList.toggle("on", ids.includes(c.dataset.q)));
+  }
+  const rest = () => highlight(selected && LINKED.includes(selected) ? [selected] : []);
+  addEventListener("message", (e) => {
+    if (!frame || e.source !== frame.contentWindow || !e.data || typeof e.data !== "object") return;
+    if (typeof e.data.clicked === "string" && QID.test(e.data.clicked) && byId[e.data.clicked]) select(e.data.clicked, { scroll: true, flash: true });
+    else if (e.data.key === "send") send();
+    else if (e.data.key === "escape") { frame.blur(); document.body.focus(); }
+  });
+
+  // ---------- header ----------
+  $("doc-path").textContent = "→ " + S.doc;
+  function setStatus(working) {
+    $("agent-dot").classList.toggle("working", working);
+    $("agent-status").textContent = working ? "Agent working on your send…" : `Agent waiting for you · since ${hhmm(S.agent.since)}`;
+  }
+  setStatus(false);
+  $("first-draw").onclick = () => { firstDraw = !firstDraw; $("first-draw").setAttribute("aria-pressed", String(firstDraw)); if (firstDraw && mode === "visual") mode = selected ? "thread" : "visual"; renderVisual(); renderComposer(); };
+  $("finish").onclick = () => toast(`Finish would write ${S.doc} (${Q.filter(isOpen).length} questions still open)`);
+
+  // ---------- visual pane ----------
+  function renderVisual() {
+    const v = S.visual;
+    const pane = $("visual");
+    if (firstDraw) {
+      frame = null;
+      const agreed = Q.filter((q) => q.status === "answered");
+      pane.innerHTML = `
+        <div class="vbar"><b>Visual</b><span>Not drawn yet</span></div><div></div>
+        <div class="empty"><div class="inner">
+          <h2>Agreed so far</h2>
+          <p class="lede">${agreed.length} decisions across ${new Set(agreed.map((q) => q.round)).size} rounds. Visualize turns them into a prototype you can point at; each region links back to the question that decided it.</p>
+          <ul class="agreed">${agreed.map((q) => `<li><span class="id">${up(q.id)}</span><span><span class="t">${esc(q.title)}</span><span class="arrow">→</span><span class="a">${esc(answerLine(q))}</span></span></li>`).join("")}</ul>
+          <div class="cta"><button type="button" class="primary" id="visualize">Visualize</button><span class="meta">Sends immediately; the agent draws while you keep answering.</span></div>
+        </div></div>`;
+      $("visualize").onclick = () => { toast("Visualize sent · the agent will draw v1"); firstDraw = false; $("first-draw").setAttribute("aria-pressed", "false"); renderVisual(); renderComposer(); };
+      return;
+    }
+    pane.innerHTML = `
+      <div class="vbar">
+        <b>Visual</b><span>${esc(v.kind.replace(/^./, (c) => c.toUpperCase()))} v${v.version} · drawn ${hhmm(v.at)}</span>
+        <span class="linked" aria-label="Questions linked to regions"><span class="meta">Linked</span>${LINKED.map((id) => `<button type="button" class="qchip" data-q="${id}" title="${esc(byId[id] ? byId[id].title : id)}">${up(id)}</button>`).join("")}</span>
+      </div>
+      ${v.stale ? `<div class="stale" role="note"><span class="msgtxt"><strong>Out of date.</strong> ${esc(v.note.replace(/^v\d+:\s*/, "").replace(/;\s*stale since/, " · stale since"))}.</span><button type="button" id="redraw">Visualize</button></div>` : "<div></div>"}
+      <div class="frame-wrap"><iframe id="visual-frame" title="Visual prototype v${v.version}" sandbox="allow-scripts"></iframe></div>`;
+    frame = $("visual-frame");
+    frame.srcdoc = VISUAL_HTML;
+    frame.addEventListener("load", rest);
+    pane.querySelectorAll(".qchip").forEach((c) => {
+      c.onmouseenter = () => highlight([c.dataset.q]);
+      c.onmouseleave = rest;
+      c.onclick = () => select(c.dataset.q, { scroll: true, flash: true });
+    });
+    const rd = $("redraw"); if (rd) rd.onclick = () => toast("Visualize sent · the agent will redraw v4");
+  }
+
+  // ---------- rail head ----------
+  function renderHead() {
+    const cur = Q.filter((q) => q.round === maxR);
+    const open = cur.filter((q) => q.status === "open").length;
+    const reop = Q.filter((q) => q.status === "reopened");
+    $("rhead").innerHTML = `
+      <div class="row"><h2>Conversation</h2>
+        <span>Round ${maxR} · ${open} open</span>
+        ${reop.length ? `<span class="needs">· reopened ${reop.map((q) => `<a href="#${q.id}" data-go="${q.id}">${up(q.id)}</a>`).join(" ")}</span>` : ""}
+      </div>
+      <div class="jump" role="navigation" aria-label="Jump to round"><span class="lbl">Round</span>${rounds.map((r) => `<button type="button" data-r="${r}" class="${r === maxR ? "cur" : ""}" aria-label="Jump to round ${r}">${r}</button>`).join("")}</div>`;
+    $("rhead").querySelectorAll("[data-go]").forEach((a) => a.onclick = (e) => { e.preventDefault(); select(a.dataset.go, { scroll: true, flash: true }); });
+    $("rhead").querySelectorAll("[data-r]").forEach((b) => b.onclick = () => jumpRound(+b.dataset.r));
+  }
+  function jumpRound(r) {
+    const sec = document.querySelector(`[data-round="${r}"]`);
+    if (!sec) return;
+    const tl = $("timeline");
+    if (getComputedStyle(tl).overflowY === "auto") tl.scrollTo({ top: sec.offsetTop - tl.offsetTop, behavior: "smooth" });
+    else sec.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // ---------- timeline ----------
+  function items() {
+    const out = [];
+    for (const q of Q) {
+      out.push({ kind: "q", ord: 0, at: roundStart[q.round], round: q.round, q });
+      for (const m of q.thread) out.push({ kind: "msg", ord: 1, at: Date.parse(m.at), round: q.round, q, m });
+      const st = staged[q.id];
+      if (st && st.thread) st.thread.forEach((t, i) => out.push({ kind: "msg", ord: 2, at: Infinity, round: q.round, q, m: { who: "user", text: t }, staged: true, idx: i }));
+    }
+    for (const m of (S.visual.thread || [])) out.push({ kind: "vis", ord: 1, at: Date.parse(m.at), round: roundAt(Date.parse(m.at)), m });
+    const sv = staged.visual;
+    if (sv && sv.thread) sv.thread.forEach((t, i) => out.push({ kind: "vis", ord: 2, at: Infinity, round: maxR, m: { who: "user", text: t }, staged: true, idx: i }));
+    return out.sort((a, b) => a.round - b.round || a.at - b.at || a.ord - b.ord);
+  }
+
+  function renderCard(q) {
+    const st = staged[q.id] || {};
+    const full = isOpen(q) || expanded.has(q.id) || q.id === selected;
+    const linked = LINKED.includes(q.id);
+    if (!full) {
+      const deferred = q.status === "deferred";
+      const sa = st.answer ? answerLine(q, st.answer) : "";
+      return `<button type="button" class="line ${deferred ? "deferred" : ""} ${sa || st.reopen ? "staged" : ""} ${linked ? "linked" : ""}" id="${q.id}" data-q="${q.id}"
+          aria-label="${up(q.id)} ${esc(q.title)}: ${deferred ? "deferred" : esc(answerLine(q))}">
+        <span class="ic" aria-hidden="true">${deferred ? "–" : "✓"}</span><span class="id">${up(q.id)}</span><span class="t">${esc(q.title)}</span>
+        <span class="a"><span class="arrow">→</span>${st.reopen ? "reopen staged" : sa ? "staged: " + esc(sa) : deferred ? "deferred" : esc(answerLine(q))}</span>
+      </button>`;
+    }
+    const answered = q.status === "answered";
+    const was = q.status === "reopened" && q.answer ? q.answer.option : null;
+    const opts = q.options.map((o) => {
+      const rec = q.rec && q.rec.option === o.k;
+      const chosen = answered && q.answer && q.answer.option === o.k;
+      const isStaged = st.answer && st.answer.option === o.k;
+      const cls = ["opt", rec && !chosen ? "rec" : "", chosen ? "chosen" : "", was === o.k ? "was-chosen" : "", isStaged ? "staged" : ""].join(" ");
+      return `<button type="button" class="${cls}" data-opt="${o.k}" aria-pressed="${isStaged ? "true" : "false"}"><span class="k">${o.k}</span><span>${esc(o.text)}${rec ? `<span class="tag">Recommended</span>` : ""}${isStaged ? `<span class="tag">Staged</span>` : ""}</span></button>`;
+    }).join("");
+    const badge = st.answer || st.defer || st.reopen ? `<span class="chip staged">${st.defer ? "Defer staged" : st.reopen ? "Reopen staged" : "Staged"}</span>` : `<span class="chip ${q.status}">${q.status[0].toUpperCase() + q.status.slice(1)}</span>`;
+    const stagedText = st.answer && st.answer.kind === "text" ? `<div class="staged-text"><span class="lbl">Your answer · staged</span>${esc(st.answer.text)}</div>` : "";
+    const answeredLine = answered && q.answer ? `<p class="was">Decided: <b>${esc(answerLine(q))}</b>${q.answer.kind === "accept" ? " (accepted the recommendation)" : ""}</p>` : "";
+    const wasLine = q.status === "reopened" && q.answer ? `<p class="was">Was: <b>${esc(answerLine(q))}</b></p>` : "";
+    const acts = answered
+      ? `<button type="button" class="ghost" data-act="thread">Reply</button><button type="button" class="ghost" data-act="reopen">${st.reopen ? "Unstage reopen" : "Reopen"}</button><span class="sep"></span><button type="button" class="ghost" data-act="collapse">Collapse</button>`
+      : q.status === "deferred"
+        ? `<button type="button" class="ghost" data-act="reopen">${st.reopen ? "Unstage reopen" : "Reopen"}</button><span class="sep"></span><button type="button" class="ghost" data-act="collapse">Collapse</button>`
+        : `<button type="button" data-act="accept"${st.answer && st.answer.kind === "accept" ? ' class="staged"' : ""}>Accept ${q.rec.option}</button>
+           <button type="button" class="ghost" data-act="answer">Answer in words</button>
+           <button type="button" class="ghost" data-act="thread">Reply</button>
+           <span class="sep"></span>
+           ${st.answer || st.defer ? `<button type="button" class="ghost" data-act="unstage">Unstage</button>` : `<button type="button" class="ghost" data-act="defer">Defer</button>`}`;
+    return `<article class="card ${q.id === selected ? "selected" : ""}" id="${q.id}" data-q="${q.id}" tabindex="-1" aria-labelledby="h-${q.id}">
+      <div class="meta-row"><span class="id">${up(q.id)}</span>${badge}${q.updated ? `<span class="chip updated">Rec updated</span>` : ""}${q.deps.length ? `<span>after ${q.deps.map(up).join(", ")}</span>` : "<span>root</span>"}${linked ? `<span class="invis vismark" title="Hover to see it outlined in the visual">In visual</span>` : ""}</div>
+      <h3 id="h-${q.id}">${esc(q.title)}</h3>
+      <p class="body">${esc(q.body)}</p>
+      ${wasLine}${answered ? "" : `<div class="opts">${opts}</div><p class="why"><b>Why ${q.rec.option}.</b> ${esc(q.rec.why)}</p>`}
+      ${answeredLine}${stagedText}
+      <div class="acts">${acts}</div>
+    </article>`;
+  }
+
+  function renderMsg(it) {
+    if (it.kind === "vis") {
+      return `<button type="button" class="msg vis ${it.m.who} ${it.staged ? "staged" : ""}" data-vis="1" ${it.staged ? `data-unstage-vis="${it.idx}"` : ""}>
+        <span class="who"><span class="v">Visual</span> · <span class="w">${it.m.who === "user" ? "you" : "agent"}</span>${it.staged ? " · staged" : " · " + hhmm(it.m.at)}</span><span class="t">${esc(it.m.text)}</span></button>`;
+    }
+    return `<button type="button" class="msg ${it.m.who} ${it.staged ? "staged" : ""}" data-q="${it.q.id}" data-msg="1">
+      <span class="who"><span class="q">${up(it.q.id)}</span> · <span class="w">${it.m.who === "user" ? "you" : "agent"}</span>${it.staged ? " · staged" : " · " + hhmm(it.m.at)}</span><span class="t">${esc(it.m.text)}</span></button>`;
+  }
+
+  function renderTimeline(opts = {}) {
+    const tl = $("timeline");
+    const keep = tl.scrollTop;
+    const groups = new Map();
+    for (const it of items()) { if (!groups.has(it.round)) groups.set(it.round, []); groups.get(it.round).push(it); }
+    let html = "";
+    for (const [r, list] of groups) {
+      const qs = list.filter((i) => i.kind === "q").map((i) => i.q);
+      const open = qs.filter(isOpen).length;
+      const summary = open ? `${open} open` : `${qs.length} decided`;
+      html += `<section data-round="${r}" aria-label="Round ${r}"><h3 class="round-h ${r === maxR ? "current" : ""}"><span>Round ${r}${r === maxR ? " · current" : ""}</span><span class="${open ? "n-open" : "n-done"}">${summary}</span></h3><div class="round-body">`;
+      for (const it of list) html += it.kind === "q" ? renderCard(it.q) : renderMsg(it);
+      html += `</div></section>`;
+    }
+    tl.innerHTML = html;
+    if (!opts.reset) tl.scrollTop = keep;
+    wireTimeline(tl);
+  }
+
+  function wireTimeline(tl) {
+    tl.querySelectorAll("[data-q]").forEach((el) => {
+      const id = el.dataset.q;
+      el.addEventListener("mouseenter", () => highlight([id]));
+      el.addEventListener("mouseleave", rest);
+    });
+    tl.querySelectorAll(".line").forEach((el) => el.onclick = () => { expanded.add(el.dataset.q); select(el.dataset.q, { scroll: true }); });
+    tl.querySelectorAll(".msg[data-msg]").forEach((el) => el.onclick = () => select(el.dataset.q));
+    tl.querySelectorAll(".msg[data-vis]").forEach((el) => el.onclick = () => { if (el.dataset.unstageVis != null) return; mode = "visual"; renderComposer(); $("composer-in").focus(); });
+    tl.querySelectorAll(".card").forEach((card) => {
+      const id = card.dataset.q;
+      card.addEventListener("click", (e) => {
+        if (e.target.closest("button")) return;
+        if (selected !== id) select(id);
+      });
+      card.querySelectorAll("[data-opt]").forEach((b) => b.onclick = () => {
+        const s = stageFor(id);
+        if (s.answer && s.answer.option === b.dataset.opt) delete s.answer; else { s.answer = { kind: "option", option: b.dataset.opt }; delete s.defer; }
+        clean(id); selected = id; setChip(id); renderAll();
+      });
+      card.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => act(id, b.dataset.act));
+    });
+  }
+
+  function act(id, a) {
+    const q = byId[id];
+    const s = stageFor(id);
+    if (a === "accept") { if (s.answer && s.answer.kind === "accept") delete s.answer; else { s.answer = { kind: "accept", option: q.rec.option }; delete s.defer; } }
+    else if (a === "defer") { s.defer = true; delete s.answer; }
+    else if (a === "unstage") { delete s.answer; delete s.defer; }
+    else if (a === "reopen") { s.reopen = !s.reopen; }
+    else if (a === "collapse") { expanded.delete(id); if (selected === id) selected = null; clean(id); rest(); renderAll(); return; }
+    else if (a === "thread" || a === "answer") { clean(id); selected = id; mode = a; renderAll(); $("composer-in").focus(); return; }
+    clean(id); selected = id; renderAll();
+  }
+
+  function select(id, o = {}) {
+    if (!byId[id]) return;
+    selected = id;
+    if (!isOpen(byId[id])) expanded.add(id);
+    setChip(id);
+    renderAll();
+    const el = $(id);
+    if (el && o.scroll) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (el && o.flash) { el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 1100); }
+  }
+
+  // ---------- composer ----------
+  function setChip(id) { if (mode === "visual" || !mode) mode = "thread"; if (byId[id] && byId[id].status !== "open" && byId[id].status !== "reopened" && mode === "answer") mode = "thread"; }
+  const MODES = ["thread", "answer", "visual"];
+  $("chip").onclick = () => {
+    if (!selected) { mode = "visual"; toast("Click a question card to target it"); renderComposer(); return; }
+    mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
+    renderComposer(); $("composer-in").focus();
+  };
+  function renderComposer() {
+    if (!selected) mode = "visual";
+    const chip = $("chip");
+    const label = mode === "visual" ? "visual" : `@${selected} ${mode}`;
+    chip.className = "m-" + mode;
+    chip.innerHTML = `${esc(label)}<span class="cyc" aria-hidden="true">⇄</span>`;
+    chip.setAttribute("aria-label", `Target: ${label}. Click to change.`);
+    const q = byId[selected];
+    const ph = mode === "visual"
+      ? (firstDraw ? "Anything the first draw should show…" : "Feedback on the visual: what should change in the next draw…")
+      : mode === "answer"
+        ? `Answer ${up(selected)} in your own words (replaces picking an option)…`
+        : `Ask about or push back on ${up(selected)} · ${q.title}…`;
+    $("composer-in").placeholder = ph;
+    $("stage-btn").textContent = mode === "answer" ? "Stage answer" : "Stage";
+  }
+  function stageComposer() {
+    const ta = $("composer-in");
+    const t = ta.value.trim();
+    if (!t) { ta.focus(); return; }
+    if (mode === "visual") (stageFor("visual").thread = stageFor("visual").thread || []).push(t);
+    else if (mode === "answer") { const s = stageFor(selected); s.answer = { kind: "text", text: t }; delete s.defer; }
+    else (stageFor(selected).thread = stageFor(selected).thread || []).push(t);
+    ta.value = "";
+    renderAll();
+    const tl = $("timeline");
+    const target = mode === "visual" ? tl.querySelector(".msg.vis.staged:last-of-type") : $(selected);
+    if (mode !== "visual" && mode !== "answer") { const all = tl.querySelectorAll(`.msg.staged[data-q="${selected}"]`); const last = all[all.length - 1]; if (last) last.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+    else if (target) target.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+  $("stage-btn").onclick = stageComposer;
+  $("composer-in").addEventListener("keydown", (e) => {
+    if (e.isComposing) return;
+    if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) { e.preventDefault(); stageComposer(); }
+  });
+
+  function renderFooter() {
+    const n = stagedCount();
+    const parts = Object.entries(staged).map(([id, s]) => {
+      if (id === "visual") return `visual +${s.thread.length}`;
+      const bits = [];
+      if (s.answer) bits.push(s.answer.kind === "text" ? "text" : "→ " + s.answer.option);
+      if (s.defer) bits.push("defer");
+      if (s.reopen) bits.push("reopen");
+      if (s.thread && s.thread.length) bits.push(`+${s.thread.length} msg`);
+      return `${up(id)} ${bits.join(" ")}`;
+    });
+    $("staged-list").innerHTML = n ? `<b>${n} staged</b> · ${esc(parts.join(" · "))}` : "Nothing staged yet";
+    $("send").disabled = n === 0;
+    $("send").textContent = n ? `Send ${n} to agent` : "Send to agent";
+  }
+
+  function send() {
+    const n = stagedCount();
+    if (!n) return;
+    for (const [id, s] of Object.entries(staged)) {
+      if (id === "visual") { for (const t of s.thread) S.visual.thread.push({ who: "user", text: t, at: now() }); continue; }
+      const q = byId[id];
+      for (const t of (s.thread || [])) q.thread.push({ who: "user", text: t, at: now() });
+      if (s.answer) { q.answer = s.answer; q.status = "answered"; expanded.delete(id); }
+      if (s.defer) q.status = "deferred";
+      if (s.reopen) q.status = "reopened";
+      delete staged[id];
+    }
+    if (selected && !isOpen(byId[selected])) selected = null;
+    setStatus(true);
+    toast(`Sent ${n} action${n > 1 ? "s" : ""} as one event`);
+    renderAll();
+    setTimeout(() => setStatus(false), 2600);
+  }
+  $("send").onclick = send;
+
+  let toastT;
+  function toast(t) { const el = $("toast"); el.textContent = t; el.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), 2200); }
+
+  // ---------- keyboard (subset of spec §7) ----------
+  document.addEventListener("keydown", (e) => {
+    if (e.isComposing) return;
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); return; }
+    const inField = e.target.closest && e.target.closest("input, textarea, [contenteditable]");
+    if (e.key === "Escape") { if (inField) e.target.blur(); return; }
+    if (inField || e.ctrlKey || e.altKey || e.metaKey) return;
+    const q = byId[selected];
+    const openIds = Q.filter(isOpen).map((x) => x.id);
+    if (e.key === "j" || e.key === "k") {
+      const i = openIds.indexOf(selected);
+      const next = e.key === "j" ? openIds[i + 1] || openIds[0] : openIds[i - 1] || openIds[openIds.length - 1];
+      if (next) { e.preventDefault(); select(next, { scroll: true }); }
+    } else if (e.key === "r" && q) { e.preventDefault(); mode = "thread"; renderComposer(); $("composer-in").focus(); }
+    else if (e.key === "f" && q && isOpen(q)) { e.preventDefault(); mode = "answer"; renderComposer(); $("composer-in").focus(); }
+    else if (e.key === "a" && q && isOpen(q)) act(q.id, "accept");
+    else if (/^[1-4]$/.test(e.key) && q && isOpen(q)) { const o = q.options[+e.key - 1]; if (o) { const b = document.querySelector(`#${q.id} [data-opt="${o.k}"]`); if (b) b.click(); } }
+  });
+
+  function renderAll(opts) { renderHead(); renderTimeline(opts); renderComposer(); renderFooter(); rest(); }
+
+  renderVisual();
+  renderAll({ reset: true });
+  // Land on the current round.
+  requestAnimationFrame(() => {
+    const tl = $("timeline"), sec = document.querySelector(`[data-round="${maxR}"]`);
+    if (sec && getComputedStyle(tl).overflowY === "auto") tl.scrollTop = sec.offsetTop - tl.offsetTop;
+  });
+})();
+</script>
+</body>
+</html>

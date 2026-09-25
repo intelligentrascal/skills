@@ -1,0 +1,266 @@
+/* Hallmark · route: studied-DNA (Apple DESIGN.md + Craft/shadcn summary) · macrostructure: app shell (document + sticky figure / visual + rail)
+ * tone: quiet document · paper: #fbf8f4 warm (L~98) · accent: #0066cc action blue (links, focus, current only)
+ * display: ui-serif/New York → Charter · body: -apple-system (SF Pro) · outlier: ui-monospace for file paths + kbd only
+ * axes: light / roman-serif / cool-accent-on-warm-paper · studied: yes · pre-emit critique: P4 H5 E4 S4 R5 V4
+ * Tastemaker · mood: premium-calm (studied) · contrast: every text pair >= 4.5:1 (check_contrast.py) · motion: 3 primitives
+ *
+ * theme-studio.css — shared visual system for the Brief and Studio mockups (design/mockups/DESIGN.md).
+ * Linked AFTER skills/grilling-ui/page/tokens.css: it keeps that file's reduced-motion rules and keyframes,
+ * re-points its legacy variables at this palette, and restyles its base controls. System fonts only. */
+
+:root {
+  /* ---- surfaces (Craft warm paper; Apple parchment rhythm) ---- */
+  --paper:        #fbf8f4;   /* page canvas */
+  --paper-2:      #f4efe9;   /* grouped fill, hover wash, segmented track */
+  --surface:      #fffefc;   /* cards, sheets, panes — one step up from paper */
+  --material:     rgb(251 248 244 / 0.82);  /* sticky bars, with backdrop blur */
+  --material-hi:  rgb(255 254 252 / 0.86);  /* sticky headers inside white panes */
+  --hairline:     #e8e2da;   /* dividers, card borders */
+  --hairline-2:   #d6cec4;   /* input + secondary button borders, hover borders */
+
+  /* ---- ink ---- */
+  --ink:          #1d1c1a;   /* 16.1:1 on paper */
+  --ink-2:        #57534d;   /*  7.2:1 on paper · secondary copy */
+  --ink-3:        #6b665f;   /*  >= 4.6:1 on paper, paper-2, surface, stone · meta */
+  --on-ink:       #fbf8f4;   /* text on the black pill */
+
+  /* ---- the one accent (Apple action blue) ---- */
+  --blue:         #0066cc;   /* 5.3:1 on paper · links, focus ring, current item, selection */
+  --blue-press:   #00529f;
+  --blue-wash:    rgb(0 102 204 / 0.14);    /* focus halo modifier only */
+
+  /* ---- the one primary surface (Craft near-black pill) ---- */
+  --pill:         #1d1c1a;
+  --pill-hover:   #34322e;
+  --pill-press:   #0e0d0c;
+
+  /* ---- state tints (Craft pastels, each one means one thing) ---- */
+  --butter:       #fcefc2;  --butter-ink: #6a4f00;  --butter-wash: #fdf7e2;  /* open · needs you · visual region */
+  --peach:        #fde5d6;  --peach-ink:  #8f3f16;                            /* reopened · out of date */
+  --peri:         #e4e9fb;  --peri-ink:   #2d43a0;  --peri-wash: #f2f5fd;    /* staged: yours, not sent */
+  --peri-line:    #b3c0ef;
+  --mint:         #e2f2e5;  --mint-ink:   #276238;                            /* decided */
+  --stone:        #eeeae4;  --stone-ink:  #57534d;                            /* deferred · neutral chip */
+  --ochre:        #8a5a12;  /* the visual's region outline (verbatim listener) — echoed on "in visual" marks */
+
+  /* ---- type ---- */
+  --font-display: ui-serif, "New York", Charter, "Iowan Old Style", Georgia, serif;
+  --font-ui:      -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
+  --font-mono:    ui-monospace, "SF Mono", Menlo, monospace;
+  --t-caption: 12px;  --t-footnote: 13px;  --t-sub: 14px;  --t-body: 15px;  --t-callout: 16px;  --t-lead: 17px;
+  --t-title3: 20px;   --t-title2: 28px;    --t-title1: 40px;
+  --track-display: -0.022em;  --track-title: -0.012em;  --track-ui: -0.006em;
+
+  /* ---- space (4pt) ---- */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;  --sp-4: 16px;  --sp-5: 20px;  --sp-6: 24px;
+  --sp-8: 32px; --sp-10: 40px; --sp-12: 48px; --sp-16: 64px;
+
+  /* ---- shape ---- */
+  --r-chip: 6px;  --r-row: 10px;  --r-tile: 12px;  --r-card: 18px;  --r-sheet: 22px;  --r-pill: 999px;
+
+  /* ---- depth: hairlines everywhere, ONE shadow for the product (the visual) ---- */
+  --shadow-product: 0 12px 32px -10px rgb(29 28 26 / 0.18);
+
+  /* ---- motion ---- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-press: 100ms;  --dur-hover: 160ms;  --dur-enter: 260ms;
+
+  /* ---- z ---- */
+  --z-raised: 10;  --z-sticky: 200;  --z-toast: 500;
+
+  /* ---- legacy tokens.css names, re-pointed so nothing falls back to the old palette ---- */
+  --bg: var(--paper);  --panel: var(--surface);  --rule: var(--hairline);
+  --accent: var(--blue);  --focus: var(--blue);
+  --ok: var(--mint-ink);  --ok-soft: var(--mint);
+  --stage: var(--peri-ink);  --stage-soft: var(--peri);  --warn-soft: var(--peach);
+  --serif: var(--font-display);  --sans: var(--font-ui);  --mono: var(--font-mono);
+  --r1: var(--r-chip);  --r2: var(--r-tile);
+}
+
+html { overflow-x: clip; -webkit-text-size-adjust: 100%; }
+body {
+  overflow-x: clip;
+  font-family: var(--font-ui);
+  font-size: var(--t-body);
+  line-height: 1.47;
+  letter-spacing: var(--track-ui);
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: var(--track-title);
+  line-height: 1.2;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+a:active { color: var(--blue-press); }
+
+kbd {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 6px;
+  border: 1px solid var(--hairline-2);
+  border-bottom-width: 1px;
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--ink-2);
+}
+.meta { color: var(--ink-3); font-size: var(--t-footnote); }
+.path { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0; color: var(--ink-2); }
+
+/* ---------------------------------------------------------------------------
+   Controls. Every state: default · hover · focus-visible · active · disabled ·
+   pressed/selected · staged · pending. Border width never changes between states.
+   --------------------------------------------------------------------------- */
+button, .opt {
+  font: inherit;
+  font-size: var(--t-footnote);
+  letter-spacing: var(--track-ui);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--hairline-2);
+  border-radius: var(--r-pill);
+  padding: 6px 14px;
+  line-height: 1.35;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--dur-hover) var(--ease-out),
+              border-color var(--dur-hover) var(--ease-out),
+              color var(--dur-hover) var(--ease-out),
+              transform var(--dur-press) var(--ease-out);
+}
+button.primary {
+  background: var(--pill); border-color: var(--pill); color: var(--on-ink);
+  font-weight: 600; padding: 8px 18px;
+}
+button.ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
+
+.opt {
+  display: block; width: 100%;
+  border-radius: var(--r-tile);
+  border-color: var(--hairline);
+  padding: 10px 14px;
+  font-size: var(--t-sub);
+  line-height: 1.45;
+}
+
+textarea {
+  font: inherit;
+  font-size: var(--t-body);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--hairline-2);
+  border-radius: var(--r-tile);
+  padding: 10px 14px;
+  width: 100%;
+  resize: vertical;
+  transition: border-color var(--dur-hover) var(--ease-out), background-color var(--dur-hover) var(--ease-out);
+}
+textarea::placeholder { color: var(--ink-3); }
+
+@media (hover: hover) {
+  button:hover, .opt:hover { background: var(--paper-2); border-color: var(--hairline-2); }
+  .opt:hover { background: var(--surface); border-color: var(--hairline-2); }
+  button.primary:hover { background: var(--pill-hover); border-color: var(--pill-hover); color: var(--on-ink); }
+  button.ghost:hover { background: var(--paper-2); border-color: transparent; color: var(--ink); }
+  textarea:hover { border-color: var(--ink-3); }
+}
+
+button:active, .opt:active { transform: scale(0.98); background: var(--paper-2); }
+.opt:active { transform: scale(0.995); }
+button.primary:active { background: var(--pill-press); border-color: var(--pill-press); }
+
+button:focus-visible, .opt:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+button:focus:not(:focus-visible), .opt:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
+textarea:focus { transition: none; outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-wash); }
+
+button:disabled, button[aria-disabled="true"], .opt[aria-disabled="true"], textarea:disabled {
+  cursor: not-allowed; transform: none;
+  color: var(--ink-3); background: var(--paper-2); border-color: var(--hairline);
+}
+button.primary:disabled { background: var(--stone); border-color: var(--stone); color: var(--ink-3); }
+
+/* pressed / selected: blue edge, no side stripe */
+button[aria-pressed="true"], .opt[aria-pressed="true"], .opt.selected, button.selected {
+  border-color: var(--blue); background: var(--surface); box-shadow: none; color: var(--ink);
+}
+a[aria-current], a.selected { font-weight: 600; box-shadow: none; }
+
+/* staged: chosen here, not yet sent (periwinkle) */
+button.staged, .opt.staged, textarea.staged, a.staged {
+  border-color: var(--peri-ink); background: var(--peri); color: var(--peri-ink);
+}
+.opt.staged { color: var(--ink); box-shadow: none; }
+.opt.staged::after { content: none; }
+textarea.staged { background: var(--peri-wash); color: var(--ink); }
+
+/* pending: sent, waiting on the agent */
+button.pending, .opt.pending, textarea.pending { border-style: dashed; border-color: var(--ink-3); color: var(--ink-2); }
+
+/* ---- shared pieces --------------------------------------------------------- */
+/* state chip: sentence case, tinted, never uppercase */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-ui); font-size: var(--t-caption); font-weight: 600; letter-spacing: 0;
+  line-height: 20px; padding: 0 8px; border-radius: var(--r-chip);
+  background: var(--stone); color: var(--stone-ink); white-space: nowrap;
+}
+.chip.open     { background: var(--butter); color: var(--butter-ink); }
+.chip.reopened { background: var(--peach);  color: var(--peach-ink); }
+.chip.deferred { background: var(--stone);  color: var(--stone-ink); }
+.chip.answered { background: var(--mint);   color: var(--mint-ink); }
+.chip.staged   { background: var(--peri);   color: var(--peri-ink); }
+.chip.updated  { background: var(--stone);  color: var(--stone-ink); }
+
+/* "in visual" mark: the ochre square repeats the outline the visual draws */
+.vismark::before {
+  content: ""; width: 8px; height: 8px; flex: none;
+  border: 1.5px solid var(--ochre); border-radius: 2px;
+}
+
+/* status dot */
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mint-ink); flex: none; }
+.dot.working { background: var(--butter-ink); animation: pulse 1.2s var(--ease-in-out) infinite; }
+
+/* option key: a small round well, like a list radio */
+.opt .k {
+  display: inline-grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid var(--hairline-2);
+  font-family: var(--font-ui); font-size: var(--t-caption); font-weight: 600; letter-spacing: 0;
+  color: var(--ink-2); background: var(--surface);
+}
+
+/* toast */
+.toast {
+  position: fixed; left: 50%; z-index: var(--z-toast);
+  transform: translate(-50%, 8px);
+  padding: 8px 16px; border-radius: var(--r-pill);
+  background: var(--pill); color: var(--on-ink);
+  font-size: var(--t-footnote); font-weight: 500;
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--dur-enter) var(--ease-out), transform var(--dur-enter) var(--ease-out);
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  button:active, .opt:active { transform: none; }
+  .toast, .toast.show { transform: translate(-50%, 0); }
+}

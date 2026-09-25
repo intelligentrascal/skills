@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>grill · Brief</title>
+<link rel="stylesheet" href="../../skills/grilling-ui/page/tokens.css" />
+<link rel="stylesheet" href="theme-studio.css" />
+<style>
+  /* Brief — the grill as one readable document (spec §7, Brief row). Theme: theme-studio.css, tokens only. */
+  html { scroll-padding-top: 80px; scroll-padding-bottom: 88px; }
+  body { min-height: 100vh; min-height: 100dvh; }
+
+  /* ---- header: translucent material bar ---------------------------------- */
+  .top {
+    position: sticky; top: 0; z-index: var(--z-sticky);
+    display: flex; align-items: center; gap: var(--sp-4);
+    min-height: 56px; padding: var(--sp-2) var(--sp-8);
+    background: var(--material);
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .top .name { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+  .top h1 { font-family: var(--font-ui); font-size: var(--t-body); font-weight: 600; letter-spacing: var(--track-ui); margin: 0; white-space: nowrap; }
+  .top .doc { padding: 2px 8px; border-radius: var(--r-chip); background: var(--paper-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .top .spacer { flex: 1; }
+  .top .agent { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--t-footnote); color: var(--ink-2); white-space: nowrap; }
+  .top .agent b { font-weight: 500; color: var(--ink); }
+  .top .next { white-space: nowrap; background: var(--butter); border-color: var(--butter); color: var(--butter-ink); font-weight: 500; }
+  .top .next b { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .top .next .short { display: none; }
+  @media (hover: hover) { .top .next:hover { background: var(--butter); border-color: var(--butter-ink); color: var(--butter-ink); } }
+
+  /* ---- page grid ---------------------------------------------------------- */
+  .page {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 68ch) minmax(320px, 1fr);
+    grid-template-areas: "rail doc fig";
+    gap: var(--sp-12);
+    max-width: 1500px; margin: 0 auto;
+    padding: var(--sp-10) var(--sp-8) 140px;
+    align-items: start;
+  }
+  .rail { grid-area: rail; }
+  .doc  { grid-area: doc; min-width: 0; }
+  .fig  { grid-area: fig; min-width: 0; }
+
+  /* ---- contents rail: an Apple sidebar ----------------------------------- */
+  .rail { position: sticky; top: 88px; font-size: var(--t-footnote); max-height: calc(100vh - 176px); overflow: auto; padding: 2px var(--sp-2) 2px 2px; }
+  .rail h2 { font-family: var(--font-ui); font-size: var(--t-caption); font-weight: 600; letter-spacing: 0; color: var(--ink-3); margin: 0 0 var(--sp-2) var(--sp-2); }
+  .rail ol { list-style: none; margin: 0; padding: 0; }
+  .rail li { margin: 0; }
+  .rail a {
+    display: flex; align-items: baseline; gap: var(--sp-2);
+    padding: 4px var(--sp-2); border-radius: var(--r-row);
+    color: var(--ink-2); line-height: 1.35; text-decoration: none;
+    transition: background-color var(--dur-hover) var(--ease-out), color var(--dur-hover) var(--ease-out);
+  }
+  @media (hover: hover) { .rail a:hover { background: var(--paper-2); color: var(--ink); text-decoration: none; } }
+  .rail a.cur { background: var(--paper-2); color: var(--blue); font-weight: 600; }
+  .rail a .n {
+    margin-left: auto; flex: none; min-width: 20px; text-align: center;
+    font-size: 11px; line-height: 18px; font-weight: 700; font-variant-numeric: tabular-nums;
+    border-radius: var(--r-pill); padding: 0 6px; background: var(--butter); color: var(--butter-ink);
+  }
+  .rail a .n.zero { background: transparent; color: var(--mint-ink); font-weight: 600; }
+  .rail .lvl1 > a { font-weight: 600; color: var(--ink); margin-top: var(--sp-3); }
+  .rail .lvl1:first-child > a { margin-top: 0; }
+  .rail .lvl1 > a.cur { color: var(--blue); }
+  .rail .lvl2 > a { padding-left: var(--sp-4); }
+  .rail .q a { padding-left: 28px; font-size: var(--t-caption); color: var(--ink-2); }
+  .rail .q a .qid { flex: none; }
+  .rail .q a > span:last-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rail .q a.staged { color: var(--peri-ink); background: transparent; border: 0; }
+  .rail .q a.staged::after { content: ""; flex: none; align-self: center; margin-left: auto; width: 6px; height: 6px; border-radius: 50%; background: var(--peri-ink); }
+  .rail .legend { margin: var(--sp-5) var(--sp-2) 0; padding-top: var(--sp-3); border-top: 1px solid var(--hairline); color: var(--ink-3); font-size: var(--t-caption); line-height: 1.5; }
+
+  /* ---- document ----------------------------------------------------------- */
+  .intro h1 { font-size: 44px; line-height: 1.06; letter-spacing: var(--track-display); margin: 0 0 var(--sp-3); }
+  .intro .sum { font-size: var(--t-lead); line-height: 1.5; color: var(--ink-2); margin: 0 0 var(--sp-5); max-width: 56ch; }
+  .intro .counts { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0; padding: 0; list-style: none; }
+  .intro .counts li { font-size: var(--t-footnote); line-height: 26px; padding: 0 10px; border-radius: var(--r-pill); background: var(--stone); color: var(--stone-ink); white-space: nowrap; }
+  .intro .counts b { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .intro .counts .settled  { background: var(--mint);   color: var(--mint-ink); }
+  .intro .counts .open     { background: var(--butter); color: var(--butter-ink); }
+  .intro .counts .reopened { background: var(--peach);  color: var(--peach-ink); }
+  .intro .counts .round    { background: transparent; box-shadow: inset 0 0 0 1px var(--hairline-2); color: var(--ink-2); }
+
+  .qid { font-family: var(--font-ui); font-size: var(--t-caption); font-weight: 500; letter-spacing: 0; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+  section.sec { margin-top: var(--sp-16); padding-top: var(--sp-6); border-top: 1px solid var(--hairline); }
+  section.sec > h2 { font-size: 30px; letter-spacing: var(--track-display); margin: 0 0 var(--sp-2); display: flex; align-items: baseline; gap: var(--sp-3); }
+  section.sub { margin-top: var(--sp-10); }
+  section.sub > h3 { font-size: 22px; margin: 0 0 var(--sp-1); display: flex; align-items: baseline; gap: var(--sp-3); }
+  .sec-note { color: var(--ink-2); font-size: var(--t-sub); margin: 0 0 var(--sp-2); }
+
+  /* answered question: one prose line */
+  .line {
+    position: relative; display: block;
+    margin: 0 0 0 calc(-1 * var(--sp-3)); padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-tile);
+    font-size: var(--t-callout); line-height: 1.55;
+    scroll-margin-top: 88px;
+    transition: background-color var(--dur-hover) var(--ease-out);
+  }
+  .line .t { font-weight: 600; }
+  .line .arrow { color: var(--ink-3); margin: 0 3px; }
+  .line .a { color: var(--ink); }
+  .line .a.text::before { content: "\201C"; color: var(--ink-3); }
+  .line .a.text::after  { content: "\201D"; color: var(--ink-3); }
+  .line .a .meta { font-size: var(--t-sub); }
+  .line .qid { margin-right: var(--sp-2); }
+  .line .tail { white-space: nowrap; }
+  .line .ctl { font-size: var(--t-caption); padding: 2px 10px; margin-left: var(--sp-1); color: var(--ink-2); background: transparent; border-color: transparent; vertical-align: 1px; }
+  @media (hover: hover) { .line .ctl:hover { border-color: var(--hairline-2); background: var(--surface); color: var(--ink); } }
+  .line .reopen { opacity: 0; transition: opacity var(--dur-hover) var(--ease-out); }
+  .line:hover .reopen, .line:focus-within .reopen, .line .reopen.staged { opacity: 1; }
+  @media (hover: none) { .line .reopen { opacity: 1; } }
+  .line .reopen.staged { color: var(--peri-ink); border-color: var(--peri-line); background: var(--peri); }
+  .vis {
+    display: inline-flex; align-items: center; gap: 6px; vertical-align: 1px;
+    font-size: 11px; font-weight: 500; line-height: 18px; padding: 0 8px; margin-left: var(--sp-1);
+    color: var(--ink-2); background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-pill); white-space: nowrap;
+  }
+  @media (hover: hover) { .vis:hover { background: var(--butter-wash); border-color: var(--butter); color: var(--butter-ink); } }
+  .line:hover, .line.hl { background: var(--surface); }
+  .line.hl .vis, .block.hl .vis { background: var(--butter-wash); border-color: var(--butter); color: var(--butter-ink); }
+  .line.lead { font-size: var(--t-lead); padding-top: var(--sp-2); }
+  .line.lead .t { display: none; }
+  .line.lead .arrow { margin-left: 0; }
+  .line .notes { margin: var(--sp-1) 0 var(--sp-1) var(--sp-4); }
+  .line.reopen-staged .a { text-decoration: line-through; text-decoration-color: var(--peri-ink); color: var(--ink-2); }
+
+  /* open / reopened question: a white card on the paper */
+  .block {
+    position: relative;
+    margin: var(--sp-4) 0 0 calc(-1 * var(--sp-3));
+    padding: var(--sp-5) var(--sp-6) var(--sp-5);
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-card);
+    scroll-margin-top: 88px;
+    transition: border-color var(--dur-hover) var(--ease-out);
+  }
+  .block:hover, .block.hl { border-color: var(--hairline-2); }
+  .block.has-staged { border-color: var(--peri-line); }
+  .block.sel, .block:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .block:focus { outline: none; }
+  .block.sel:focus, .block:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .bh { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-2); }
+  .bh .qid { order: -1; }
+  .bh h4 { font-size: var(--t-title3); line-height: 1.25; margin: 0; flex: 1 0 100%; order: 1; }
+  .bh .vis { margin-left: auto; }
+  .body { color: var(--ink-2); margin: 0 0 var(--sp-4); font-size: var(--t-body); max-width: 62ch; }
+  .was { font-size: var(--t-sub); color: var(--ink-2); margin: calc(-1 * var(--sp-2)) 0 var(--sp-4); }
+  .was s { text-decoration-color: var(--peach-ink); }
+
+  .opts { display: grid; gap: var(--sp-2); margin: 0 0 var(--sp-3); }
+  .opts .opt { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: var(--sp-3); align-items: start; }
+  .opts .opt > span:nth-child(2) { padding-top: 1px; }
+  .opts .opt .rt, .opts .opt .st { font-size: var(--t-caption); font-weight: 600; white-space: nowrap; padding-top: 2px; }
+  .opts .opt .rt { color: var(--peri-ink); }
+  /* the recommendation: dashed and pre-selected (not yet staged) */
+  .opts .opt.rec { border: 1px dashed var(--peri-ink); background: var(--peri-wash); }
+  .opts .opt.rec .k { border-style: dashed; border-color: var(--peri-ink); color: var(--peri-ink); }
+  .opts.overridden .opt.rec { background: var(--surface); border-color: var(--hairline-2); }
+  .opts.overridden .opt.rec .k { border-color: var(--hairline-2); color: var(--ink-2); }
+  .opts .opt.staged, .opts .opt.rec.staged { border: 1px solid var(--peri-ink); background: var(--peri); }
+  .opts .opt.staged .k, .opts.overridden .opt.staged .k { background: var(--peri-ink); border: 1px solid var(--peri-ink); color: var(--surface); }
+  .opts .opt .st { display: none; color: var(--peri-ink); }
+  .opts .opt.staged .st { display: inline; }
+  .opts .opt.staged .rt { display: none; }
+
+  .why { margin: 0 0 var(--sp-4); font-size: var(--t-sub); color: var(--ink-2); }
+  .why b { color: var(--ink); font-weight: 600; }
+  .free { display: block; }
+  .free textarea { min-height: 44px; height: 44px; line-height: 1.45; overflow: hidden; resize: none; }
+  .free .hint { display: none; font-size: var(--t-caption); font-weight: 500; color: var(--peri-ink); margin-top: 6px; }
+  .free.on .hint { display: block; }
+
+  /* thread: collapsed to bold first lines, expand inline */
+  .thread { margin: var(--sp-4) 0 0; padding: var(--sp-3) 0 0; border-top: 1px solid var(--hairline); list-style: none; }
+  .thread li { margin: 0; }
+  .msg {
+    display: block; width: calc(100% + 2 * var(--sp-2)); margin-left: calc(-1 * var(--sp-2));
+    background: transparent; border: 0; border-radius: var(--r-row);
+    padding: var(--sp-1) var(--sp-2); font-size: var(--t-sub); line-height: 1.5; color: var(--ink);
+  }
+  @media (hover: hover) { .msg:hover { background: var(--paper); border: 0; } }
+  .msg:active { transform: none; background: var(--paper-2); }
+  .msg .who { font-size: var(--t-caption); font-weight: 600; color: var(--ink-3); margin-right: var(--sp-2); }
+  .msg .who.user { color: var(--ink); }
+  .msg b { font-weight: 600; }
+  .msg .rest { display: none; color: var(--ink-2); font-weight: 400; }
+  .msg .more { color: var(--blue); font-size: var(--t-caption); margin-left: var(--sp-1); }
+  .msg[aria-expanded="true"] .rest { display: inline; }
+  .msg[aria-expanded="true"] .more { display: none; }
+  .msg .at { color: var(--ink-3); font-size: var(--t-caption); margin-left: var(--sp-1); font-variant-numeric: tabular-nums; }
+
+  /* deferred */
+  .sec.deferred .line .t { font-weight: 500; color: var(--ink-2); }
+  .sec.deferred .line .meta { font-size: var(--t-sub); }
+  .sec.deferred .line .ctl { opacity: 1; color: var(--blue); }
+  .sec.deferred .block { margin-top: var(--sp-2); margin-bottom: var(--sp-4); }
+
+  /* ---- the visual: the product, resting on the page ----------------------- */
+  .fig { position: sticky; top: 88px; }
+  .fig figure { margin: 0; }
+  .fig .frame { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-sheet); overflow: hidden; box-shadow: var(--shadow-product); }
+  .fig .fh { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-5); }
+  .fig .fh h2 { font-family: var(--font-ui); font-size: var(--t-sub); font-weight: 600; letter-spacing: var(--track-ui); margin: 0; }
+  .fig .fh .v { color: var(--ink-3); font-size: var(--t-caption); }
+  .fig .fh .spacer { flex: 1; }
+  .fig .fh button { font-size: var(--t-caption); padding: 4px 12px; }
+  .stale { display: flex; align-items: center; gap: var(--sp-3); margin: 0 var(--sp-3) var(--sp-3); padding: 8px 8px 8px 14px; border-radius: var(--r-tile); background: var(--peach); color: var(--peach-ink); font-size: var(--t-footnote); }
+  .stale b { font-weight: 600; }
+  .stale .spacer { flex: 1; }
+  .stale button { font-size: var(--t-caption); padding: 4px 12px; border-color: transparent; background: var(--surface); color: var(--ink); font-weight: 600; }
+  .viewport { position: relative; overflow: hidden; background: var(--paper); border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); }
+  .viewport iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; background: var(--surface); }
+  .fig figcaption { padding: var(--sp-3) var(--sp-5) var(--sp-4); font-size: var(--t-footnote); line-height: 1.5; color: var(--ink-2); }
+  .fig figcaption .how-now { display: block; color: var(--butter-ink); font-weight: 600; margin-bottom: 2px; }
+  .fig figcaption .how-now:empty { display: none; }
+  .fig figcaption .how { display: flex; align-items: center; gap: 6px; color: var(--ink-3); font-size: var(--t-caption); margin-top: var(--sp-2); }
+  .fig.hidden .viewport, .fig.hidden figcaption, .fig.hidden .stale { display: none; }
+
+  /* ---- send bar: material, one black pill -------------------------------- */
+  .bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-sticky);
+    display: flex; align-items: center; gap: var(--sp-3);
+    min-height: 60px; padding: var(--sp-2) var(--sp-8);
+    background: var(--material);
+    -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+    border-top: 1px solid var(--hairline);
+    font-size: var(--t-footnote);
+  }
+  .bar .list { flex: 1; min-width: 0; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar .list b { color: var(--peri-ink); font-weight: 600; }
+  .bar .list a { color: var(--ink); font-weight: 500; }
+  .bar .keys { color: var(--ink-3); font-size: var(--t-caption); white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+  .bar button { white-space: nowrap; font-size: var(--t-sub); padding: 8px 16px; }
+  .bar button.primary { padding: 8px 20px; }
+  .toast { bottom: 80px; }
+
+  /* ---- < 1100: figure sits under the header, no rail ---------------------- */
+  @media (max-width: 1099px) {
+    .page { grid-template-columns: minmax(0, 68ch); grid-template-areas: "fig" "doc"; justify-content: center; gap: var(--sp-10); padding-top: var(--sp-6); }
+    .rail { display: none; }
+    .fig { position: static; }
+  }
+  /* ---- < 760: everything stacks, tighter gutters -------------------------- */
+  @media (max-width: 759px) {
+    .top { padding: var(--sp-2) var(--sp-4); gap: var(--sp-2); min-height: 52px; }
+    .top .name { flex: 1; }
+    .top h1 { overflow: hidden; text-overflow: ellipsis; }
+    .top .spacer { display: none; }
+    .top .doc, .top .agent span { display: none; }
+    .top .agent b { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .top .next { padding: 4px 12px; }
+    .top .next .long { display: none; }
+    .top .next .short { display: inline; }
+    .page { padding: var(--sp-4) var(--sp-4) 150px; grid-template-columns: minmax(0, 1fr); gap: var(--sp-8); }
+    .intro h1 { font-size: 32px; }
+    .intro .sum { font-size: var(--t-callout); }
+    section.sec { margin-top: var(--sp-12); }
+    section.sec > h2 { font-size: 25px; }
+    section.sub > h3 { font-size: 20px; }
+    .block { padding: var(--sp-4); margin-left: calc(-1 * var(--sp-2)); margin-right: calc(-1 * var(--sp-2)); border-radius: var(--r-card); }
+    .bh h4 { font-size: 19px; }
+    .opts .opt { grid-template-columns: 22px minmax(0, 1fr); row-gap: 2px; }
+    .opts .opt > span:last-child { grid-column: 2; }
+    .opts .opt > span:last-child:empty { display: none; }
+    .line { margin-left: calc(-1 * var(--sp-2)); padding-left: var(--sp-2); padding-right: var(--sp-2); font-size: var(--t-body); }
+    .line .tail { white-space: normal; }
+    .fig .frame { border-radius: var(--r-card); }
+    .bar { padding: var(--sp-2) var(--sp-4) calc(var(--sp-2) + env(safe-area-inset-bottom)); flex-wrap: wrap; row-gap: 6px; }
+    .bar .list { flex-basis: 100%; }
+    .bar .keys { display: none; }
+    .bar .spacer { flex: 1; }
+    .toast { bottom: 128px; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="name"><h1 id="topic"></h1><span class="doc path" id="doc"></span></div>
+  <span class="spacer"></span>
+  <button type="button" class="next ghost" id="next-open" title="Jump to the next open question (j)"></button>
+  <span class="agent"><i class="dot" id="dot"></i><b id="agent-text">Waiting for you</b><span id="agent-since"></span></span>
+</header>
+
+<div class="page">
+  <nav class="rail" id="rail" aria-label="Jump to section"></nav>
+  <main class="doc" id="doc-main"></main>
+  <aside class="fig" id="fig" aria-label="Visual"></aside>
+</div>
+
+<div class="bar" id="bar">
+  <span class="list" id="staged-list"></span>
+  <span class="keys"><kbd>j</kbd>/<kbd>k</kbd> open questions · <kbd>a</kbd> accept · <kbd>⌘↵</kbd> send</span>
+  <span class="spacer"></span>
+  <button type="button" id="finish">Finish grill</button>
+  <button type="button" class="primary" id="send" disabled>Send to Agent</button>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/*__DATA__*/
+</script>
+<script>
+(() => {
+  const S = SESSION;
+  const Q = S.questions;
+  const byId = Object.fromEntries(Q.map((q) => [q.id, q]));
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const qnum = (id) => id.toUpperCase();
+  const byRound = (a, b) => a.round - b.round || parseInt(a.id.slice(1), 10) - parseInt(b.id.slice(1), 10);
+  const needsAnswer = (q) => q.status === "open" || q.status === "reopened";
+
+  /* ---- sections from dependency roots (plan Task 4, Step 1) ---------- */
+  const rootOf = (q, byId) => { let cur = q, seen = new Set(); while (cur.deps && cur.deps.length && !seen.has(cur.id)) { seen.add(cur.id); const p = byId[cur.deps[0]]; if (!p) break; cur = p; } return cur.id; };
+  // Within a root section, the question one step below the root on the deps[0] path.
+  // Used to split a root section into sub-sections when the session has a single root
+  // (this session: everything descends from Q1, so one flat section would be 24 items long).
+  const branchOf = (q) => {
+    let cur = q, prev = null, seen = new Set();
+    while (cur.deps && cur.deps.length && !seen.has(cur.id)) { seen.add(cur.id); const p = byId[cur.deps[0]]; if (!p) break; prev = cur; cur = p; }
+    return prev ? prev.id : q.id;
+  };
+
+  const deferred = Q.filter((q) => q.status === "deferred").sort(byRound);
+  const live = Q.filter((q) => q.status !== "deferred");
+  const roots = [...new Set(live.map((q) => rootOf(q, byId)))].map((id) => byId[id]).sort(byRound);
+  const SECTIONS = roots.map((r) => {
+    const members = live.filter((q) => rootOf(q, byId) === r.id && q.id !== r.id);
+    const branchIds = [...new Set(members.map(branchOf))].map((id) => byId[id]).sort(byRound);
+    const split = roots.length === 1 && branchIds.length > 1;
+    const subs = split
+      ? branchIds.map((b) => ({ head: b, items: members.filter((q) => branchOf(q) === b.id && q.id !== b.id) }))
+      : [{ head: null, items: members }];
+    return { head: r, subs };
+  });
+  const order = (items) => [...items.filter((q) => !needsAnswer(q)).sort(byRound), ...items.filter(needsAnswer).sort(byRound)];
+
+  /* ---- visual regions ------------------------------------------------ */
+  const REGIONS = new Set([...VISUAL_HTML.matchAll(/data-q="(q\d+)"/g)].map((m) => m[1]));
+
+  /* ---- staging (in memory for the mockup) ---------------------------- */
+  // staged[id] = { option?: "A", text?: "...", reopen?: true }
+  const staged = {};
+  const expandedDeferred = new Set();
+
+  const optText = (q, k) => { const o = q.options.find((x) => x.k === k); return o ? o.text : ""; };
+  const answerText = (q) => {
+    const a = q.answer; if (!a) return { html: "", kind: "" };
+    if (a.kind === "text") return { html: esc(a.text), kind: "text" };
+    const t = optText(q, a.option);
+    return { html: esc(t) + (a.text ? ` <span class="meta">— “${esc(a.text)}”</span>` : ""), kind: a.kind };
+  };
+  const firstLine = (text) => {
+    const m = String(text).match(/^(.+?[.!?])(\s+|$)([\s\S]*)$/);
+    return m ? [m[1], m[3]] : [text, ""];
+  };
+  const hhmm = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toISOString().slice(11, 16); };
+
+  const thread = (q) => !q.thread || !q.thread.length ? "" :
+    `<ul class="thread" aria-label="Thread">${q.thread.map((m, i) => {
+      const [first, rest] = firstLine(m.text);
+      return `<li><button type="button" class="msg" aria-expanded="false" data-msg="${q.id}:${i}"><span class="who ${m.who}">${m.who === "agent" ? "Agent" : "You"}</span><b>${esc(first)}</b>${rest ? ` <span class="rest">${esc(rest)}</span><span class="more">· more</span>` : ""}<span class="at">${hhmm(m.at)}</span></button></li>`;
+    }).join("")}</ul>`;
+
+  const visTag = (q) => REGIONS.has(q.id) ? `<button type="button" class="vis vismark" data-show="${q.id}" title="Show its part of the visual">In visual</button>` : "";
+
+  function line(q, lead) {
+    const a = answerText(q);
+    const st = staged[q.id] || {};
+    const nThread = (q.thread || []).length;
+    return `<div class="line ${lead ? "lead" : ""} ${st.reopen ? "reopen-staged" : ""}" id="${q.id}" data-q="${q.id}" tabindex="-1">`
+      + (lead ? "" : `<span class="qid">${qnum(q.id)}</span>`)
+      + `<span class="t">${esc(q.title)}</span> <span class="arrow">→</span> <span class="a ${a.kind === "text" ? "text" : ""}">${a.html}</span>`
+      + `<span class="tail">${REGIONS.has(q.id) ? `<button type="button" class="vis vismark" data-show="${q.id}" title="Show its part of the visual">In visual</button>` : ""}`
+      + (nThread ? `<button type="button" class="ctl" data-notes="${q.id}" aria-expanded="false">${nThread} ${nThread === 1 ? "note" : "notes"}</button>` : "")
+      + `<button type="button" class="ctl reopen ${st.reopen ? "staged" : ""}" data-reopen="${q.id}" aria-pressed="${st.reopen ? "true" : "false"}">${st.reopen ? "reopen · staged" : "reopen"}</button></span>`
+      + (nThread ? `<div class="notes" hidden>${thread(q)}</div>` : "")
+      + `</div>`;
+  }
+
+  function block(q) {
+    const st = staged[q.id] || {};
+    const hasText = !!(st.text && st.text.trim());
+    const overridden = !!st.option || hasText;
+    const opts = q.options.map((o, i) => {
+      const isRec = q.rec && q.rec.option === o.k;
+      const isStaged = st.option === o.k;
+      return `<button type="button" class="opt ${isRec ? "rec" : ""} ${isStaged ? "staged" : ""}" data-q="${q.id}" data-opt="${o.k}" aria-pressed="${isStaged}">`
+        + `<span class="k">${o.k}</span><span>${esc(o.text)}</span>`
+        + `<span>${isRec ? `<span class="rt">Recommended</span>` : ""}<span class="st">Staged</span></span></button>`;
+    }).join("");
+    const was = q.status === "reopened" && q.answer ? `<p class="was">Was: <s>${answerText(q).html}</s></p>` : "";
+    const tags = `<span class="chip ${q.status}">${q.status[0].toUpperCase() + q.status.slice(1)}</span>${q.updated ? `<span class="chip updated">Rec updated</span>` : ""}${visTag(q)}`;
+    return `<article class="block ${Object.keys(st).length ? "has-staged" : ""}" id="${q.id}" data-q="${q.id}" tabindex="-1" aria-labelledby="h-${q.id}">`
+      + `<div class="bh"><span class="qid">${qnum(q.id)}</span><h4 id="h-${q.id}">${esc(q.title)}</h4>${tags}</div>`
+      + `<p class="body">${esc(q.body)}</p>${was}`
+      + `<div class="opts ${overridden && !st.option ? "overridden" : ""} ${st.option ? "overridden" : ""}" role="group" aria-label="Options">${opts}</div>`
+      + (q.rec ? `<p class="why"><b>Why ${esc(q.rec.option)}:</b> ${esc(q.rec.why)}</p>` : "")
+      + `<label class="free ${hasText ? "on" : ""}"><span class="visually-hidden" hidden>Your answer</span><textarea rows="1" data-free="${q.id}" class="${hasText ? "staged" : ""}" placeholder="Answer in your own words, or push back…" aria-label="Free-text answer for ${qnum(q.id)}">${esc(st.text || "")}</textarea><span class="hint">Staged as your answer${st.option ? ` with option ${st.option}` : ""}.</span></label>`
+      + thread(q)
+      + `</article>`;
+  }
+
+  function subHead(q, tag) {
+    const open = q && needsAnswer(q);
+    return open ? block(q) : line(q, true);
+  }
+
+  /* ---- render ---------------------------------------------------------- */
+  const slug = (id) => "sec-" + id;
+  const openIn = (items) => items.filter(needsAnswer).length;
+
+  function renderDoc() {
+    const settled = Q.filter((q) => q.status === "answered").length;
+    const open = Q.filter((q) => q.status === "open").length;
+    const reopened = Q.filter((q) => q.status === "reopened").length;
+    const rounds = Math.max(...Q.map((q) => q.round));
+    let h = `<div class="intro"><h1>${esc(S.topic)}</h1><p class="sum">${esc(S.note || "")}</p>`
+      + `<ul class="counts"><li class="settled"><b>${settled}</b> settled</li><li class="open"><b>${open}</b> open</li><li class="reopened"><b>${reopened}</b> reopened</li><li class="deferred"><b>${deferred.length}</b> deferred</li><li class="round">Round <b>${rounds}</b></li></ul></div>`;
+    for (const sec of SECTIONS) {
+      const r = sec.head;
+      h += `<section class="sec" id="${slug(r.id)}"><h2><span>${esc(r.title)}</span><span class="qid">${qnum(r.id)}</span></h2>`;
+      h += subHead(r);
+      for (const sub of sec.subs) {
+        if (sub.head) {
+          h += `<section class="sub" id="${slug(sub.head.id)}"><h3><span>${esc(sub.head.title)}</span><span class="qid">${qnum(sub.head.id)}</span></h3>`;
+          h += subHead(sub.head);
+        }
+        for (const q of order(sub.items)) h += needsAnswer(q) ? block(q) : line(q);
+        if (sub.head) h += `</section>`;
+      }
+      h += `</section>`;
+    }
+    if (deferred.length) {
+      h += `<section class="sec deferred" id="sec-deferred"><h2>Deferred</h2><p class="sec-note">Parked on purpose. Open one to answer it now.</p>`;
+      for (const q of deferred) {
+        const ex = expandedDeferred.has(q.id);
+        const parent = q.deps && q.deps[0] ? byId[q.deps[0]] : null;
+        h += `<div class="line" id="${q.id}" data-q="${q.id}" tabindex="-1"><span class="qid">${qnum(q.id)}</span><span class="t">${esc(q.title)}</span> <span class="meta">· after ${parent ? esc(parent.title) : "—"}</span>`
+          + `<span class="tail"><button type="button" class="ctl" data-expand="${q.id}" aria-expanded="${ex}">${ex ? "close" : "answer now"}</button></span></div>`;
+        if (ex) h += block(q).replace(`id="${q.id}"`, `id="${q.id}-b"`);
+      }
+      h += `</section>`;
+    }
+    $("doc-main").innerHTML = h;
+  }
+
+  function renderRail() {
+    let h = `<h2>Contents</h2><ol>`;
+    for (const sec of SECTIONS) {
+      const all = [sec.head, ...sec.subs.flatMap((s) => (s.head ? [s.head] : []).concat(s.items))];
+      h += `<li class="lvl1"><a href="#${slug(sec.head.id)}" data-sec="${slug(sec.head.id)}">${esc(sec.head.title)}<span class="n ${openIn(all) ? "" : "zero"}">${openIn(all) || "✓"}</span></a></li>`;
+      for (const sub of sec.subs) {
+        if (!sub.head) continue;
+        const items = [sub.head, ...sub.items];
+        const n = openIn(items);
+        h += `<li class="lvl2"><a href="#${slug(sub.head.id)}" data-sec="${slug(sub.head.id)}">${esc(sub.head.title)}<span class="n ${n ? "" : "zero"}">${n || "✓"}</span></a></li>`;
+        for (const q of items.filter(needsAnswer).sort(byRound)) {
+          h += `<li class="q"><a href="#${q.id}" title="${esc(q.title)}" data-jump="${q.id}" class="${staged[q.id] ? "staged" : ""}"><span class="qid">${qnum(q.id)}</span><span>${esc(q.title)}</span></a></li>`;
+        }
+      }
+    }
+    if (deferred.length) h += `<li class="lvl1"><a href="#sec-deferred" data-sec="sec-deferred">Deferred<span class="n zero">${deferred.length}</span></a></li>`;
+    h += `</ol><p class="legend">Numbers are questions waiting on you. Hover a question to outline its part of the visual.</p>`;
+    $("rail").innerHTML = h;
+  }
+
+  function renderFig() {
+    const v = S.visual || {};
+    $("fig").innerHTML = `<figure class="frame">`
+      + `<div class="fh"><h2>Visual</h2><span class="v">${esc((v.kind || "").replace(/^./, (c) => c.toUpperCase()))} · v${esc(v.version || "")}</span><span class="spacer"></span><button type="button" class="ghost" id="fig-toggle" aria-expanded="true">Hide</button></div>`
+      + (v.stale ? `<div class="stale" role="note"><span><b>Out of date.</b> A question it shows was reopened.</span><span class="spacer"></span><button type="button" id="regen">Regenerate</button></div>` : "")
+      + `<div class="viewport" id="viewport"><iframe id="visual-frame" title="Visual v${esc(v.version || "")}" sandbox="allow-scripts"></iframe></div>`
+      + `<figcaption><span id="fig-status" class="how-now" aria-live="polite"></span>${esc(v.note || "")}<span class="how vismark">Click a part of the visual to jump to its question.</span></figcaption></figure>`;
+    const f = $("visual-frame");
+    f.srcdoc = VISUAL_HTML;
+    fit();
+  }
+
+  // The visual is authored at a desktop width; scale it to the figure instead of reflowing it.
+  const NATIVE_W = 680, NATIVE_H = 418;
+  function fit() {
+    const vp = $("viewport"), f = $("visual-frame"); if (!vp || !f) return;
+    const w = vp.clientWidth || NATIVE_W;
+    const cap = innerWidth < 1100 ? (innerWidth < 760 ? 240 : 300) : Infinity;
+    const s = Math.min(1, w / NATIVE_W, cap / NATIVE_H);
+    f.style.width = NATIVE_W + "px"; f.style.height = NATIVE_H + "px";
+    f.style.transform = `scale(${s})`;
+    vp.style.height = Math.round(NATIVE_H * s) + "px";
+    f.style.left = Math.max(0, Math.round((w - NATIVE_W * s) / 2)) + "px";
+  }
+
+  function stagedCount() { return Object.values(staged).filter((s) => s.option || (s.text && s.text.trim()) || s.reopen).length; }
+  function renderBar() {
+    const entries = Object.entries(staged).filter(([, s]) => s.option || (s.text && s.text.trim()) || s.reopen);
+    const n = entries.length;
+    $("send").disabled = !n;
+    $("send").textContent = n ? `Send ${n} to Agent` : "Send to Agent";
+    $("staged-list").innerHTML = n
+      ? `<b>${n} staged</b> · ` + entries.map(([id, s]) => `<a href="#${id}" data-jump="${id}">${qnum(id)}</a> ${s.reopen ? "reopen" : [s.option ? "→ " + s.option : "", s.text && s.text.trim() ? "“" + esc(s.text.trim().slice(0, 28)) + (s.text.trim().length > 28 ? "…" : "") + "”" : ""].filter(Boolean).join(" ")}`).join(" · ")
+      : "Nothing staged. Picks and notes stay here until you send.";
+    const left = Q.filter((q) => needsAnswer(q) && !staged[q.id]).length;
+    $("next-open").innerHTML = left ? `<b>${left}</b><span class="long"> waiting on you · next</span><span class="short"> open</span> ↓` : "All staged";
+  }
+
+  function render() {
+    const y = window.scrollY;
+    const focusId = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.free;
+    const caret = focusId ? document.activeElement.selectionStart : 0;
+    renderDoc(); renderRail(); renderBar();
+    document.querySelectorAll(".free textarea").forEach(grow);
+    window.scrollTo(0, y);
+    if (focusId) { const t = document.querySelector(`[data-free="${focusId}"]`); if (t) { t.focus({ preventScroll: true }); t.setSelectionRange(caret, caret); } }
+    observeSections();
+  }
+
+  function grow(t) { t.style.height = "auto"; t.style.height = Math.max(38, t.scrollHeight + 2) + "px"; }
+
+  /* ---- staging actions ------------------------------------------------- */
+  function clean(id) { const s = staged[id]; if (s && !s.option && !(s.text && s.text.trim()) && !s.reopen) delete staged[id]; }
+  function pick(id, k) {
+    const s = staged[id] = staged[id] || {};
+    s.option = s.option === k ? undefined : k;
+    clean(id); render();
+  }
+  function accept(id) { const q = byId[id]; if (q && q.rec) { staged[id] = Object.assign(staged[id] || {}, { option: q.rec.option }); render(); } }
+
+  /* ---- visual linkage (parent side of Task 20's protocol) -------------- */
+  let hlId = null;
+  function highlight(ids) {
+    const f = $("visual-frame");
+    if (f && f.contentWindow) f.contentWindow.postMessage({ highlight: ids }, "*");
+  }
+  function hoverTo(id) {
+    if (id === hlId) return;
+    hlId = id;
+    document.querySelectorAll(".hl").forEach((el) => el.classList.remove("hl"));
+    if (id) document.querySelectorAll(`[data-q="${id}"].line, [data-q="${id}"].block`).forEach((el) => el.classList.add("hl"));
+    highlight(id ? [id] : []);
+    const st = $("fig-status");
+    if (st) st.textContent = !id ? "" : REGIONS.has(id) ? `${qnum(id)} · ${byId[id].title}: outlined above` : "";
+  }
+  function select(id) {
+    const el = document.getElementById(id) || document.getElementById(id + "-b");
+    if (!el) {
+      const q = byId[id];
+      if (q && q.status === "deferred") { expandedDeferred.add(id); render(); return select(id); }
+      return;
+    }
+    document.querySelectorAll(".sel").forEach((x) => x.classList.remove("sel"));
+    const target = document.getElementById(id + "-b") || el;
+    target.classList.add("sel");
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.focus({ preventScroll: true });
+    setTimeout(() => target.classList.remove("sel"), 1800);
+  }
+
+  addEventListener("message", (e) => {
+    const f = $("visual-frame");
+    if (!f || e.source !== f.contentWindow || !e.data || typeof e.data !== "object") return;
+    if (typeof e.data.clicked === "string" && /^q\d+$/.test(e.data.clicked)) select(e.data.clicked);
+    else if (e.data.key === "send") send();
+    else if (e.data.key === "escape") { const b = document.querySelector(".block"); (b || document.body).focus(); }
+  });
+
+  document.addEventListener("mouseover", (e) => {
+    const el = e.target.closest(".block[data-q], .line[data-q]");
+    hoverTo(el ? el.dataset.q : null);
+  });
+  document.addEventListener("focusin", (e) => {
+    const el = e.target.closest(".block[data-q], .line[data-q]");
+    if (el) hoverTo(el.dataset.q);
+  });
+
+  /* ---- events ---------------------------------------------------------- */
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    const opt = t.closest(".opt[data-opt]");
+    if (opt) return pick(opt.dataset.q, opt.dataset.opt);
+    const ro = t.closest("[data-reopen]");
+    if (ro) { const id = ro.dataset.reopen; staged[id] = staged[id] || {}; staged[id].reopen = !staged[id].reopen; clean(id); return render(); }
+    const notes = t.closest("[data-notes]");
+    if (notes) { const box = notes.closest(".line").querySelector(".notes"); const on = box.hidden; box.hidden = !on; notes.setAttribute("aria-expanded", String(on)); return; }
+    const msg = t.closest(".msg");
+    if (msg) { msg.setAttribute("aria-expanded", String(msg.getAttribute("aria-expanded") !== "true")); return; }
+    const ex = t.closest("[data-expand]");
+    if (ex) { const id = ex.dataset.expand; expandedDeferred.has(id) ? expandedDeferred.delete(id) : expandedDeferred.add(id); render(); if (expandedDeferred.has(id)) setTimeout(() => select(id), 0); return; }
+    const jump = t.closest("[data-jump]");
+    if (jump) { e.preventDefault(); return select(jump.dataset.jump); }
+    if (t.closest("#next-open")) return nextOpen(1);
+    const show = t.closest("[data-show]");
+    if (show) { const r = $("fig").getBoundingClientRect(); if (r.bottom < 60 || r.top > innerHeight) $("fig").scrollIntoView({ behavior: "smooth", block: "start" }); hlId = null; return hoverTo(show.dataset.show); }
+    if (t.closest("#fig-toggle")) { const fig = $("fig"); const hid = fig.classList.toggle("hidden"); t.textContent = hid ? "Show" : "Hide"; t.setAttribute("aria-expanded", String(!hid)); return; }
+    if (t.closest("#regen")) return toast("Visualize sent · the agent will redraw v4");
+    if (t.closest("#finish")) return toast("Finish asks to confirm first (7 open questions)");
+    if (t.closest("#send")) return send();
+  });
+
+  document.addEventListener("input", (e) => {
+    const t = e.target.closest("[data-free]"); if (!t) return;
+    const id = t.dataset.free;
+    staged[id] = staged[id] || {};
+    staged[id].text = t.value;
+    clean(id);
+    grow(t);
+    // light update: no full re-render while typing
+    const b = t.closest(".block");
+    const has = !!t.value.trim();
+    t.classList.toggle("staged", has);
+    t.closest(".free").classList.toggle("on", has);
+    b.classList.toggle("has-staged", !!staged[id]);
+    b.querySelector(".opts").classList.toggle("overridden", has || !!(staged[id] && staged[id].option));
+    renderBar();
+    const ra = document.querySelector(`.rail [data-jump="${id}"]`); if (ra) ra.classList.toggle("staged", !!staged[id]);
+  });
+
+  function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2200); }
+
+  function send() {
+    const n = stagedCount(); if (!n) return;
+    for (const k in staged) delete staged[k];
+    $("dot").classList.add("working"); $("agent-text").textContent = "Agent is working"; $("agent-since").textContent = "";
+    toast(`Sent ${n} ${n === 1 ? "action" : "actions"} as one turn`);
+    render();
+    setTimeout(() => { $("dot").classList.remove("working"); $("agent-text").textContent = "Waiting for you"; $("agent-since").textContent = "· just now"; }, 2600);
+  }
+
+  /* ---- keyboard (subset of spec §7) ------------------------------------ */
+  const openBlocks = () => [...document.querySelectorAll(".block")];
+  function nextOpen(dir) {
+    const bs = openBlocks(); if (!bs.length) return;
+    const cur = document.activeElement && document.activeElement.closest && document.activeElement.closest(".block");
+    let i = cur ? bs.indexOf(cur) + dir : -1;
+    if (i < 0) {
+      // first block below (or above) the middle of the viewport
+      const mid = innerHeight / 3;
+      i = dir > 0 ? bs.findIndex((b) => b.getBoundingClientRect().top > mid) : bs.map((b) => b.getBoundingClientRect().top < mid - 10).lastIndexOf(true);
+      if (i < 0) i = dir > 0 ? 0 : bs.length - 1;
+    }
+    i = Math.max(0, Math.min(bs.length - 1, i));
+    bs[i].scrollIntoView({ behavior: "smooth", block: "center" });
+    bs[i].focus({ preventScroll: true });
+    hoverTo(bs[i].dataset.q);
+  }
+  document.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); return send(); }
+    const inField = e.target.closest && e.target.closest("input, textarea, [contenteditable]");
+    if (e.key === "Escape") { if (inField) { const b = e.target.closest(".block"); (b || document.body).focus(); } return; }
+    if (inField || e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
+    const cur = document.activeElement && document.activeElement.closest && document.activeElement.closest(".block");
+    if (e.key === "j") { e.preventDefault(); nextOpen(1); }
+    else if (e.key === "k") { e.preventDefault(); nextOpen(-1); }
+    else if (cur && e.key === "a") { e.preventDefault(); const id = cur.dataset.q; accept(id); focusBlock(id); }
+    else if (cur && /^[1-4]$/.test(e.key)) {
+      const q = byId[cur.dataset.q]; const o = q && q.options[+e.key - 1];
+      if (o) { e.preventDefault(); pick(q.id, o.k); focusBlock(q.id); }
+    }
+    else if (cur && e.key === "f") { e.preventDefault(); const t = cur.querySelector("textarea"); if (t) t.focus(); }
+  });
+  function focusBlock(id) { const b = document.querySelector(`.block[data-q="${id}"]`); if (b) b.focus({ preventScroll: true }); }
+
+  /* ---- rail: current section ------------------------------------------ */
+  let io = null;
+  function observeSections() {
+    if (io) io.disconnect();
+    if (!("IntersectionObserver" in window)) return;
+    const vis = new Map();
+    io = new IntersectionObserver((ents) => {
+      ents.forEach((en) => vis.set(en.target.id, en.isIntersecting ? en.boundingClientRect.top : null));
+      const tops = [...vis.entries()].filter(([, v]) => v != null).sort((a, b) => a[1] - b[1]);
+      const id = tops.length ? tops[0][0] : null;
+      document.querySelectorAll(".rail a[data-sec]").forEach((a) => a.classList.toggle("cur", a.dataset.sec === id));
+    }, { rootMargin: "-80px 0px -55% 0px" });
+    document.querySelectorAll("section.sub, section.sec.deferred").forEach((s) => io.observe(s));
+  }
+
+  /* ---- boot ------------------------------------------------------------ */
+  $("topic").textContent = S.topic;
+  $("doc").textContent = "→ " + S.doc;
+  if (S.agent && S.agent.since) $("agent-since").textContent = "· since " + hhmm(S.agent.since);
+  renderFig();
+  render();
+  if ("ResizeObserver" in window) new ResizeObserver(fit).observe($("fig")); else addEventListener("resize", fit);
+})();
+</script>
+</body>
+</html>
