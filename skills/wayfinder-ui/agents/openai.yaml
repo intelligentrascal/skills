@@ -1,0 +1,3 @@
+interface:
+  display_name: "Wayfinder (UI)"
+  short_description: "Chart a large effort as a map of decision tickets, with a live browser board"

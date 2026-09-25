@@ -222,7 +222,7 @@
     {
       "id": 24,
       "subject": "Task 25: Plugin and marketplace manifests",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Installable local plugin `intelligentrascal` depending on `mattpocock-skills@mattpocock`.\n\n**Depends on:** T22, T23, T24\n\n**Verify:** `node --test scripts/test/manifest.test.mjs` → pass; `claude plugin validate /Users/rahil/code/skills` → valid; `claude plugin marketplace add /Users/rahil/code/skills && claude plugin install intelligentrascal@intelligentrascal && claude plugin list | grep intelligentrascal` → listed, enabled.\n\nSee plan section \"Task 25\".\n\n```json:metadata\n{\"files\":[\".claude-plugin/plugin.json\",\".claude-plugin/marketplace.json\",\"scripts/test/manifest.test.mjs\"],\"verifyCommand\":\"node --test scripts/test/manifest.test.mjs → pass; claude plugin validate /Users/rahil/code/skills → valid; claude plugin marketplace add /Users/rahil/code/skills && claude plugin install intelligentrascal@intelligentrascal && claude plugin list | grep intelligentrascal → listed, enabled.\",\"acceptanceCriteria\":[\"`plugin.json`:\",\"`marketplace.json`:\",\"Skills are found by the default `skills/` scan (four folders).\",\"`claude plugin validate /Users/rahil/code/skills` reports no errors.\",\"Test parses both files and asserts names, dependency, allowlist, and that each `skills/*/SKILL.md` has matching `name`.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         21,
@@ -242,7 +242,7 @@
     {
       "id": 26,
       "subject": "Task 27: Codex `openai.yaml` sidecars",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Codex UI metadata and invocation policy for all four skills.\n\n**Depends on:** T22, T23\n\n**Verify:** `node --test skills/grilling-ui/test/skills.test.mjs` → pass.\n\nSee plan section \"Task 27\".\n\n```json:metadata\n{\"files\":[\"skills/{grilling-ui,grill-me-ui,grill-docs-ui,wayfinder-ui}/agents/openai.yaml\",\"test/skills.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/skills.test.mjs → pass.\",\"acceptanceCriteria\":[\"`grilling-ui/agents/openai.yaml`:\",\"Wrappers: `interface.display_name` \\\"Grill Me (UI)\\\", \\\"Grill With Docs (UI)\\\", \\\"Wayfinder (UI)\\\" and short descriptions; **no** `policy` block (they are model-invocable by their \\\"ui\\\" triggers, spec §3 Descriptions).\",\"Test parses the YAML with a tiny line parser (no deps) and asserts the above.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         21,
@@ -252,7 +252,7 @@
     {
       "id": 27,
       "subject": "Task 28: `install-agents.sh` and Codex sandbox check",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** One script to install the skill set for Codex, OpenCode and Pi; check Pocock's skills; record the agents pin; print/check the Codex sandbox config.\n\n**Depends on:** T25\n\n**Verify:** `node --test scripts/test/install-agents.test.mjs` → pass; `bash -n scripts/install-agents.sh` → no output.\n\nSee plan section \"Task 28\".\n\n```json:metadata\n{\"files\":[\"scripts/install-agents.sh\",\"scripts/test/install-agents.test.mjs\"],\"verifyCommand\":\"node --test scripts/test/install-agents.test.mjs → pass; bash -n scripts/install-agents.sh → no output.\",\"acceptanceCriteria\":[\"Honors `HOME` and `AGENTS_SKILLS_DIR` (default `$HOME/.agents/skills`) so tests run in a temp HOME.\",\"Step 1: `ln -sfn \\\"$REPO/skills/<s>\\\" \\\"$DEST/<s>\\\"` for **all four** skills (never a subset); refuses (exit 1) if a non-symlink directory with one of those names exists.\",\"Step 2: finds `grilling` and `domain-modeling` in `$DEST` or `$HOME/.pi/agent/skills`; if missing prints `npx skills add -g mattpocock/skills` and exits 2 after linking.\",\"Step 3: records `upstream.json.pocock.agents = { \\\"dir\\\": <where found>, \\\"skillFolderHash\\\": <from the skills lock file>, \\\"contentSha\\\": <sha256 of grilling+domain-modeling SKILL.md> }`. Lock file: `$XDG_STATE_HOME/skills/.skill-lock.json` else `$HOME/.agents/.skill-lock.json` (`$RESEARCH/vercel-labs-skills/src/skill-lock.ts:7,64-70`); missing lock → `skillFolderHash: null`. JSON edited with `node -e` (no jq dependency).\",\"Step 4: prints the exact Codex config block from T9; checks `$HOME/.codex/config.toml` for `network_access = true` under `[sandbox_workspace_write]` and `~/.intelligentrascal` (expanded) in `writable_roots`; prints \\\"Codex sandbox: OK\\\" or \\\"Codex sandbox: missing — add the block above\\\".\",\"Idempotent (second run: same links, no errors).\",\"Test: temp HOME with fake `~/.agents/skills/grilling/SKILL.md` + `domain-modeling/SKILL.md` and a lock file → exit 0, 4 symlinks to the repo, `upstream.json` updated (test copies the repo's `upstream.json` to a temp repo root via `REPO_ROOT` env override); without Pocock skills → exit 2 with the npx hint; codex config present/missing messages.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         24
@@ -342,7 +342,7 @@
     {
       "id": 36,
       "subject": "Task 37: `sync-pocock.sh`",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Report and apply Pocock upstream changes safely: diffs per install, ahead-of-release warning, loud failures, wayfinder three-way merge, tests, pin bump, nothing committed.\n\n**Depends on:** T23, T28\n\n**Verify:** `node --test scripts/test/sync-pocock.test.mjs` → pass; `bash -n scripts/sync-pocock.sh`.\n\nSee plan section \"Task 37\".\n\n```json:metadata\n{\"files\":[\"scripts/sync-pocock.sh\",\"scripts/test/sync-pocock.test.mjs\"],\"verifyCommand\":\"node --test scripts/test/sync-pocock.test.mjs → pass; bash -n scripts/sync-pocock.sh.\",\"acceptanceCriteria\":[\"Inputs (env-overridable for tests): `CLAUDE_PLUGINS=${CLAUDE_PLUGINS:-$HOME/.claude/plugins}`, `POCOCK_MARKETPLACE=$CLAUDE_PLUGINS/marketplaces/mattpocock` (git repo), `REPO_ROOT`.\",\"Claude install: read `installed_plugins.json` `mattpocock-skills@mattpocock[0]` `{version, gitCommitSha, installPath}`; if ≠ `upstream.json.pocock.claude`, for each of `grilling, domain-modeling, grill-me, grill-with-docs, wayfinder` print `git -C $POCOCK_MARKETPLACE diff <pinned>..<installed> -- skills/**/<name>/` (fetch the pinned commit if missing: `git fetch origin <sha>`).\",\"Agents install: if `upstream.json.pocock.agents` exists and the current `contentSha` differs, print `diff -u` of the SKILL.md files between the Claude pinned copy (`git show <pinned>:<path>`) and the agents copy; print both versions; note editing the npx copy is unsupported.\",\"Warn when `git -C $POCOCK_MARKETPLACE rev-list --count <installed>..origin/main` > 0 (after `git fetch -q origin main`; offline → skip with a note).\",\"Fail (exit 3, message naming the skill) if a delegated skill folder is missing/renamed at the installed version, or `grilling`/`domain-modeling` gained `disable-model-invocation: true` in SKILL.md or `allow_implicit_invocation: false` in `agents/openai.yaml`.\",\"Wayfinder: `git merge-file -L ours -L base -L theirs skills/wayfinder-ui/upstream/wayfinder.md <base tmp> <theirs tmp>` with base = pinned, theirs = installed; conflicts left marked, exit status reported.\",\"Run `node --test skills/grilling-ui/test/*.test.mjs scripts/test/*.test.mjs`; on success bump `upstream.json` pins (claude and, if present, agents, and `wayfinder.vendoredFrom`); never `git commit`.\",\"Test: builds a fake marketplace git repo with two commits (v1 pin, v2 installed) in a temp dir, fake `installed_plugins.json`, temp REPO_ROOT copy → asserts diff printed, merge applied, pins bumped, and a v3 where `grilling` gains `disable-model-invocation: true` exits 3.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         22,
@@ -395,5 +395,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T15:48:53.286Z"
+  "lastUpdated": "2026-09-25T15:57:05.194Z"
 }

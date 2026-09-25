@@ -1,0 +1,17 @@
+{
+  "name": "intelligentrascal",
+  "owner": {
+    "name": "Rahil"
+  },
+  "description": "Rahil's local marketplace: the intelligentrascal grill skills.",
+  "allowCrossMarketplaceDependenciesOn": [
+    "mattpocock"
+  ],
+  "plugins": [
+    {
+      "name": "intelligentrascal",
+      "source": "./",
+      "description": "Grill skills with a browser UI."
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+interface:
+  display_name: "Grill With Docs (UI)"
+  short_description: "Grill with docs on a browser page, keeping CONTEXT.md and ADRs current"

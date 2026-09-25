@@ -146,13 +146,18 @@ test("wayfinder-ui: vendored upstream/wayfinder.md is byte-identical to the pinn
 });
 
 test("upstream.json: pins", () => {
-  const u = JSON.parse(readFileSync(join(ROOT, "upstream.json"), "utf8"));
-  assert.deepEqual(u, { pocock: {
-    plugin: "mattpocock-skills",
-    claude: { version: "1.2.3", commit: PIN },
-    agents: null,
-    wayfinder: { vendoredFrom: PIN },
-  } });
+  // Shape, not values: install-agents.sh records `agents` and sync-pocock.sh bumps the pins.
+  const u = JSON.parse(readFileSync(join(ROOT, "upstream.json"), "utf8")).pocock;
+  const sha = /^[0-9a-f]{40}$/;
+  assert.equal(u.plugin, "mattpocock-skills");
+  assert.match(u.claude.version, /^\d+\.\d+\.\d+$/);
+  assert.match(u.claude.commit, sha);
+  assert.match(u.wayfinder.vendoredFrom, sha);
+  if (u.agents !== null) {
+    assert.equal(typeof u.agents.dir, "string");
+    assert.match(u.agents.contentSha, /^[0-9a-f]{64}$/);
+    assert.ok(u.agents.skillFolderHash === null || typeof u.agents.skillFolderHash === "object");
+  }
 });
 
 test("wayfinder-ui: frontmatter, triggers, $SKILL, preflight and load order", () => {
@@ -186,3 +191,45 @@ test("wayfinder-ui: chart mode, finish, work mode and hub commands", () => {
   assert.deepEqual(bare.map((m) => m[0]), []);
   assert.match(text, /No design doc in either mode/);
 });
+
+// ---- Codex agents/openai.yaml sidecars (T27; spec §2, §5b) ----
+// Field names verified against openai/codex (research clone at b35a7af):
+//   codex-rs/ext/skills/src/loader/mod.rs:20-21   SKILLS_METADATA_DIR = "agents", SKILLS_METADATA_FILENAME = "openai.yaml"
+//   codex-rs/ext/skills/src/loader/metadata.rs:28-34  SkillMetadataFile { interface, dependencies, policy }
+//   codex-rs/ext/skills/src/loader/metadata.rs:51-53  Policy { allow_implicit_invocation: Option<bool> }
+//   codex-rs/skills/src/interface.rs:10-22        SkillInterfaceFile { display_name (≤ 64 chars), short_description (≤ 1024), … }
+// Convention: Pocock's .agents/invocation.md (policy block only on skills hidden from the model).
+
+// Tiny YAML reader for the two-level maps these files use: { section: { key: value } }.
+function readYaml(text) {
+  const out = {}; let section = null;
+  for (const raw of text.split("\n")) {
+    if (!raw.trim() || raw.trim().startsWith("#")) continue;
+    const m = /^( *)([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/.exec(raw);
+    assert.ok(m, `parsable YAML line: ${JSON.stringify(raw)}`);
+    const [, indent, key, val] = m;
+    const v = val === "" ? undefined : /^".*"$/.test(val) ? JSON.parse(val) : val === "true" ? true : val === "false" ? false : val;
+    if (indent.length === 0) { assert.equal(v, undefined, `top-level ${key} is a map`); section = out[key] = {}; }
+    else { assert.equal(indent.length, 2, "two-space indent"); assert.ok(section, "nested key under a section"); section[key] = v; }
+  }
+  return out;
+}
+const sidecar = (skill) => readYaml(readFileSync(join(SKILLS, skill, "agents", "openai.yaml"), "utf8"));
+
+test("openai.yaml: grilling-ui is hidden from implicit invocation", () => {
+  assert.deepEqual(sidecar("grilling-ui"), {
+    interface: { display_name: "Grilling UI (engine)", short_description: "Browser transport for the -ui grill skills" },
+    policy: { allow_implicit_invocation: false },
+  });
+});
+
+for (const [skill, name] of [["grill-me-ui", "Grill Me (UI)"], ["grill-docs-ui", "Grill With Docs (UI)"], ["wayfinder-ui", "Wayfinder (UI)"]]) {
+  test(`openai.yaml: ${skill} has a display name and no policy block`, () => {
+    const y = sidecar(skill);
+    assert.deepEqual(Object.keys(y), ["interface"], "only an interface block (model-invocable by its ui triggers)");
+    assert.equal(y.interface.display_name, name);
+    assert.equal(typeof y.interface.short_description, "string");
+    assert.ok(y.interface.short_description.length > 10 && y.interface.short_description.length <= 1024);
+    assert.deepEqual(Object.keys(y.interface).sort(), ["display_name", "short_description"]);
+  });
+}
