@@ -4,13 +4,13 @@
     {
       "id": 0,
       "subject": "Task 1: Repo scaffold and the shared token set",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Create the repo skeleton and `tokens.css` (the one token set used by mockups, layouts and board), with an automated contrast check.\n\n**Depends on:** none\n\n**Verify:** `node --test skills/grilling-ui/test/tokens.test.mjs` → all pass.\n\nSee plan section \"Task 1\".\n\n```json:metadata\n{\"files\":[\"skills/grilling-ui/page/tokens.css\",\"skills/grilling-ui/test/tokens.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/tokens.test.mjs → all pass.\",\"acceptanceCriteria\":[\"`tokens.css` defines on `:root`: `--bg --panel --ink --ink-2 --ink-3 --rule --accent --ok --ok-soft --stage --stage-soft --warn-soft --focus --serif --sans --mono` and spacing/radius tokens `--r1 --r2 --s1..--s6`; system fonts only (no `@import`, no `url(http`).\",\"Base rules for all 8 control states on `button`, `.opt`, `textarea`, `a`: default, hover, active, `:focus-visible` (2px `--focus` outline, offset 2px), disabled, selected/`[aria-pressed=true]`, staged (`.staged`), pending (`.pending`).\",\"`@media (prefers-reduced-motion: reduce)` block ported from `$JASON/page.html:191-205` (spinners pulse instead of rotate).\",\"No italic headings (`h1..h4 { font-style: normal }`), serif headings / sans body.\",\"Test computes WCAG contrast for the real pairings and asserts ≥ 4.5: `--ink` on `--bg` and `--panel`; `--ink-2` on `--bg`/`--panel`; `--accent` on `--panel`; `#fff` on `--accent`; `--ok` on `--ok-soft`; `--stage` text on `--stage-soft` (≥ 4.5; darken `--stage` from Jason's `#b8791f` as needed); `--ink-3` on `--panel` ≥ 3.0 (secondary meta text only, documented in a CSS comment).\"],\"humanGate\":false}\n```"
     },
     {
       "id": 1,
       "subject": "Task 2: Mockup data, build script and picker",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** One `data.js` (Jason's real 17-question session + a synthetic round), a build script that inlines it into each template, and a picker page (`?v=`, number keys) with a per-task stopwatch.\n\n**Depends on:** T1\n\n**Verify:** `node design/mockups/build.mjs && node -e \"const fs=require('fs');for(const f of ['inbox','brief','studio'])if(fs.existsSync('design/mockups/'+f+'.template.html')&&fs.readFileSync('design/mockups/'+f+'.html','utf8').includes('/*__DATA__*/'))process.exit(1)\"` → exit 0 (run again after T3–T5). Open `design/mockups/index.html` in a browser: picker renders, number keys switch.\n\nSee plan section \"Task 2\".\n\n```json:metadata\n{\"files\":[\"design/mockups/data.js\",\"design/mockups/build.mjs\",\"design/mockups/index.html\"],\"verifyCommand\":\"node design/mockups/build.mjs && node -e \\\"const fs=require('fs');for(const f of ['inbox','brief','studio'])if(fs.existsSync('design/mockups/'+f+'.template.html')&&fs.readFileSync('design/mockups/'+f+'.html','utf8').includes('/*__DATA__*/'))process.exit(1)\\\" → exit 0 (run again after T3–T5). Open design/mockups/index.html in a browser: picker renders, number keys switch.\",\"acceptanceCriteria\":[\"`data.js` defines `const SESSION` in the real state.json shape (spec §4, Jason schema `$JASON/SKILL.md:392-417`): `questions` is an **array** (convert Jason's `questions` map and `rounds` list from `$JASON/design/mockups/data.js`), all 17 questions preserved with their answers/threads/status.\",\"Adds round 9: 8 open questions `q18`–`q25` on the topic (plausible grill-with-ui follow-ups with 2–4 options, `rec`, `why` ≤ 2 sentences naming the cost, titles ≤ 8 words); plus two existing answered questions set to `status: \\\"reopened\\\"` with a thread message explaining why (use q15 and q16, since tasks 3–4 target them), and one more deferred (q23). `visual: { kind: \\\"prototype\\\", version: 3, stale: true, note: \\\"v3: ...\\\" }` and a `VISUAL_HTML` string: a small self-contained prototype whose regions carry `data-q` (at least q1, q9, q12, q15 regions) and include the linkage listener from T20 Step 3 (copy it verbatim).\",\"`build.mjs` reads each `*.template.html`, replaces `/*__DATA__*/` with `data.js` contents, writes `<name>.html` (Jason's slot convention, `$JASON/design/mockups/a-inbox.template.html:110`). Idempotent. Prints the files written.\",\"`index.html`: loads `inbox.html` / `brief.html` / `studio.html` in a full-size iframe by `?v=inbox|brief|studio`; keys `1`/`2`/`3` switch (ignored when focus is in the iframe's text fields: switching is done by parent keydown only); a small fixed panel lists the four timed tasks (spec §9.1) with Start/Stop per task per layout and a \\\"Copy results\\\" button producing JSON `{layout:{task1:ms,...}}` for `decision.json`.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         0
@@ -19,7 +19,7 @@
     {
       "id": 2,
       "subject": "Task 3: Inbox mockup",
-      "status": "pending",
+      "status": "in_progress",
       "description": "**Goal:** Static-interactive Inbox mockup (Jason's list | card | discussion) on `tokens.css`, plus the hover→highlight linkage.\n\n**Depends on:** T2\n\n**Verify:** `node design/mockups/build.mjs`, open `design/mockups/index.html?v=inbox` at 1440 px and at 390 px width: no horizontal scroll, Q15 hover outlines its region.\n\nSee plan section \"Task 3\".\n\n```json:metadata\n{\"files\":[\"design/mockups/inbox.template.html\"],\"verifyCommand\":\"node design/mockups/build.mjs, open design/mockups/index.html?v=inbox at 1440 px and at 390 px width: no horizontal scroll, Q15 hover outlines its region.\",\"acceptanceCriteria\":[\"Ported from `$JASON/design/mockups/a-inbox-clean.template.html` (layout `260px | 1fr | 33vw`), but links `../../skills/grilling-ui/page/tokens.css` and removes Google Fonts.\",\"Renders all rounds from `SESSION.questions`; selecting a question shows card + thread; options stage (dashed rec, staged highlight), free text stages, reopened/deferred marks, updated marker.\",\"Visual toggle shows `VISUAL_HTML` in `<iframe sandbox=\\\"allow-scripts\\\" srcdoc>`, with a stale strip (\\\"Out of date · regenerate…\\\").\",\"Hovering a nav item posts `{highlight:[id]}` to the iframe; clicking a `data-q` region selects that question.\",\"Stacks below 760 px (port `$JASON/page.html:153-183`).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         1
@@ -28,7 +28,7 @@
     {
       "id": 3,
       "subject": "Task 4: Brief mockup",
-      "status": "pending",
+      "status": "in_progress",
       "description": "**Goal:** Document-model mockup per spec §7 Brief row.\n\n**Depends on:** T2\n\n**Verify:** build; `index.html?v=brief` at 1440 / 1000 / 390 px.\n\nSee plan section \"Task 4\".\n\n```json:metadata\n{\"files\":[\"design/mockups/brief.template.html\"],\"verifyCommand\":\"build; index.html?v=brief at 1440 / 1000 / 390 px.\",\"acceptanceCriteria\":[\"One column max-width `68ch`; sections derived from dependency roots: for each question with `deps: []`, a section titled by that root question; every other question goes in the section of its first root ancestor (walk `deps[0]` to a root). Deferred questions in their own final section \\\"Deferred\\\".\",\"Answered question = one prose line `Title → chosen option text` (text answers show the text) + a \\\"reopen\\\" control.\",\"Open/reopened question = compact block: heading; options as a vertical list with full text; recommended option dashed and pre-selected (staged-looking); the why in one line; free-text field always visible; thread collapsed to bold first lines that expand inline on click.\",\"≥ 1100 px: left jump rail (section links + open counts) and the visual as a sticky figure on the right; < 1100 px the figure sits under the header; < 760 px everything stacks.\",\"Hovering a question block highlights its `data-q` regions (same postMessage).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         1
@@ -37,7 +37,7 @@
     {
       "id": 4,
       "subject": "Task 5: Studio mockup",
-      "status": "pending",
+      "status": "in_progress",
       "description": "**Goal:** Visual-first mockup per spec §7 Studio row.\n\n**Depends on:** T2\n\n**Verify:** build; `index.html?v=studio` at 1440 / 390 px.\n\nSee plan section \"Task 5\".\n\n```json:metadata\n{\"files\":[\"design/mockups/studio.template.html\"],\"verifyCommand\":\"build; index.html?v=studio at 1440 / 390 px.\",\"acceptanceCriteria\":[\"Visual iframe takes ~60% width; conversation rail on the right holds one timeline grouped under sticky round headers: open question cards in full, answered cards collapsed to one line, thread messages placed by `at` time, visual feedback (`visual.thread`) in the same stream.\",\"One composer at the bottom of the rail with a target chip: `@qN thread`, `@qN answer`, `visual`; clicking a card sets the chip to that question; the chip is a button cycling the three targets.\",\"Hover card → highlight regions; click region → select card (scroll into view).\",\"A toggle \\\"before first draw\\\" shows the empty state: \\\"Agreed so far\\\" (bullet list derived from answered questions: `title → answer`) and a Visualize call to action.\",\"Stacks below 760 px (visual above rail, `height: 60vh`).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         1
@@ -57,7 +57,7 @@
     {
       "id": 6,
       "subject": "Task 7: util + session state patch/validate (port)",
-      "status": "pending",
+      "status": "in_progress",
       "description": "**Goal:** Port Jason's patch/merge/stamp/validate into `lib/state.mjs` with the new fields, as pure functions with unit tests.\n\n**Depends on:** none\n\n**Verify:** `node --test skills/grilling-ui/test/state.test.mjs` → all pass.\n\nSee plan section \"Task 7\".\n\n```json:metadata\n{\"files\":[\"skills/grilling-ui/lib/util.mjs\",\"skills/grilling-ui/lib/state.mjs\",\"skills/grilling-ui/hub.mjs\",\"skills/grilling-ui/test/state.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/state.test.mjs → all pass.\",\"acceptanceCriteria\":[\"`util.mjs` exports `parseArgs, print, die, writeJson, readJson, rand(hexChars), sleep, isObj, oneLine` (port `$JASON/server.mjs:31-49`; `die` prefix `grill:`; `writeJson` atomic temp+rename).\",\"`state.mjs` exports `PatchError, applyPatch(state, patch, nowIso), validateState(state)` ported from `$JASON/server.mjs:254-450` with these additions:\",\"All patch tests from `$JASON/test/server.test.mjs:291-572` ported as direct `applyPatch`/`validateState` calls (the CLI-level ones — stdin/`--file`/exit codes, lines 487–612 — are ported in T10).\",\"`hub.mjs`: shebang, `parseArgs`, a `cmds` table (own keys only, `$JASON/server.mjs:485-489`), usage message listing all subcommands of the CLI contract below.\"],\"humanGate\":false}\n```"
     },
     {
@@ -392,5 +392,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T14:39:30.872Z"
+  "lastUpdated": "2026-09-25T14:48:39.181Z"
 }

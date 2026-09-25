@@ -1,0 +1,215 @@
+/* grilling-ui — the one token set.
+   Used by every page layout (inbox, brief, studio), the board and the design mockups.
+   Light only (no dark mode: spec §1 non-goal). System fonts only, no network.
+
+   Contrast (checked by test/tokens.test.mjs, WCAG 2.x):
+     --ink    on --bg / --panel      >= 4.5
+     --ink-2  on --bg / --panel      >= 4.5
+     --accent on --panel, #fff on --accent  >= 4.5
+     --ok     on --ok-soft           >= 4.5
+     --stage  on --stage-soft        >= 4.5   (darkened from Jason's #b8791f, which was 3.1)
+     --ink-3  on --panel             >= 3.0   secondary meta text ONLY (timestamps, counts,
+                                              hints) — never body copy or anything the user
+                                              must read to act. Darkened from #9a9285 so it
+                                              also clears 3.0 on --bg. */
+:root {
+  --bg: #f7f4ee;
+  --panel: #ffffff;
+  --ink: #1f1c18;
+  --ink-2: #625b51;
+  --ink-3: #8a8276;
+  --rule: #e6e0d4;
+  --accent: #9a3a26;
+  --ok: #3d6b4a;
+  --ok-soft: #e3eee5;
+  --stage: #8a5a12;
+  --stage-soft: #f8ecd2;
+  --warn-soft: #fbe9e4;
+  --focus: #2a5db0;
+
+  --serif: "Iowan Old Style", Charter, Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --r1: 4px;
+  --r2: 8px;
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 40px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+/* Serif headings, sans body. Never italic. */
+h1, h2, h3, h4 {
+  font-family: var(--serif);
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--ink);
+  margin: 0 0 var(--s2);
+}
+
+code, kbd, pre { font-family: var(--mono); font-size: 0.9em; }
+kbd {
+  padding: 0 var(--s1);
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: var(--r1);
+  background: var(--panel);
+  color: var(--ink-2);
+}
+
+.meta { color: var(--ink-3); font-size: 13px; } /* secondary meta text only (see contrast note) */
+
+/* ---------------------------------------------------------------------------
+   Control states: default, hover, active, focus-visible, disabled,
+   selected / [aria-pressed=true], staged (.staged), pending (.pending)
+   on button, .opt, textarea, a.
+   --------------------------------------------------------------------------- */
+
+/* default */
+button, .opt {
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r1);
+  padding: var(--s1) var(--s3);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
+.opt { display: block; width: 100%; padding: var(--s2) var(--s3); }
+textarea {
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r1);
+  padding: var(--s2);
+  width: 100%;
+  resize: vertical;
+}
+a { color: var(--accent); text-underline-offset: 2px; }
+
+/* hover */
+button:hover, .opt:hover { border-color: var(--ink-3); background: var(--bg); }
+button.primary:hover { background: #82301f; border-color: #82301f; }
+button.ghost:hover { background: var(--bg); color: var(--ink); }
+textarea:hover { border-color: var(--ink-3); }
+a:hover { text-decoration-thickness: 2px; }
+
+/* active */
+button:active, .opt:active { transform: translateY(1px); background: var(--rule); }
+button.primary:active { background: #6e2819; }
+a:active { color: var(--ink); }
+
+/* focus-visible: 2px --focus outline, offset 2px */
+button:focus-visible, .opt:focus-visible, textarea:focus-visible, a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+button:focus:not(:focus-visible), .opt:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
+textarea:focus { border-color: var(--focus); }
+
+/* disabled */
+button:disabled, button[aria-disabled="true"], .opt[aria-disabled="true"], textarea:disabled {
+  cursor: not-allowed;
+  color: var(--ink-3);
+  background: var(--bg);
+  border-color: var(--rule);
+  transform: none;
+}
+button.primary:disabled { background: var(--rule); border-color: var(--rule); color: var(--ink-2); }
+a[aria-disabled="true"] { color: var(--ink-3); pointer-events: none; text-decoration: none; }
+
+/* selected / pressed */
+button[aria-pressed="true"], .opt[aria-pressed="true"], .opt.selected, button.selected,
+a[aria-current], a.selected {
+  border-color: var(--ink);
+  background: var(--panel);
+  box-shadow: inset 3px 0 0 var(--ink);
+  color: var(--ink);
+}
+a[aria-current], a.selected { font-weight: 600; box-shadow: none; }
+
+/* staged: chosen locally, not yet sent */
+button.staged, .opt.staged, textarea.staged, a.staged {
+  border-color: var(--stage);
+  background: var(--stage-soft);
+  color: var(--stage);
+}
+.opt.staged { box-shadow: inset 3px 0 0 var(--stage); color: var(--ink); }
+.opt.staged::after { content: " · staged"; color: var(--stage); font-size: 13px; }
+
+/* pending: sent, waiting on the agent */
+button.pending, .opt.pending, textarea.pending, a.pending {
+  cursor: progress;
+  border-style: dashed;
+  border-color: var(--ink-3);
+  color: var(--ink-2);
+}
+button.pending::after, .opt.pending::after {
+  content: "";
+  display: inline-block;
+  width: .7em; height: .7em;
+  margin-left: var(--s2);
+  vertical-align: -1px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+/* shared progress indicators */
+.spin {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+/* Ported from Jason's page.html:191-205.
+   The blanket reset stops everything that travels or rotates, but progress
+   indicators are the only sign the agent is working, so they pulse instead:
+   .spin (border-right transparent) would read as a broken ring if frozen, and
+   #progress::after starts at left:-30% so a stopped one is invisible. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* spinner: stop rotating, close the ring so it does not look broken */
+  .spin, button.pending::after, .opt.pending::after {
+    animation: pulse 1.6s ease-in-out infinite !important;
+    border-right-color: currentColor !important;
+  }
+  /* progress bar: stop travelling, become a full-width bar that pulses */
+  #progress::after { animation: pulse 1.6s ease-in-out infinite !important; left: 0 !important; width: 100% !important; }
+  /* status dot & Finish button: opacity/colour only, nothing moves — just slow them */
+  .dot.working { animation-duration: 2.4s !important; animation-iteration-count: infinite !important; }
+  #finish.ready { animation-duration: 2.4s !important; animation-iteration-count: infinite !important; }
+  button:active, .opt:active { transform: none; }
+}

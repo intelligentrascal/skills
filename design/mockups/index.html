@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Layout picker</title>
+<link rel="stylesheet" href="../../skills/grilling-ui/page/tokens.css" />
+<style>
+  html, body { height: 100%; }
+  body { display: grid; grid-template-rows: auto 1fr; overflow: hidden; }
+  .bar {
+    display: flex; align-items: center; gap: var(--s2);
+    padding: var(--s1) var(--s3);
+    background: var(--panel); border-bottom: 1px solid var(--rule);
+    font-size: 13px;
+  }
+  .bar h1 { font-size: 14px; margin: 0 var(--s3) 0 0; }
+  .bar .spacer { flex: 1; }
+  .bar button { padding: 2px var(--s3); font-size: 13px; }
+  .bar kbd { font-size: 11px; margin-right: var(--s1); }
+  iframe { width: 100%; height: 100%; border: 0; display: block; background: var(--bg); }
+
+  #timer {
+    position: fixed; right: var(--s4); bottom: var(--s4); z-index: 10;
+    width: 340px; max-width: calc(100vw - 2 * var(--s4));
+    background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r2);
+    box-shadow: 0 6px 24px rgba(31, 28, 24, .14);
+    font-size: 13px;
+  }
+  #timer header {
+    display: flex; align-items: center; gap: var(--s2);
+    padding: var(--s2) var(--s3); border-bottom: 1px solid var(--rule);
+  }
+  #timer header h2 { font-size: 14px; margin: 0; flex: 1; }
+  #timer.collapsed .body { display: none; }
+  #timer.collapsed header { border-bottom: 0; }
+  #timer .body { padding: var(--s2) var(--s3) var(--s3); }
+  #timer ol { list-style: none; margin: 0 0 var(--s3); padding: 0; }
+  #timer li { display: grid; grid-template-columns: 1fr auto auto; gap: var(--s2); align-items: center; padding: var(--s1) 0; border-bottom: 1px solid var(--rule); }
+  #timer li:last-child { border-bottom: 0; }
+  #timer .task { line-height: 1.35; }
+  #timer .time { font-family: var(--mono); font-size: 12px; color: var(--ink-2); min-width: 5ch; text-align: right; }
+  #timer li.running .time { color: var(--stage); font-weight: 600; }
+  #timer li button { padding: 2px var(--s2); font-size: 12px; min-width: 52px; text-align: center; }
+  #timer .actions { display: flex; gap: var(--s2); }
+  #timer .actions button { font-size: 12px; }
+  #timer .grid { width: 100%; border-collapse: collapse; margin: 0 0 var(--s3); font-size: 12px; }
+  #timer .grid th, #timer .grid td { padding: 2px var(--s1); text-align: right; border-bottom: 1px solid var(--rule); }
+  #timer .grid th:first-child, #timer .grid td:first-child { text-align: left; }
+  #timer .grid th { font-weight: 600; color: var(--ink-2); }
+  #timer .grid tr.cur td { font-weight: 600; }
+  #out { display: none; font-family: var(--mono); font-size: 11px; height: 90px; margin-top: var(--s2); }
+  #out.show { display: block; }
+  .status { margin-left: auto; }
+</style>
+</head>
+<body>
+<div class="bar" role="toolbar" aria-label="Layouts">
+  <h1>grill UI · layout comparison</h1>
+  <button type="button" data-v="inbox"><kbd>1</kbd>Inbox</button>
+  <button type="button" data-v="brief"><kbd>2</kbd>Brief</button>
+  <button type="button" data-v="studio"><kbd>3</kbd>Studio</button>
+  <span class="spacer"></span>
+  <span class="meta">Keys work when focus is outside the mockup. Click here or press Esc in a field first.</span>
+</div>
+<iframe id="frame" title="Layout mockup"></iframe>
+
+<section id="timer" aria-label="Timed tasks">
+  <header>
+    <h2>Timed tasks · <span id="cur-layout"></span></h2>
+    <button type="button" class="ghost" id="collapse" aria-expanded="true">Hide</button>
+  </header>
+  <div class="body">
+    <ol id="tasks"></ol>
+    <table class="grid" id="grid" aria-label="Results by layout"></table>
+    <div class="actions">
+      <button type="button" class="primary" id="copy">Copy results</button>
+      <button type="button" id="reset">Reset all</button>
+      <span class="meta status" id="status" role="status"></span>
+    </div>
+    <textarea id="out" readonly aria-label="Results JSON"></textarea>
+  </div>
+</section>
+
+<script>
+(() => {
+  const LAYOUTS = ["inbox", "brief", "studio"];
+  // The four timed tasks from spec §9.1.
+  const TASKS = [
+    { id: "task1", text: "What did we decide about Q2 transport?" },
+    { id: "task2", text: "Answer the open round (round 9)." },
+    { id: "task3", text: "Find which part of the visual Q15 changes." },
+    { id: "task4", text: "Push back on Q16 in free text." },
+  ];
+  const KEY = "mockups:timings";
+  const $ = (id) => document.getElementById(id);
+
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(results)); } catch {} };
+  let results = load();           // { inbox: { task1: ms, ... }, ... }
+  let running = null;             // { layout, task, t0 }
+  let tick = null;
+
+  const fmt = (ms) => {
+    if (ms == null) return "—";
+    const s = ms / 1000;
+    return s < 60 ? s.toFixed(1) + "s" : Math.floor(s / 60) + "m" + String(Math.round(s % 60)).padStart(2, "0") + "s";
+  };
+
+  const params = new URLSearchParams(location.search);
+  let layout = LAYOUTS.includes(params.get("v")) ? params.get("v") : "inbox";
+
+  function setLayout(v) {
+    if (!LAYOUTS.includes(v)) return;
+    if (running && running.layout !== v) stop();
+    layout = v;
+    const url = new URL(location.href);
+    url.searchParams.set("v", v);
+    history.replaceState(null, "", url);
+    $("frame").src = v + ".html";
+    document.querySelectorAll(".bar button[data-v]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+    $("cur-layout").textContent = v;
+    render();
+  }
+
+  function start(task) {
+    if (running) stop();
+    running = { layout, task, t0: performance.now() };
+    tick = setInterval(renderTimes, 100);
+    render();
+  }
+  function stop() {
+    if (!running) return;
+    const ms = Math.round(performance.now() - running.t0);
+    (results[running.layout] ||= {})[running.task] = ms;
+    save();
+    running = null;
+    clearInterval(tick);
+    render();
+  }
+
+  function renderTimes() {
+    for (const t of TASKS) {
+      const el = document.querySelector(`#tasks li[data-task="${t.id}"] .time`);
+      if (!el) continue;
+      const live = running && running.layout === layout && running.task === t.id;
+      el.textContent = fmt(live ? performance.now() - running.t0 : results[layout]?.[t.id]);
+    }
+  }
+
+  function render() {
+    const ol = $("tasks");
+    ol.innerHTML = "";
+    TASKS.forEach((t, i) => {
+      const live = running && running.layout === layout && running.task === t.id;
+      const li = document.createElement("li");
+      li.dataset.task = t.id;
+      li.className = live ? "running" : "";
+      const txt = document.createElement("span");
+      txt.className = "task";
+      txt.textContent = `${i + 1}. ${t.text}`;
+      const time = document.createElement("span");
+      time.className = "time";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = live ? "Stop" : "Start";
+      if (live) btn.classList.add("staged");
+      btn.setAttribute("aria-label", `${live ? "Stop" : "Start"} task ${i + 1} on ${layout}`);
+      btn.onclick = () => (live ? stop() : start(t.id));
+      li.append(txt, time, btn);
+      ol.append(li);
+    });
+    renderTimes();
+
+    const grid = $("grid");
+    grid.innerHTML = "";
+    const head = grid.insertRow();
+    for (const h of ["", "1", "2", "3", "4"]) { const th = document.createElement("th"); th.textContent = h; head.append(th); }
+    for (const v of LAYOUTS) {
+      const tr = grid.insertRow();
+      if (v === layout) tr.className = "cur";
+      tr.insertCell().textContent = v;
+      for (const t of TASKS) tr.insertCell().textContent = fmt(results[v]?.[t.id]);
+    }
+  }
+
+  const resultsJson = () => {
+    const out = {};
+    for (const v of LAYOUTS) if (results[v] && Object.keys(results[v]).length) out[v] = { ...results[v] };
+    return JSON.stringify(out, null, 2);
+  };
+
+  $("copy").onclick = async () => {
+    if (running) stop();
+    const json = resultsJson();
+    const out = $("out");
+    out.value = json;
+    try {
+      await navigator.clipboard.writeText(json);
+      $("status").textContent = "Copied. Paste into decision.json → timings.";
+    } catch {
+      out.classList.add("show");
+      out.select();
+      $("status").textContent = "Clipboard blocked: copy from the box.";
+    }
+  };
+  $("reset").onclick = () => {
+    if (!confirm("Clear all recorded times?")) return;
+    running = null; clearInterval(tick);
+    results = {}; save(); render();
+    $("out").classList.remove("show");
+    $("status").textContent = "Cleared.";
+  };
+  $("collapse").onclick = () => {
+    const c = $("timer").classList.toggle("collapsed");
+    $("collapse").textContent = c ? "Show" : "Hide";
+    $("collapse").setAttribute("aria-expanded", String(!c));
+  };
+  document.querySelectorAll(".bar button[data-v]").forEach((b) => (b.onclick = () => setLayout(b.dataset.v)));
+
+  // Parent-level keys only: keydown inside the iframe never reaches this document,
+  // so typing 1/2/3 in a mockup's text field cannot switch layouts.
+  document.addEventListener("keydown", (e) => {
+    if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    if (t.closest && t.closest("input, textarea, select, [contenteditable]")) {
+      if (e.key === "Escape") t.blur();
+      return;
+    }
+    const i = ["1", "2", "3"].indexOf(e.key);
+    if (i >= 0) { e.preventDefault(); setLayout(LAYOUTS[i]); }
+  });
+
+  setLayout(layout);
+})();
+</script>
+</body>
+</html>
