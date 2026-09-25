@@ -329,6 +329,8 @@ function addSessionRoutes(hub) {
 //                                   `: keep-alive` comment every GRILL_SSE_KEEPALIVE_MS (25 s)
 //   GET /s/<id>/presence?tab=<t>    204; records tab → now (403 for a foreign Origin/Sec-Fetch-Site)
 //   GET /s/<id>/clients             {count: tabs seen in the last GRILL_PRESENCE_MS (45 s), lastSeen, hubStarted}
+//   GET /admin/stats                admin token → {sse: open /events streams, sessions, maps (folders
+//                                   with a watch attached), rss} (plan T18: all tabs share one stream)
 //
 // hub gains: broadcast(event, obj), watchDir(kind, key, dir, files) (lazy fs.watch on a folder,
 // filtered by file name, 30 ms debounce per key, pings `kind` with {id|key}), ping(kind, key)
@@ -412,6 +414,12 @@ function addLiveRoutes(hub) {
 
   const sessionKey = (m) => { if (!hub.sessionDir(m[1])) throw httpError(404, "no such grill"); return m[1]; };
   hub.routes.push(
+    ["GET", /^\/admin\/stats$/, (req, res) => {
+      if (!hub.originOk(req)) return json(res, 403, { error: "cross-origin request rejected" });
+      if (!hub.isAdmin(req)) return json(res, 401, { error: "admin token required" });
+      const kinds = [...hub.watchers.keys()].map((k) => k.split(":")[0]);
+      json(res, 200, { sse: hub.sse.size, sessions: kinds.filter((k) => k === "s").length, maps: kinds.filter((k) => k === "m").length, rss: process.memoryUsage().rss });
+    }],
     ["GET", /^\/events$/, (req, res) => {
       res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", connection: "keep-alive", "x-accel-buffering": "no" });
       res.write(`retry: 2000\n\nevent: hello\ndata: ${JSON.stringify({ pid: hub.pid, started: hub.started })}\n\n`);

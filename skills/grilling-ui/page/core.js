@@ -4,7 +4,8 @@
 // (378-433, 456-466, 591-628). Changed for the hub:
 //   - paths are relative to GRILL.base; POSTs carry x-grill-token;
 //   - staging lives in localStorage["grill:<sessionId>"] (switching layouts keeps it);
-//   - state arrives as an SSE ping on /events → GET state (no 1 s polling);
+//   - state arrives as an SSE ping on /events → GET state (no 1 s polling); one EventSource per
+//     browser, shared through a leader tab, with a 5 s poll fallback (plan T18, Grill.transport);
 //   - hub down: banner after 3 s, /health every 5 s, state re-fetched on recovery;
 //   - tab title "<project> · <topic>", favicon status dot, header project/branch/phase/listener
 //     and layout switch; bare /s/<id>/ redirects to the last-used layout (plan D1);
@@ -44,7 +45,7 @@
   const CHECK = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="currentColor"/><path d="M6 10.4l2.6 2.6L14 7.4" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   let S = null, raw = null, selected = null;
-  let gone = false, troubleSince = 0, confirmFinish = false;
+  let gone = false, confirmFinish = false;
   let L = null; // the mounted layout
   const storeKey = "grill:" + (G.id || "");
   const fresh = () => ({ staged: {}, pending: [], drafts: {}, view: "questions", vfeedback: [] });
@@ -80,68 +81,161 @@
     return fresh ? { on: true, text: `agent listening (${agentName(o.agent)})` } : { on: false, text: "no agent listening: Sends will queue" };
   }
 
-  // ---- fetching: SSE ping → GET state ----
-  let inflight = null, again = false;
-  function fetchState() {
-    if (inflight) { again = true; return inflight; }
-    inflight = (async () => { do { again = false; await fetchOnce(); } while (again); })().finally(() => { inflight = null; });
-    return inflight;
-  }
-  async function fetchOnce() {
-    let text;
-    try {
-      const r = await fetch(BASE + "state", { cache: "no-store" });
-      if (!r.ok) throw new Error(String(r.status));
-      text = await r.text();
-    } catch { trouble(); return; }
-    recovered();
-    if (text !== raw) { raw = text; try { S = JSON.parse(text); } catch { return; } onState(); } else tick();
-  }
-  function recovered() {
-    troubleSince = 0;
-    if (healthTimer) { clearTimeout(healthTimer); healthTimer = null; }
-    if (gone) { gone = false; render(); }
-  }
-  // Something failed to reach the hub: start (or keep) the /health loop.
-  let healthTimer = null;
-  function trouble() {
-    if (!troubleSince) troubleSince = Date.now();
-    if (!gone && Date.now() - troubleSince >= GONE_AFTER_MS) { gone = true; render(); } else tick();
-    if (!healthTimer) healthTimer = setTimeout(checkHealth, gone ? HEALTH_EVERY_MS : 1000);
-  }
-  async function checkHealth() {
-    healthTimer = null;
-    let up = false;
-    try { const r = await fetch("/health", { cache: "no-store" }); up = r.ok; } catch {}
-    if (up) { presence(); fetchState(); ensureEvents(); return; } // fetchState clears the banner, or re-enters trouble()
-    trouble();
-  }
-
-  let es = null, hubId = null;
-  function openEvents() {
-    try { es = new EventSource("/events"); } catch { es = null; trouble(); return; }
-    es.addEventListener("hello", (e) => {
-      let d = {}; try { d = JSON.parse(e.data); } catch {}
-      const id = `${d.pid}:${d.started}`;
-      if (hubId !== null && id !== hubId) presence(); // a new hub process: tell it this tab exists at once
-      hubId = id;
-      fetchState(); // pings sent while disconnected were missed
-    });
-    es.addEventListener("s", (e) => { let d = {}; try { d = JSON.parse(e.data); } catch {} if (d.id === G.id) fetchState(); });
-    es.onerror = () => {
-      trouble();
-      if (es && es.readyState === EventSource.CLOSED) { es = null; setTimeout(ensureEvents, HEALTH_EVERY_MS); }
-    };
-  }
-  function ensureEvents() { if (!es) openEvents(); }
-
-  // ---- presence (D6) ----
+  // ---- transport (plan T18, D5, D6): one EventSource per browser, poll fallback, presence ----
+  // Grill.transport(opts) → conn. Shared by every page on the hub (sessions now, the board in
+  // T34), so it knows nothing about sessions. opts:
+  //   kind       "s" | "m": the ping event this page follows (D5)
+  //   key        the session id (kind "s", matched against {id}) or map key (kind "m", {key})
+  //   url        what to GET on a matching ping, on every hello, and every 5 s while polling
+  //   presence   the presence URL without ?tab= (D6); pinged at start, every 20 s, on a new hub
+  //   onText(text)   the fetched body changed (raw text compare)
+  //   onSame()       a fetch or a failure that changed nothing visible: refresh clocks
+  //   onGone(gone)   the hub-down state flipped (banner after 3 s without a successful fetch)
+  //   onMode(mode)   "sse" | "poll" flipped (for the status tooltip)
+  // conn: { start(), refetch() → Promise, trouble(), presence(), gone, mode, leader, tabId }.
+  //
+  // Leader election: navigator.locks "grill-sse"; the tab holding the lock opens the only
+  // /events stream and relays every event (and its open/error) on BroadcastChannel "grill-sse";
+  // the others only listen. Closing the leader frees the lock and a waiting tab takes over at
+  // once. Every tab counts the shared stream's errors: 3 without an open → that tab polls `url`
+  // every 5 s (and says so); the leader closes the stream and retries it every 60 s, and at once
+  // when the hub comes back after being unreachable. Without locks or BroadcastChannel each tab
+  // opens its own stream.
+  const SSE_CHANNEL = "grill-sse";
+  const SSE_MAX_ERRORS = 3;
+  const POLL_EVERY_MS = 5000;
+  const SSE_RETRY_MS = 60 * 1000;
+  const SSE_REOPEN_MS = 2000; // a stream the browser gave up on (CLOSED) is reopened after this
+  const POLL_NOTE = "Live updates are unavailable, so this tab checks for changes every 5 s (it retries live updates every minute).";
   const tabId = (() => {
     let t = null; try { t = sessionStorage.getItem("grill:tab"); } catch {}
     if (!t || !/^[A-Za-z0-9_-]{1,64}$/.test(t)) { t = Math.random().toString(36).slice(2, 12) + Date.now().toString(36); try { sessionStorage.setItem("grill:tab", t); } catch {} }
     return t;
   })();
-  const presence = () => { fetch(BASE + "presence?tab=" + encodeURIComponent(tabId), { cache: "no-store" }).catch(() => {}); };
+  function transport(o) {
+    const noop = () => {};
+    const onText = o.onText || noop, onSame = o.onSame || noop, onGone = o.onGone || noop, onMode = o.onMode || noop;
+    const field = o.kind === "m" ? "key" : "id";
+    let raw = null, gone = false, troubleSince = 0, healthTimer = null;
+    let inflight = null, again = false;
+    let mode = "sse", errors = 0, pollTimer = null, hubId = null;
+    let leader = false, bc = null, es = null, retryTimer = null, started = false;
+    const owns = () => leader || !bc; // this tab runs the stream
+
+    // ---- fetching ----
+    function refetch() {
+      if (inflight) { again = true; return inflight; }
+      inflight = (async () => { do { again = false; await fetchOnce(); } while (again); })().finally(() => { inflight = null; });
+      return inflight;
+    }
+    async function fetchOnce() {
+      let text;
+      try {
+        const r = await fetch(o.url, { cache: "no-store" });
+        if (!r.ok) throw new Error(String(r.status));
+        text = await r.text();
+      } catch { trouble(); return; }
+      recovered();
+      if (text !== raw) { raw = text; onText(text); } else onSame();
+    }
+    function recovered() {
+      troubleSince = 0;
+      if (healthTimer) { clearTimeout(healthTimer); healthTimer = null; }
+      if (gone) { gone = false; onGone(false); }
+    }
+    // Something failed to reach the hub: start (or keep) the /health loop.
+    function trouble() {
+      if (!troubleSince) troubleSince = Date.now();
+      if (!gone && Date.now() - troubleSince >= GONE_AFTER_MS) { gone = true; onGone(true); } else onSame();
+      if (!healthTimer) healthTimer = setTimeout(checkHealth, gone ? HEALTH_EVERY_MS : 1000);
+    }
+    async function checkHealth() {
+      healthTimer = null;
+      let up = false;
+      try { const r = await fetch("/health", { cache: "no-store" }); up = r.ok; } catch {}
+      if (!up) { trouble(); return; }
+      presence();
+      // The hub was unreachable, so the stream's errors said nothing about SSE itself: reopen now.
+      if (owns() && !es) openES();
+      refetch(); // clears the banner, or re-enters trouble()
+    }
+    const presence = () => { if (o.presence) fetch(o.presence + "?tab=" + encodeURIComponent(tabId), { cache: "no-store" }).catch(noop); };
+
+    // ---- events (the leader's own, or relayed) ----
+    function setMode(m) {
+      if (m === mode) return;
+      mode = m;
+      clearInterval(pollTimer); pollTimer = null;
+      if (m === "poll") pollTimer = setInterval(refetch, POLL_EVERY_MS);
+      onMode(m);
+    }
+    function dispatch(ev, d) {
+      d = d && typeof d === "object" ? d : {};
+      if (ev === "_open") { errors = 0; setMode("sse"); }
+      else if (ev === "_err") { errors++; if (errors >= SSE_MAX_ERRORS) setMode("poll"); refetch(); } // the fetch tells a dead hub from a dead stream
+      else if (ev === "_state") { errors = d.mode === "poll" ? SSE_MAX_ERRORS : 0; setMode(d.mode === "poll" ? "poll" : "sse"); }
+      else if (ev === "hello") {
+        const id = `${d.pid}:${d.started}`;
+        if (hubId !== null && id !== hubId) presence(); // a new hub process: tell it this tab exists at once (it also re-attaches the folder watch)
+        hubId = id; errors = 0; setMode("sse");
+        refetch(); // pings sent while disconnected were missed
+      } else if (ev === o.kind && d[field] === o.key) refetch();
+    }
+    function emit(ev, d) { if (bc && leader) { try { bc.postMessage({ ev, d }); } catch {} } dispatch(ev, d); }
+    function closeES() { if (es) { es.onerror = null; try { es.close(); } catch {} es = null; } }
+    function openES() {
+      if (es) return;
+      clearTimeout(retryTimer); retryTimer = null;
+      let cur;
+      try { cur = es = new EventSource("/events"); } catch { es = null; emit("_err", {}); retryTimer = setTimeout(openES, SSE_RETRY_MS); return; }
+      cur.onopen = () => emit("_open", {});
+      for (const ev of ["hello", "s", "m"]) cur.addEventListener(ev, (e) => { let d = {}; try { d = JSON.parse(e.data); } catch {} emit(ev, d); });
+      cur.onerror = () => {
+        if (es !== cur) return;
+        emit("_err", {});
+        if (errors >= SSE_MAX_ERRORS) { closeES(); retryTimer = setTimeout(openES, SSE_RETRY_MS); }
+        else if (cur.readyState === EventSource.CLOSED) { closeES(); retryTimer = setTimeout(openES, SSE_REOPEN_MS); }
+      };
+    }
+    function start() {
+      if (started) return; started = true;
+      const canShare = typeof BroadcastChannel === "function" && !!(navigator.locks && navigator.locks.request);
+      if (canShare) {
+        try { bc = new BroadcastChannel(SSE_CHANNEL); } catch { bc = null; }
+      }
+      if (bc) {
+        bc.onmessage = (e) => {
+          const m = e.data || {};
+          if (m.hi) { if (leader) bc.postMessage({ ev: "_state", d: { mode } }); return; }
+          if (!leader && typeof m.ev === "string") dispatch(m.ev, m.d);
+        };
+        // Held until the tab goes away; the next tab in the queue then gets it.
+        navigator.locks.request(SSE_CHANNEL, () => new Promise(() => { leader = true; openES(); }));
+        bc.postMessage({ hi: 1 }); // a leader already polling says so
+      } else openES();
+      presence();
+      setInterval(presence, PRESENCE_EVERY_MS);
+      refetch();
+    }
+    return {
+      start, refetch, trouble, presence,
+      get gone() { return gone; },
+      get mode() { return mode; },
+      get leader() { return owns(); },
+      get streaming() { return !!es && es.readyState === EventSource.OPEN; },
+      tabId,
+    };
+  }
+
+  // This session's connection (started by mount).
+  const conn = transport({
+    kind: "s", key: G.id, url: BASE + "state", presence: BASE + "presence",
+    onText(text) { raw = text; try { S = JSON.parse(text); } catch { return; } onState(); },
+    onSame: () => tick(),
+    onGone(g) { gone = g; render(); },
+    onMode: () => renderStatus(),
+  });
+  const fetchState = () => conn.refetch();
 
   function onState() {
     const handled = Number((S.agent || {}).handled) || 0;
@@ -215,7 +309,7 @@
     try {
       r = await fetch(BASE + "send", { method: "POST", headers: { "content-type": "application/json", "x-grill-token": G.token || "" }, body: JSON.stringify({ actions }) });
       j = await r.json().catch(() => ({}));
-    } catch { r = null; trouble(); }
+    } catch { r = null; conn.trouble(); }
     if (!j.ok) { const w = $("send-why"); if (w) w.textContent = "Send failed: " + (j.error || (r && r.status) || "hub down"); }
     return j.ok ? j : null;
   }
@@ -363,6 +457,8 @@
   }
   function renderStatus() {
     const dot = $("agent-dot"), txt = $("agent-status"), hd = document.querySelector("header"), li = $("listener");
+    const box = document.querySelector("header .status");
+    if (box) { const t = conn.mode === "poll" ? POLL_NOTE : ""; if (box.title !== t) box.title = t; }
     if (gone) { if (dot) dot.className = "dot gone"; if (txt) txt.textContent = "hub down"; if (li) li.textContent = ""; setFavicon("gone"); return; }
     if (!S) return;
     const a = S.agent || {};
@@ -437,15 +533,14 @@
     document.addEventListener("click", (e) => { const t = $("terms"); if (t && !e.target.closest("#terms") && !e.target.closest("#terms-toggle")) t.classList.remove("show"); });
     document.addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); } });
     setInterval(tick, 1000);
-    setInterval(presence, PRESENCE_EVERY_MS);
-    presence();
     render();
-    openEvents();
-    fetchState();
+    conn.start();
   }
 
   window.Grill = {
     boot: G, base: BASE, layouts: LAYOUTS,
+    // shared with the board (T34): the connection factory, and this page's connection
+    transport, conn, POLL_NOTE,
     get S() { return S; }, local,
     get selected() { return selected; },
     get gone() { return gone; },

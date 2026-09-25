@@ -155,7 +155,7 @@
     {
       "id": 17,
       "subject": "Task 18: Shared EventSource, poll fallback, handoff reconnect",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** All tabs share one EventSource; a tab whose EventSource fails 3 times polls every 5 s; SSE reconnects across hub restart/handoff.\n\n**Depends on:** T17\n\n**Verify:** `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/sse.e2e.mjs` → `PASS`, exit 0; `page.e2e.mjs` still passes.\n\nSee plan section \"Task 18\".\n\n```json:metadata\n{\"files\":[\"page/core.js\",\"test/sse.e2e.mjs\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=… node skills/grilling-ui/test/sse.e2e.mjs → PASS, exit 0; page.e2e.mjs still passes.\",\"acceptanceCriteria\":[\"Leader: `navigator.locks.request(\\\"grill-sse\\\", () => new Promise(() => openES()))`; the leader relays every SSE event on `BroadcastChannel(\\\"grill-sse\\\")` and handles it itself; followers only listen on the channel. When the leader tab closes, another acquires the lock within ~1 s.\",\"Each tab handles only pings for its own `id`/`key`; on `hello` with a new `{pid, started}` every tab refetches.\",\"3 consecutive `error` events without an `open` → that tab switches to a 5 s poll of `state` and says so in the status tooltip; it retries SSE every 60 s.\",\"E2E: open 8 tabs on 3 sessions in one context → hub reports exactly 1 `/events` client (add `GET /admin/stats` → `{sse, sessions, rss}`, admin token); a patch in each session updates its tabs within 1 s; close the leader → updates continue; handoff (`GRILL_VERSION_OVERRIDE` change + `ensure`) → tabs update after reconnect on the same URL; block `/events` via `page.route` → tab falls back to polling and still updates.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         16
@@ -393,5 +393,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T15:47:29.488Z"
+  "lastUpdated": "2026-09-25T15:48:06.719Z"
 }
