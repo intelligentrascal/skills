@@ -1,0 +1,396 @@
+{
+  "planPath": "docs/superpowers/plans/2026-09-25-intelligentrascal-grill-ui-plan.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Task 1: Repo scaffold and the shared token set",
+      "status": "pending",
+      "description": "**Goal:** Create the repo skeleton and `tokens.css` (the one token set used by mockups, layouts and board), with an automated contrast check.\n\n**Depends on:** none\n\n**Verify:** `node --test skills/grilling-ui/test/tokens.test.mjs` → all pass.\n\nSee plan section \"Task 1\".\n\n```json:metadata\n{\"files\":[\"skills/grilling-ui/page/tokens.css\",\"skills/grilling-ui/test/tokens.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/tokens.test.mjs → all pass.\",\"acceptanceCriteria\":[\"`tokens.css` defines on `:root`: `--bg --panel --ink --ink-2 --ink-3 --rule --accent --ok --ok-soft --stage --stage-soft --warn-soft --focus --serif --sans --mono` and spacing/radius tokens `--r1 --r2 --s1..--s6`; system fonts only (no `@import`, no `url(http`).\",\"Base rules for all 8 control states on `button`, `.opt`, `textarea`, `a`: default, hover, active, `:focus-visible` (2px `--focus` outline, offset 2px), disabled, selected/`[aria-pressed=true]`, staged (`.staged`), pending (`.pending`).\",\"`@media (prefers-reduced-motion: reduce)` block ported from `$JASON/page.html:191-205` (spinners pulse instead of rotate).\",\"No italic headings (`h1..h4 { font-style: normal }`), serif headings / sans body.\",\"Test computes WCAG contrast for the real pairings and asserts ≥ 4.5: `--ink` on `--bg` and `--panel`; `--ink-2` on `--bg`/`--panel`; `--accent` on `--panel`; `#fff` on `--accent`; `--ok` on `--ok-soft`; `--stage` text on `--stage-soft` (≥ 4.5; darken `--stage` from Jason's `#b8791f` as needed); `--ink-3` on `--panel` ≥ 3.0 (secondary meta text only, documented in a CSS comment).\"],\"humanGate\":false}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Task 2: Mockup data, build script and picker",
+      "status": "pending",
+      "description": "**Goal:** One `data.js` (Jason's real 17-question session + a synthetic round), a build script that inlines it into each template, and a picker page (`?v=`, number keys) with a per-task stopwatch.\n\n**Depends on:** T1\n\n**Verify:** `node design/mockups/build.mjs && node -e \"const fs=require('fs');for(const f of ['inbox','brief','studio'])if(fs.existsSync('design/mockups/'+f+'.template.html')&&fs.readFileSync('design/mockups/'+f+'.html','utf8').includes('/*__DATA__*/'))process.exit(1)\"` → exit 0 (run again after T3–T5). Open `design/mockups/index.html` in a browser: picker renders, number keys switch.\n\nSee plan section \"Task 2\".\n\n```json:metadata\n{\"files\":[\"design/mockups/data.js\",\"design/mockups/build.mjs\",\"design/mockups/index.html\"],\"verifyCommand\":\"node design/mockups/build.mjs && node -e \\\"const fs=require('fs');for(const f of ['inbox','brief','studio'])if(fs.existsSync('design/mockups/'+f+'.template.html')&&fs.readFileSync('design/mockups/'+f+'.html','utf8').includes('/*__DATA__*/'))process.exit(1)\\\" → exit 0 (run again after T3–T5). Open design/mockups/index.html in a browser: picker renders, number keys switch.\",\"acceptanceCriteria\":[\"`data.js` defines `const SESSION` in the real state.json shape (spec §4, Jason schema `$JASON/SKILL.md:392-417`): `questions` is an **array** (convert Jason's `questions` map and `rounds` list from `$JASON/design/mockups/data.js`), all 17 questions preserved with their answers/threads/status.\",\"Adds round 9: 8 open questions `q18`–`q25` on the topic (plausible grill-with-ui follow-ups with 2–4 options, `rec`, `why` ≤ 2 sentences naming the cost, titles ≤ 8 words); plus two existing answered questions set to `status: \\\"reopened\\\"` with a thread message explaining why (use q15 and q16, since tasks 3–4 target them), and one more deferred (q23). `visual: { kind: \\\"prototype\\\", version: 3, stale: true, note: \\\"v3: ...\\\" }` and a `VISUAL_HTML` string: a small self-contained prototype whose regions carry `data-q` (at least q1, q9, q12, q15 regions) and include the linkage listener from T20 Step 3 (copy it verbatim).\",\"`build.mjs` reads each `*.template.html`, replaces `/*__DATA__*/` with `data.js` contents, writes `<name>.html` (Jason's slot convention, `$JASON/design/mockups/a-inbox.template.html:110`). Idempotent. Prints the files written.\",\"`index.html`: loads `inbox.html` / `brief.html` / `studio.html` in a full-size iframe by `?v=inbox|brief|studio`; keys `1`/`2`/`3` switch (ignored when focus is in the iframe's text fields: switching is done by parent keydown only); a small fixed panel lists the four timed tasks (spec §9.1) with Start/Stop per task per layout and a \\\"Copy results\\\" button producing JSON `{layout:{task1:ms,...}}` for `decision.json`.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        0
+      ]
+    },
+    {
+      "id": 2,
+      "subject": "Task 3: Inbox mockup",
+      "status": "pending",
+      "description": "**Goal:** Static-interactive Inbox mockup (Jason's list | card | discussion) on `tokens.css`, plus the hover→highlight linkage.\n\n**Depends on:** T2\n\n**Verify:** `node design/mockups/build.mjs`, open `design/mockups/index.html?v=inbox` at 1440 px and at 390 px width: no horizontal scroll, Q15 hover outlines its region.\n\nSee plan section \"Task 3\".\n\n```json:metadata\n{\"files\":[\"design/mockups/inbox.template.html\"],\"verifyCommand\":\"node design/mockups/build.mjs, open design/mockups/index.html?v=inbox at 1440 px and at 390 px width: no horizontal scroll, Q15 hover outlines its region.\",\"acceptanceCriteria\":[\"Ported from `$JASON/design/mockups/a-inbox-clean.template.html` (layout `260px | 1fr | 33vw`), but links `../../skills/grilling-ui/page/tokens.css` and removes Google Fonts.\",\"Renders all rounds from `SESSION.questions`; selecting a question shows card + thread; options stage (dashed rec, staged highlight), free text stages, reopened/deferred marks, updated marker.\",\"Visual toggle shows `VISUAL_HTML` in `<iframe sandbox=\\\"allow-scripts\\\" srcdoc>`, with a stale strip (\\\"Out of date · regenerate…\\\").\",\"Hovering a nav item posts `{highlight:[id]}` to the iframe; clicking a `data-q` region selects that question.\",\"Stacks below 760 px (port `$JASON/page.html:153-183`).\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        1
+      ]
+    },
+    {
+      "id": 3,
+      "subject": "Task 4: Brief mockup",
+      "status": "pending",
+      "description": "**Goal:** Document-model mockup per spec §7 Brief row.\n\n**Depends on:** T2\n\n**Verify:** build; `index.html?v=brief` at 1440 / 1000 / 390 px.\n\nSee plan section \"Task 4\".\n\n```json:metadata\n{\"files\":[\"design/mockups/brief.template.html\"],\"verifyCommand\":\"build; index.html?v=brief at 1440 / 1000 / 390 px.\",\"acceptanceCriteria\":[\"One column max-width `68ch`; sections derived from dependency roots: for each question with `deps: []`, a section titled by that root question; every other question goes in the section of its first root ancestor (walk `deps[0]` to a root). Deferred questions in their own final section \\\"Deferred\\\".\",\"Answered question = one prose line `Title → chosen option text` (text answers show the text) + a \\\"reopen\\\" control.\",\"Open/reopened question = compact block: heading; options as a vertical list with full text; recommended option dashed and pre-selected (staged-looking); the why in one line; free-text field always visible; thread collapsed to bold first lines that expand inline on click.\",\"≥ 1100 px: left jump rail (section links + open counts) and the visual as a sticky figure on the right; < 1100 px the figure sits under the header; < 760 px everything stacks.\",\"Hovering a question block highlights its `data-q` regions (same postMessage).\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        1
+      ]
+    },
+    {
+      "id": 4,
+      "subject": "Task 5: Studio mockup",
+      "status": "pending",
+      "description": "**Goal:** Visual-first mockup per spec §7 Studio row.\n\n**Depends on:** T2\n\n**Verify:** build; `index.html?v=studio` at 1440 / 390 px.\n\nSee plan section \"Task 5\".\n\n```json:metadata\n{\"files\":[\"design/mockups/studio.template.html\"],\"verifyCommand\":\"build; index.html?v=studio at 1440 / 390 px.\",\"acceptanceCriteria\":[\"Visual iframe takes ~60% width; conversation rail on the right holds one timeline grouped under sticky round headers: open question cards in full, answered cards collapsed to one line, thread messages placed by `at` time, visual feedback (`visual.thread`) in the same stream.\",\"One composer at the bottom of the rail with a target chip: `@qN thread`, `@qN answer`, `visual`; clicking a card sets the chip to that question; the chip is a button cycling the three targets.\",\"Hover card → highlight regions; click region → select card (scroll into view).\",\"A toggle \\\"before first draw\\\" shows the empty state: \\\"Agreed so far\\\" (bullet list derived from answered questions: `title → answer`) and a Visualize call to action.\",\"Stacks below 760 px (visual above rail, `height: 60vh`).\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        1
+      ]
+    },
+    {
+      "id": 5,
+      "subject": "Task 6: Screenshots and the layout comparison — HUMAN GATE (blocking M7)",
+      "status": "pending",
+      "description": "**Goal:** Screenshot all three at 1440 and 390 px, run the user's four timed tasks, and record which of Brief/Studio get built.\n\n**Depends on:** T3, T4, T5\n\n**Verify:** `PLAYWRIGHT_PKG=... node design/mockups/shoot.mjs` → prints 6 paths, exit 0; `node -e \"const d=require('./design/mockups/decision.json');if(!Array.isArray(d.build))process.exit(1)\"` → exit 0.\n\nSee plan section \"Task 6\".\n\n```json:metadata\n{\"files\":[\"design/mockups/shoot.mjs\",\"design/mockups/decision.json\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=... node design/mockups/shoot.mjs → prints 6 paths, exit 0; node -e \\\"const d=require('./design/mockups/decision.json');if(!Array.isArray(d.build))process.exit(1)\\\" → exit 0.\",\"acceptanceCriteria\":[\"`shoot.mjs` (Playwright via `PLAYWRIGHT_PKG`) writes `design/mockups/shots/{inbox,brief,studio}-{1440,390}.png` (full page) and asserts no horizontal overflow (`document.documentElement.scrollWidth <= innerWidth`) at each width.\",\"**HUMAN GATE:** the user runs the four tasks in each layout using the picker stopwatch: (1) \\\"What did we decide about Q2 transport?\\\", (2) answer the open round 9, (3) find which part of the visual Q15 changes, (4) push back on Q16 in free text. Randomise layout order per task.\",\"`decision.json` records `{ \\\"build\\\": [...], \\\"timings\\\": <picker JSON>, \\\"notes\\\": \\\"<user's words>\\\", \\\"date\\\": \\\"...\\\" }`. `build` ⊆ `[\\\"brief\\\",\\\"studio\\\"]` (Inbox is implicit).\",\"Do **not** mark this task complete until the user has given the result in chat.\"],\"humanGate\":true}\n```",
+      "blockedBy": [
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "id": 6,
+      "subject": "Task 7: util + session state patch/validate (port)",
+      "status": "pending",
+      "description": "**Goal:** Port Jason's patch/merge/stamp/validate into `lib/state.mjs` with the new fields, as pure functions with unit tests.\n\n**Depends on:** none\n\n**Verify:** `node --test skills/grilling-ui/test/state.test.mjs` → all pass.\n\nSee plan section \"Task 7\".\n\n```json:metadata\n{\"files\":[\"skills/grilling-ui/lib/util.mjs\",\"skills/grilling-ui/lib/state.mjs\",\"skills/grilling-ui/hub.mjs\",\"skills/grilling-ui/test/state.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/state.test.mjs → all pass.\",\"acceptanceCriteria\":[\"`util.mjs` exports `parseArgs, print, die, writeJson, readJson, rand(hexChars), sleep, isObj, oneLine` (port `$JASON/server.mjs:31-49`; `die` prefix `grill:`; `writeJson` atomic temp+rename).\",\"`state.mjs` exports `PatchError, applyPatch(state, patch, nowIso), validateState(state)` ported from `$JASON/server.mjs:254-450` with these additions:\",\"All patch tests from `$JASON/test/server.test.mjs:291-572` ported as direct `applyPatch`/`validateState` calls (the CLI-level ones — stdin/`--file`/exit codes, lines 487–612 — are ported in T10).\",\"`hub.mjs`: shebang, `parseArgs`, a `cmds` table (own keys only, `$JASON/server.mjs:485-489`), usage message listing all subcommands of the CLI contract below.\"],\"humanGate\":false}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 8: Map patch/validate (pure)",
+      "status": "pending",
+      "description": "**Goal:** `lib/maps.mjs` with `applyMapPatch` and `validateMap` for the §4a `map` shape (used both for `map.json` and the session `state.map` snapshot).\n\n**Depends on:** T7\n\n**Verify:** `node --test skills/grilling-ui/test/maps.test.mjs` → pass; `node --test skills/grilling-ui/test/state.test.mjs` still passes.\n\nSee plan section \"Task 8\".\n\n```json:metadata\n{\"files\":[\"skills/grilling-ui/lib/maps.mjs\",\"skills/grilling-ui/test/maps.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/maps.test.mjs → pass; node --test skills/grilling-ui/test/state.test.mjs still passes.\",\"acceptanceCriteria\":[\"`validateMap(m)`: object; `title, link, at, destination, notes` strings (optional except `title`); `decisions`, `closed`: arrays of `{title, link?, gist?}` strings; `tickets`: array of `{title (required, unique), link?, type ∈ research|prototype|grilling|task, state ∈ frontier|blocked|claimed, blockedBy?: string[] (each must name another ticket or a closed title), assignee?: string, session?: string (http URL of the grill working it, used by T34), hubClaim?: {agentId: string, at: string, seq?: number}}`; `fog`: string[]; `outOfScope`: `{gist, link?}[]`; `listener?`: `{agentId, heartbeat}`; `handled?`: whole number. Error messages name the ticket title and field.\",\"`applyMapPatch(map, patch, now)`: `null` deletes; `tickets`, `closed`, `decisions` keyed by `title` (known title merges one level, `null` field deletes, new title appended; a ticket moved to `closed` in the same patch may be removed with `{\\\"title\\\": T, \\\"remove\\\": true}` in `tickets`); `fog`, `outOfScope` replaced whole; `listener` in a patch → rejected (\\\"listener is written by the hub\\\"); stamps `at = now` on every patch.\",\"Tests cover each rule plus unknown `blockedBy` rejection and duplicate titles.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        6
+      ]
+    },
+    {
+      "id": 8,
+      "subject": "Task 9: GRILL_HOME, project key, hub lifecycle (ensure / serve skeleton / handoff / idle exit)",
+      "status": "pending",
+      "description": "**Goal:** One hub per user: `ensure` reuses a healthy hub with the same `{pid, started}`, otherwise takes `hub.lock` and spawns a detached hub on the remembered port; version change → handoff on the same port; idle exit; clear errors on an unwritable root or denied bind.\n\n**Depends on:** T7\n\n**Verify:** `node --test skills/grilling-ui/test/lifecycle.test.mjs` → pass; `ps aux | grep \"hub.mjs serve\"` after the run shows none from the test homes.\n\nSee plan section \"Task 9\".\n\n```json:metadata\n{\"files\":[\"lib/home.mjs\",\"lib/lifecycle.mjs\",\"lib/log.mjs\",\"lib/server.mjs\",\"test/helpers.mjs\",\"test/lifecycle.test.mjs\",\"hub.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/lifecycle.test.mjs → pass; ps aux | grep \\\"hub.mjs serve\\\" after the run shows none from the test homes.\",\"acceptanceCriteria\":[\"`home.mjs`: `grillHome()` = `GRILL_HOME` or `~/.intelligentrascal`; `projectRoot(cwd)` (port `$JASON/server.mjs:58-64`); `projectKey(cwd)` per D2; `branchOf(cwd)` (`git rev-parse --abbrev-ref HEAD`, `\\\"\\\"` outside git); `assertWritable(home)` creates `home`, `logs/`, `grill-sessions/`, `maps/` and probes a write; on `EPERM|EACCES|EROFS` exits 1 with the \"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        6
+      ]
+    },
+    {
+      "id": 9,
+      "subject": "Task 10: Sessions — new, sessions, resume/ownership, pending, patch CLI",
+      "status": "pending",
+      "description": "**Goal:** Session folders per D2/D3, ownership with heartbeat and `--take`, resume selection, `pending`, and the `patch` CLI with Jason's exit/one-line contract.\n\n**Depends on:** T9\n\n**Verify:** `node --test skills/grilling-ui/test/sessions.test.mjs` → pass.\n\nSee plan section \"Task 10\".\n\n```json:metadata\n{\"files\":[\"lib/sessions.mjs\",\"test/sessions.test.mjs\",\"hub.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/sessions.test.mjs → pass.\",\"acceptanceCriteria\":[\"`new`: runs `ensure`; creates `grill-sessions/<projectKey>/<id>/` with `state.json` `{id, topic, doc, project, projectKey, cwd, branch, created, agent:{status:\\\"working\\\",since}, terms:[], questions:[]}` (+ `phase`, `mapKey` when given), empty `events.jsonl`, `meta.json` `{token: rand(32), owner: {agentId: rand(12), agent, heartbeat: now}}`. `--doc` default `docs/<slug(topic)>-design.md`. Prints `{session, id, projectKey, agentId, url, doc}` (url = `http://127.0.0.1:<port>/s/<id>/`).\",\"`sessions [--all]`: this project's sessions newest first (port `$JASON/server.mjs:106-123`) with added `branch, cwd, ageSec, inUse` (heartbeat < `GRILL_FRESH_MS`), `owner.agent`.\",\"`resume`: without `--session`: unfinished sessions of this project; exactly one and not in use → pick it; otherwise print `{\\\"choose\\\":[rows]}` and exit 0 (skill asks the user). With `--session`: if in use and no `--take` → print `{\\\"inUse\\\":true,\\\"agent\\\":..,\\\"ageSec\\\":..}` exit 4; else mint a new agentId, write owner, print `{session, agentId, url, handled, pending: <count past handled>}`.\",\"`patch --session DIR --agent-id ID [--file P]`: port `$JASON/server.mjs:452-483` (stdin via `tty.isatty(0)` guard, one-line errors, exit 2 on rejects, exit 1 on write failure); runs `ensure` first (best effort: a hub failure prints a warning to stderr but the patch still applies); refreshes `meta.owner.heartbeat` when `--agent-id` matches the owner; if it does not match, rejects with `\\\"session is owned by another agent (<agent>, <age>); resume --take to take it\\\"` exit 4.\",\"`pending --session DIR`: port `$JASON/server.mjs:126-133`.\",\"CLI-level tests ported from `$JASON/test/server.test.mjs:35-61` (key/worktree), `199-289` (sessions/pending), `487-612` (patch CLI) with the new key format and `--agent-id`.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        8
+      ]
+    },
+    {
+      "id": 10,
+      "subject": "Task 11: Hub session routes, page serving, token + Origin auth",
+      "status": "pending",
+      "description": "**Goal:** Serve pages/assets and session endpoints; sends require token and a same-origin (or absent) Origin and append to `events.jsonl`.\n\n**Depends on:** T10\n\n**Verify:** `node --test skills/grilling-ui/test/server.test.mjs` → pass.\n\nSee plan section \"Task 11\".\n\n```json:metadata\n{\"files\":[\"lib/server.mjs\",\"test/server.test.mjs\",\"page/inbox.html\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/server.test.mjs → pass.\",\"acceptanceCriteria\":[\"Routes: `GET /s/<id>/` and `/s/<id>/inbox|brief|studio` → layout HTML with `<!--GRILL_BOOT-->` replaced by `<script>window.GRILL=${JSON.stringify({kind:\\\"session\\\",id,token,base:\\\"/s/\\\"+id+\\\"/\\\",layouts:[built layouts]})}</script>`; unbuilt layout → 302 to `/s/<id>/inbox` (D1). Unknown id → 404 HTML \\\"No such grill\\\".\",\"`GET /assets/<name>` for a whitelist (`core.js, tokens.css, map-view.js, board.js`), correct content types, `cache-control: no-store`.\",\"`GET /s/<id>/state` → state.json with `owner` from meta.json merged, last-good fallback (port `$JASON/server.mjs:153-159`); `GET /s/<id>/visual` (port 161–165); `GET /s/<id>/events.jsonl` raw log.\",\"`POST /s/<id>/send`: requires `x-grill-token` equal to meta.token (401 otherwise) and Origin absent or ∈ `{http://127.0.0.1:<port>, http://localhost:<port>}` (403 otherwise, `$JASON/server.mjs:167-172`); body `{actions:[...]}` non-empty (400); appends `{type:\\\"send\\\", seq, at, session, actions}`; per-session seq initialised from `lastSeq` on first use; returns `{ok, seq}`.\",\"`POST /s/<id>/heartbeat {agentId}` (token) → updates `meta.owner.heartbeat` if agentId matches (409 otherwise).\",\"Tests: port `$JASON/test/server.test.mjs:63-118, 159-172` to the hub (`new` → url), plus 401 on missing/wrong token, 403 on `Origin: http://evil.example`, 403 on `Origin: null` (sandboxed iframe), seq survives hub restart.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        9
+      ]
+    },
+    {
+      "id": 11,
+      "subject": "Task 12: SSE, directory watch, presence and /clients",
+      "status": "pending",
+      "description": "**Goal:** Push `state` changes over the hub-wide SSE stream using a directory watch that survives atomic renames; presence tracking and `/clients`.\n\n**Depends on:** T11\n\n**Verify:** `node --test skills/grilling-ui/test/sse.test.mjs` → pass.\n\nSee plan section \"Task 12\".\n\n```json:metadata\n{\"files\":[\"lib/server.mjs\",\"test/sse.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/sse.test.mjs → pass.\",\"acceptanceCriteria\":[\"`GET /events` (SSE, `text/event-stream`, `retry: 2000`): sends `event: hello` `{pid, started}` on connect, then `event: s` `{\\\"id\\\"}` per session change and `event: m` `{\\\"key\\\"}` per map change; comment keep-alive every 25 s.\",\"Session watchers attach lazily on the first request touching `/s/<id>/…` (`fs.watch(dir)`; filter `state.json|meta.json|visual.html`; 30 ms debounce per id).\",\"`GET /s/<id>/presence?tab=<t>` → 204, records `tab → now`. `GET /s/<id>/clients` → `{count, lastSeen, hubStarted}` per D6.\",\"Tests: an EventSource-like reader (`fetch` streaming body, parse `event:`/`data:`) sees `s` pings after two consecutive `hub.mjs patch` calls (two atomic renames); presence counts two tabs, drops after `GRILL_PRESENCE_MS` (test override 300 ms).\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        10
+      ]
+    },
+    {
+      "id": 12,
+      "subject": "Task 13: watch and wait (no gap), heartbeat through the hub",
+      "status": "pending",
+      "description": "**Goal:** `watch` prints sends after `--after` already on disk then tails with no gap; `wait` blocks until sends exist; both heartbeat every 60 s via the hub.\n\n**Depends on:** T11\n\n**Verify:** `node --test skills/grilling-ui/test/watch.test.mjs` → pass.\n\nSee plan section \"Task 13\".\n\n```json:metadata\n{\"files\":[\"lib/events.mjs\",\"test/watch.test.mjs\",\"hub.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/watch.test.mjs → pass.\",\"acceptanceCriteria\":[\"`events.mjs` exports `readEvents, lastSeq` (port `$JASON/server.mjs:90-99`) and `tailLog(file, after, onLine)` that **installs `fs.watch` on the directory first, then drains**, tracks the byte offset, only emits complete lines with `seq > after`, dedupes by seq, and also re-drains every 1 s (safety net).\",\"`watch --session DIR --after N --agent-id ID`: runs `ensure`, prints each send line to stdout as it lands, never exits on its own; heartbeat `POST /s/<id>/heartbeat` every `GRILL_HEARTBEAT_MS` (default 60 000) and once at start; if the hub is down, `ensure` again.\",\"`wait --session DIR --after N --timeout S --agent-id ID`: same drain; prints all available lines `> N` and exits 0; exit 3 at timeout; heartbeats while waiting.\",\"`--map KEY` variants use `maps/<key>/events.jsonl` and `POST /m/<key>/heartbeat` (the map route lands in T14; until then, tests cover sessions only).\",\"Tests: lines written before start + 20 lines appended in a tight loop during startup are all printed exactly once in order; `wait` exit 0/3 (port `$JASON/test/server.test.mjs:120-157`); heartbeat updates `meta.json` (`GRILL_HEARTBEAT_MS=200`).\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        10
+      ]
+    },
+    {
+      "id": 13,
+      "subject": "Task 14: Map storage on the hub and `map-patch`",
+      "status": "pending",
+      "description": "**Goal:** Maps live under `maps/<projectKey>/<slug>/`; `map-patch` sends patches through the hub (single writer, D4); `/m/<key>/map` and SSE `m` pings.\n\n**Depends on:** T8, T11\n\n**Verify:** `node --test skills/grilling-ui/test/maps-hub.test.mjs` → pass.\n\nSee plan section \"Task 14\".\n\n```json:metadata\n{\"files\":[\"lib/server.mjs\",\"hub.mjs\",\"test/maps-hub.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/maps-hub.test.mjs → pass.\",\"acceptanceCriteria\":[\"`map-patch --map KEY|SLUG`: a bare slug is prefixed with the cwd's `projectKey`; creates `maps/<key>/` with `meta.json {token}` and empty `events.jsonl` if absent (CLI side, then the hub picks it up); reads patch from stdin/`--file`; `POST /m/<key>/patch` with token; prints `{ok, tickets, url}`; validation errors → one line, exit 2 (hub returns 400 with the message).\",\"Hub routes: `GET /m/<key>/` (board HTML; placeholder until T34), `GET /m/<key>/map` (map.json or 404), `POST /m/<key>/patch` (token + Origin; `applyMapPatch` + `validateMap`, atomic write, `m` ping), `POST /m/<key>/heartbeat {agentId}` (sets `listener {agentId, heartbeat}`), `GET /m/<key>/presence`, `GET /m/<key>/clients`.\",\"Key parsing: `/m/([a-z0-9-]+)/([a-z0-9-]+)/(map|patch|heartbeat|presence|clients|claim|action)?$`.\",\"Tests: create, patch twice (merge), invalid patch rejected with state unchanged, listener heartbeat shows in `/map`, bad token 401.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        7,
+        10
+      ]
+    },
+    {
+      "id": 14,
+      "subject": "Task 15: `url` and `open`",
+      "status": "pending",
+      "description": "**Goal:** Best-effort auto-open with the §6 skip rules, tab detection, URL validation and a no-shell spawn.\n\n**Depends on:** T12\n\n**Verify:** `node --test skills/grilling-ui/test/open.test.mjs` → pass.\n\nSee plan section \"Task 15\".\n\n```json:metadata\n{\"files\":[\"lib/open.mjs\",\"test/open.test.mjs\",\"hub.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/open.test.mjs → pass.\",\"acceptanceCriteria\":[\"`skipReason(env, platform)` → `\\\"GRILL_NO_OPEN\\\"`, `\\\"ssh\\\"`, `\\\"no-display\\\"` (linux without `DISPLAY`/`WAYLAND_DISPLAY`), or `null`.\",\"`URL_RE` per D1; `url` prints the URL (session: `…/s/<id>/` or `…/s/<id>/<ui>`; map: `…/m/<key>/`).\",\"`open`: skip → `{\\\"opened\\\":false,\\\"reason\\\":…,\\\"url\\\"}`; `/clients` count > 0 or `lastSeen` within 120 s → `{\\\"opened\\\":false,\\\"reason\\\":\\\"tab-open\\\"}`; if `hubStarted` < 3 s ago and count 0, poll `/clients` up to 3 s first; invalid URL → `reason: \\\"invalid-url\\\"`; spawn `[opener, url]` with `shell: false`, killed after 5 s: macOS `open`, Linux `xdg-open`, Windows `cmd /c start \\\"\\\" <url>`; `GRILL_OPENER` = executable path overriding the opener.\",\"Tests: each skip rule; regex accepts `/s/abc-1/`, `/s/abc-1/studio`, `/m/proj-1a2b3c4d/42/` and rejects `/s/../`, `/s/a/b/`, `javascript:`, `http://127.0.0.1:1/s/a/brief?x`; `GRILL_OPENER` script writes argv to a file; a present tab (presence ping) prevents opening.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        11
+      ]
+    },
+    {
+      "id": 15,
+      "subject": "Task 16: `agent-profile`",
+      "status": "pending",
+      "description": "**Goal:** Detect the agent and print exact listening/draw parameters the skill follows verbatim.\n\n**Depends on:** T7\n\n**Verify:** `node --test skills/grilling-ui/test/profile.test.mjs` → pass.\n\nSee plan section \"Task 16\".\n\n```json:metadata\n{\"files\":[\"lib/profile.mjs\",\"test/profile.test.mjs\",\"hub.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/profile.test.mjs → pass.\",\"acceptanceCriteria\":[\"`detectAgent(env, flag)`: flag wins; else D13 env order claude → codex → opencode → pi; else `\\\"unknown\\\"`.\",\"`profile(agent, {skill, session, agentId, handled, project, topic})` returns JSON with `agent`, `mode` (`monitor|wait`), `listen` (exact tool + params, placeholders `<session> <handled> <agentId>` filled when given), `repeat` (what to do on expiry/exit 3), `draw` (`{tool, background}`), `research` (`subagent|leave-open`), `loadSkill` (how to call a skill by name), `notes` (≤ 3 lines).\",\"Values (verify Codex/OpenCode/Pi tool and param names against `$RESEARCH` sources while implementing — Codex: `grep -rn yield_time_ms $RESEARCH/openai-codex/codex-rs`; OpenCode: `$RESEARCH/sst-opencode/packages/opencode/src/tool/` bash tool; Pi: `$RESEARCH/badlogic-pi-mono/packages/coding-agent/src/core/tools/bash.ts` — and adjust the names in this table, keeping the timeouts):\",\"Tests with env fixtures for all five plus `--agent` override; snapshot of the claude Monitor params (exact strings).\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        6
+      ]
+    },
+    {
+      "id": 16,
+      "subject": "Task 17: core.js + Inbox at parity with Jason's e2e",
+      "status": "pending",
+      "description": "**Goal:** Split Jason's `page.html` into `core.js` (shared) and `inbox.html` (layout), on the hub (SSE instead of 1 s polling), keyed staging, token sends; port Jason's e2e to pass unchanged in behaviour.\n\n**Depends on:** T1, T12\n\n**Verify:** `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/page.e2e.mjs` → `PASS n/n` (n ≥ 102), exit 0; units still pass.\n\nSee plan section \"Task 17\".\n\n```json:metadata\n{\"files\":[\"page/core.js\",\"test/page.e2e.mjs\",\"page/inbox.html\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=… node skills/grilling-ui/test/page.e2e.mjs → PASS n/n (n ≥ 102), exit 0; units still pass.\",\"acceptanceCriteria\":[\"`core.js` (IIFE, `\\\"use strict\\\"`, exposes `window.Grill`) contains the port of `$JASON/page.html:231-377` (helpers, staging, pending, `sendState`, `post`, `send`, `finishNow`, `visualize`, `explore`) and `378-433, 456-466, 591-628` (render wrapper, `withInputs`, `withThreadScroll`, banner, header, status, footer, send button) with these changes:\",\"`inbox.html`: markup `$JASON/page.html:208-229`, CSS `14-205` minus tokens (links `/assets/tokens.css`), inline script with renders `435-455, 467-590` registered via `Grill.mount`. Loads `/assets/core.js`. Contains `<!--GRILL_BOOT-->` before the scripts.\",\"`test/page.e2e.mjs`: port `$JASON/test/page.e2e.mjs` — `new` + write fixture state (lines 20–33) + open `url`; all checks at lines 59–352 kept; \\\"restart reuses the port\\\" (335) becomes: `POST /admin/shutdown`, see hub-down banner, `hub.mjs ensure`, banner clears on the same URL; \\\"system fonts only\\\" also asserts no request leaves 127.0.0.1. Sends are read from `events.jsonl` (no stdout); add checks: title `<project> · <topic>`, favicon changes to working, listener text flips when `meta.json` heartbeat is made stale.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        0,
+        11
+      ]
+    },
+    {
+      "id": 17,
+      "subject": "Task 18: Shared EventSource, poll fallback, handoff reconnect",
+      "status": "pending",
+      "description": "**Goal:** All tabs share one EventSource; a tab whose EventSource fails 3 times polls every 5 s; SSE reconnects across hub restart/handoff.\n\n**Depends on:** T17\n\n**Verify:** `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/sse.e2e.mjs` → `PASS`, exit 0; `page.e2e.mjs` still passes.\n\nSee plan section \"Task 18\".\n\n```json:metadata\n{\"files\":[\"page/core.js\",\"test/sse.e2e.mjs\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=… node skills/grilling-ui/test/sse.e2e.mjs → PASS, exit 0; page.e2e.mjs still passes.\",\"acceptanceCriteria\":[\"Leader: `navigator.locks.request(\\\"grill-sse\\\", () => new Promise(() => openES()))`; the leader relays every SSE event on `BroadcastChannel(\\\"grill-sse\\\")` and handles it itself; followers only listen on the channel. When the leader tab closes, another acquires the lock within ~1 s.\",\"Each tab handles only pings for its own `id`/`key`; on `hello` with a new `{pid, started}` every tab refetches.\",\"3 consecutive `error` events without an `open` → that tab switches to a 5 s poll of `state` and says so in the status tooltip; it retries SSE every 60 s.\",\"E2E: open 8 tabs on 3 sessions in one context → hub reports exactly 1 `/events` client (add `GET /admin/stats` → `{sse, sessions, rss}`, admin token); a patch in each session updates its tabs within 1 s; close the leader → updates continue; handoff (`GRILL_VERSION_OVERRIDE` change + `ensure`) → tabs update after reconnect on the same URL; block `/events` via `page.route` → tab falls back to polling and still updates.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        16
+      ]
+    },
+    {
+      "id": 18,
+      "subject": "Task 19: Keyboard layer and cheatsheet",
+      "status": "pending",
+      "description": "**Goal:** Linear/Gmail-style shortcuts for all layouts (board keys land in T34), with the §7 guard rules and a `?` cheatsheet.\n\n**Depends on:** T18\n\n**Verify:** `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/keyboard.e2e.mjs` → PASS.\n\nSee plan section \"Task 19\".\n\n```json:metadata\n{\"files\":[\"page/core.js\",\"page/inbox.html\",\"test/keyboard.e2e.mjs\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=… node skills/grilling-ui/test/keyboard.e2e.mjs → PASS.\",\"acceptanceCriteria\":[\"One `keydown` listener on `document`. Ignored when `e.isComposing`, when `e.ctrlKey || e.altKey` (except `Ctrl+Enter`), and when focus is in `input, textarea, [contenteditable]` — except `⌘↵/Ctrl↵` (send) and `Esc` (blur field / close overlay).\",\"Keys: `j/k` → `layout.move(±1)`; `1`–`4` → stage option A–D only if it exists; `a` → stage accept of `rec.option`; `r` → `layout.focusThread()`; `f` → `layout.focusFree()`; `d`/`o` → stage defer/reopen; `e` → toast \\\"Exploring Qn… Undo\\\" for 3 s, then `explore(id)` unless undone (`u` or click Undo); `v` → toggle visual or `visualize()`; `g` then `i/b/s/m` within 1 s → navigate to that layout (only built ones) or `/m/<mapKey>/` when `S.mapKey`; `u` → clear this question's staged action; `?` → cheatsheet overlay (table of the §7 rows) with an \\\"Turn shortcuts off\\\" switch stored at `localStorage[\\\"grill:keys\\\"]=\\\"off\\\"` (when off, only ⌘↵ and Esc remain).\",\"Toast and overlay are `role=\\\"status\\\"` / `role=\\\"dialog\\\"` with focus return.\",\"E2E: each shortcut's effect; `j` typed in the thread textarea types a `j`; `1` with 2 options does nothing for `3`; IME composition ignored (dispatch `keydown` with `isComposing: true`); ⌘↵ from a textarea sends; `?` opens and Esc closes; off switch persists across reload.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        17
+      ]
+    },
+    {
+      "id": 19,
+      "subject": "Task 20: Visual linkage (data-q) and visual-brief",
+      "status": "pending",
+      "description": "**Goal:** Region highlighting and click-to-select between questions and the sandboxed visual, ⌘↵/Esc forwarded out of the iframe; port `visual-brief.md` with the verbatim listener.\n\n**Depends on:** T19\n\n**Verify:** `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/keyboard.e2e.mjs` and `page.e2e.mjs` → PASS.\n\nSee plan section \"Task 20\".\n\n```json:metadata\n{\"files\":[\"skills/grilling-ui/visual-brief.md\",\"page/core.js\",\"page/inbox.html\",\"test/keyboard.e2e.mjs\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=… node skills/grilling-ui/test/keyboard.e2e.mjs and page.e2e.mjs → PASS.\",\"acceptanceCriteria\":[\"`visual-brief.md` = `$JASON/visual-brief.md` with \\\"grill-with-ui\\\" → \\\"grilling-ui\\\", plus a section \\\"Linking regions to questions\\\": every region that a question decides gets `data-q=\\\"qN\\\"`; the file must include the listener below **verbatim** before `</body>`; `grep -n 'data-q' visual.html` must return at least one hit per answered question the visual depicts.\",\"Parent side in `core.js`: `Grill.highlight(ids)` posts `{highlight: ids}` to `#visual-frame`; `message` handler accepts only `e.source === frame.contentWindow`, `clicked` matching `/^q\\\\d+$/` → `layout.select(id)`; `key: \\\"send\\\"` → `send()`; `key: \\\"escape\\\"` → focus returns to the page (`document.body` → current question heading).\",\"Inbox: `mouseenter` on a nav item / card → `highlight([id])`; `mouseleave` → `highlight([])`.\",\"E2E (extend keyboard.e2e): a fixture `visual.html` containing the listener and `data-q` regions; hover Q2 → region has class `grill-hl`; click region `q3` → Q3 selected; ⌘↵ pressed with focus inside the iframe sends staged actions.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        18
+      ]
+    },
+    {
+      "id": 20,
+      "subject": "Task 21: `grilling-ui` SKILL.md (engine)",
+      "status": "pending",
+      "description": "**Goal:** The shared engine skill: override table first, transport protocol, per-agent listening from `agent-profile`, Visualize, Finish profiles, resume, schema. No interview method.\n\n**Depends on:** T13, T15, T16, T17\n\n**Verify:** `node --test skills/grilling-ui/test/skills.test.mjs` → pass.\n\nSee plan section \"Task 21\".\n\n```json:metadata\n{\"files\":[\"skills/grilling-ui/SKILL.md\",\"skills/grilling-ui/test/skills.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/skills.test.mjs → pass.\",\"acceptanceCriteria\":[\"Frontmatter: `name: grilling-ui`, `description:` trigger-free (\\\"Browser transport for the -ui grill skills: publishes rounds to a local page and listens for Sends. Loaded by grill-me-ui, grill-docs-ui and wayfinder-ui.\\\"), `user-invocable: false`.\",\"Sections in order:\",\"`skills.test.mjs` asserts: frontmatter keys; the override table contains all six left-column phrases from §3; every `node \\\"$SKILL/hub.mjs\\\" <cmd>` mentioned is a real subcommand (parse `hub.mjs` usage); no `../` paths; no \\\"Call the Skill tool with\\\" lines (the engine loads nothing).\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        12,
+        14,
+        15,
+        16
+      ]
+    },
+    {
+      "id": 21,
+      "subject": "Task 22: `grill-me-ui` and `grill-docs-ui` wrappers",
+      "status": "pending",
+      "description": "**Goal:** Two thin wrappers: preflight, load order, finish profile.\n\n**Depends on:** T21\n\n**Verify:** `node --test skills/grilling-ui/test/skills.test.mjs` → pass.\n\nSee plan section \"Task 22\".\n\n```json:metadata\n{\"files\":[\"skills/grill-me-ui/SKILL.md\",\"skills/grill-docs-ui/SKILL.md\",\"test/skills.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/skills.test.mjs → pass.\",\"acceptanceCriteria\":[\"`grill-me-ui/SKILL.md` (full text; adapt only wording, not steps):\",\"`grill-docs-ui/SKILL.md`: same shape; description \\\"Grill with docs, with ui …\\\" triggers (\\\"grill with docs ui\\\", \\\"grill-docs-ui\\\", \\\"grill with docs in the browser\\\"); step 1 loads `grilling` then `domain-modeling` (in Claude Code: `mattpocock-skills:domain-modeling`) as **two calls**; preflight checks both; finish profile **docs**; adds: \\\"After every `CONTEXT.md` edit, patch the page `terms` with the terms touched in this grill only.\\\"\",\"Descriptions contain \\\"ui\\\" trigger phrases and do not contain bare \\\"grill me\\\" as a standalone trigger (test: every quoted trigger phrase contains \\\"ui\\\" or \\\"browser\\\").\",\"Tests extended: load order (grilling line precedes grilling-ui line), both name forms present, no `../`.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        20
+      ]
+    },
+    {
+      "id": 22,
+      "subject": "Task 23: `wayfinder-ui` (chart + work mode), vendored wayfinder, upstream pin",
+      "status": "pending",
+      "description": "**Goal:** Wayfinder wrapper reading its vendored copy, with chart-mode phases, work mode (one ticket = one session), Finish tracker writes then map snapshot.\n\n**Depends on:** T21\n\n**Verify:** `node --test skills/grilling-ui/test/skills.test.mjs` → pass; `cmp skills/wayfinder-ui/upstream/wayfinder.md ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.3/skills/engineering/wayfinder/SKILL.md` → no output.\n\nSee plan section \"Task 23\".\n\n```json:metadata\n{\"files\":[\"skills/wayfinder-ui/SKILL.md\",\"skills/wayfinder-ui/upstream/wayfinder.md\",\"upstream.json\",\"test/skills.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/skills.test.mjs → pass; cmp skills/wayfinder-ui/upstream/wayfinder.md ~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.3/skills/engineering/wayfinder/SKILL.md → no output.\",\"acceptanceCriteria\":[\"`upstream/wayfinder.md` = byte copy of `$POCOCK_PIN/skills/engineering/wayfinder/SKILL.md` (pinned 1.2.3 / `3cca18b`).\",\"`upstream.json`:\",\"`wayfinder-ui/SKILL.md`: description triggers \\\"wayfinder ui\\\", \\\"wayfind with ui\\\", \\\"/wayfinder-ui\\\", \\\"/wayfinder-ui board <map>\\\"; `$SKILL` line; preflight as T22 (grilling + domain-modeling); \\\"Read `$SKILL/upstream/wayfinder.md` (same folder) and follow it, with these changes:\\\"\",\"Tests: vendored file equals the pinned file (skip if `$POCOCK_PIN` absent); upstream.json shape; SKILL.md mentions `--phase destination`, `finished`, `map-patch`, \\\"one ticket\\\".\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        20
+      ]
+    },
+    {
+      "id": 23,
+      "subject": "Task 24: Map screen, phase header, no-map state",
+      "status": "pending",
+      "description": "**Goal:** Render the Wayfinder Map snapshot at the end of a grill in every layout (D9), show `phase` in the header, and the \"No map needed — see terminal\" state.\n\n**Depends on:** T8, T17\n\n**Verify:** `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/map.e2e.mjs` → PASS.\n\nSee plan section \"Task 24\".\n\n```json:metadata\n{\"files\":[\"page/map-view.js\",\"test/map.e2e.mjs\",\"page/core.js\",\"page/inbox.html\",\"lib/server.mjs\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=… node skills/grilling-ui/test/map.e2e.mjs → PASS.\",\"acceptanceCriteria\":[\"`map-view.js` exports `window.MapView.render(el, map, {now})`: header (destination, \\\"Snapshot at <time> · canonical: <link>\\\"), sections Decisions so far (title→gist), Frontier / Blocked (with blockedBy titles) / Claimed tickets (type chip, assignee), Closed (gist), Not yet specified (fog), Out of scope. Links render as `<a>` only for `http(s):` URLs; anything else is plain text (§4a). All text escaped.\",\"`core.js`: when `S.finished && S.finished.kind === \\\"map\\\"` the layout body is replaced by the Map screen (with a \\\"Back to questions\\\" toggle); `no-map` shows a banner \\\"No map needed — see terminal\\\"; header shows `phase` label (Destination / Frontier / Ticket).\",\"E2E: fixture session with `finished.kind: \\\"map\\\"` and a map with a local path link → Map screen renders sections, the path is plain text, snapshot time shown; `no-map` fixture shows the banner; phase label visible.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        7,
+        16
+      ]
+    },
+    {
+      "id": 24,
+      "subject": "Task 25: Plugin and marketplace manifests",
+      "status": "pending",
+      "description": "**Goal:** Installable local plugin `intelligentrascal` depending on `mattpocock-skills@mattpocock`.\n\n**Depends on:** T22, T23, T24\n\n**Verify:** `node --test scripts/test/manifest.test.mjs` → pass; `claude plugin validate /Users/rahil/code/skills` → valid; `claude plugin marketplace add /Users/rahil/code/skills && claude plugin install intelligentrascal@intelligentrascal && claude plugin list | grep intelligentrascal` → listed, enabled.\n\nSee plan section \"Task 25\".\n\n```json:metadata\n{\"files\":[\".claude-plugin/plugin.json\",\".claude-plugin/marketplace.json\",\"scripts/test/manifest.test.mjs\"],\"verifyCommand\":\"node --test scripts/test/manifest.test.mjs → pass; claude plugin validate /Users/rahil/code/skills → valid; claude plugin marketplace add /Users/rahil/code/skills && claude plugin install intelligentrascal@intelligentrascal && claude plugin list | grep intelligentrascal → listed, enabled.\",\"acceptanceCriteria\":[\"`plugin.json`:\",\"`marketplace.json`:\",\"Skills are found by the default `skills/` scan (four folders).\",\"`claude plugin validate /Users/rahil/code/skills` reports no errors.\",\"Test parses both files and asserts names, dependency, allowlist, and that each `skills/*/SKILL.md` has matching `name`.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        21,
+        22,
+        23
+      ]
+    },
+    {
+      "id": 25,
+      "subject": "Task 26: Dogfood — two concurrent grills + Monitor wake — HUMAN GATE",
+      "status": "pending",
+      "description": "**Goal:** Prove the Claude Code path end to end and verify the override table is obeyed.\n\n**Depends on:** T25\n\n**Verify:** the verification file lists every box with the user's ✓ and date.\n\nSee plan section \"Task 26\".\n\n```json:metadata\n{\"files\":[\"docs/superpowers/verification/2026-milestone-5-dogfood.md\"],\"verifyCommand\":\"the verification file lists every box with the user's ✓ and date.\",\"acceptanceCriteria\":[\"In project A: `/intelligentrascal:grill-me-ui <topic>`; in project B (different repo) at the same time: `/intelligentrascal:grill-docs-ui <topic>`. One hub (`cat ~/.intelligentrascal/hub.json` pid constant; `ps` shows one `hub.mjs serve`), two `watch` processes.\",\"The browser opened by itself for each; the URL line was also printed.\",\"Round 1 contained the whole frontier; the terminal shows only one status line per send (no ❓/➡️ rounds).\",\"A Send made while the Claude turn is idle wakes it (Monitor event) and is handled; leaving it idle past the Monitor timeout (temporarily set `timeout_ms` to 60 000 via a patched profile env `GRILL_MONITOR_MS=60000` supported by `agent-profile`) produces an expiry notice that re-arms with the current `handled`.\",\"Tabs show `<project> · <topic>` and status favicons; closing Claude in project B flips its page to \\\"no agent listening\\\" within 3 min; `/intelligentrascal:grill-docs-ui resume` picks it up and replays queued Sends.\",\"Finish in A writes `docs/<slug>-design.md` with all §4 sections; B updates `CONTEXT.md`/ADRs and its doc has \\\"see CONTEXT.md\\\" Terms and ADR-linked Locked decisions.\",\"Defects found are fixed (separate commits) before the gate is marked done.\"],\"humanGate\":true}\n```",
+      "blockedBy": [
+        24
+      ]
+    },
+    {
+      "id": 26,
+      "subject": "Task 27: Codex `openai.yaml` sidecars",
+      "status": "pending",
+      "description": "**Goal:** Codex UI metadata and invocation policy for all four skills.\n\n**Depends on:** T22, T23\n\n**Verify:** `node --test skills/grilling-ui/test/skills.test.mjs` → pass.\n\nSee plan section \"Task 27\".\n\n```json:metadata\n{\"files\":[\"skills/{grilling-ui,grill-me-ui,grill-docs-ui,wayfinder-ui}/agents/openai.yaml\",\"test/skills.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/skills.test.mjs → pass.\",\"acceptanceCriteria\":[\"`grilling-ui/agents/openai.yaml`:\",\"Wrappers: `interface.display_name` \\\"Grill Me (UI)\\\", \\\"Grill With Docs (UI)\\\", \\\"Wayfinder (UI)\\\" and short descriptions; **no** `policy` block (they are model-invocable by their \\\"ui\\\" triggers, spec §3 Descriptions).\",\"Test parses the YAML with a tiny line parser (no deps) and asserts the above.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        21,
+        22
+      ]
+    },
+    {
+      "id": 27,
+      "subject": "Task 28: `install-agents.sh` and Codex sandbox check",
+      "status": "pending",
+      "description": "**Goal:** One script to install the skill set for Codex, OpenCode and Pi; check Pocock's skills; record the agents pin; print/check the Codex sandbox config.\n\n**Depends on:** T25\n\n**Verify:** `node --test scripts/test/install-agents.test.mjs` → pass; `bash -n scripts/install-agents.sh` → no output.\n\nSee plan section \"Task 28\".\n\n```json:metadata\n{\"files\":[\"scripts/install-agents.sh\",\"scripts/test/install-agents.test.mjs\"],\"verifyCommand\":\"node --test scripts/test/install-agents.test.mjs → pass; bash -n scripts/install-agents.sh → no output.\",\"acceptanceCriteria\":[\"Honors `HOME` and `AGENTS_SKILLS_DIR` (default `$HOME/.agents/skills`) so tests run in a temp HOME.\",\"Step 1: `ln -sfn \\\"$REPO/skills/<s>\\\" \\\"$DEST/<s>\\\"` for **all four** skills (never a subset); refuses (exit 1) if a non-symlink directory with one of those names exists.\",\"Step 2: finds `grilling` and `domain-modeling` in `$DEST` or `$HOME/.pi/agent/skills`; if missing prints `npx skills add -g mattpocock/skills` and exits 2 after linking.\",\"Step 3: records `upstream.json.pocock.agents = { \\\"dir\\\": <where found>, \\\"skillFolderHash\\\": <from the skills lock file>, \\\"contentSha\\\": <sha256 of grilling+domain-modeling SKILL.md> }`. Lock file: `$XDG_STATE_HOME/skills/.skill-lock.json` else `$HOME/.agents/.skill-lock.json` (`$RESEARCH/vercel-labs-skills/src/skill-lock.ts:7,64-70`); missing lock → `skillFolderHash: null`. JSON edited with `node -e` (no jq dependency).\",\"Step 4: prints the exact Codex config block from T9; checks `$HOME/.codex/config.toml` for `network_access = true` under `[sandbox_workspace_write]` and `~/.intelligentrascal` (expanded) in `writable_roots`; prints \\\"Codex sandbox: OK\\\" or \\\"Codex sandbox: missing — add the block above\\\".\",\"Idempotent (second run: same links, no errors).\",\"Test: temp HOME with fake `~/.agents/skills/grilling/SKILL.md` + `domain-modeling/SKILL.md` and a lock file → exit 0, 4 symlinks to the repo, `upstream.json` updated (test copies the repo's `upstream.json` to a temp repo root via `REPO_ROOT` env override); without Pocock skills → exit 2 with the npx hint; codex config present/missing messages.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        24
+      ]
+    },
+    {
+      "id": 28,
+      "subject": "Task 29: Smoke runs on Codex, OpenCode, Pi — HUMAN GATE",
+      "status": "pending",
+      "description": "**Goal:** Verify install, listening discipline and the full grill loop on each non-Claude agent.\n\n**Depends on:** T27, T28\n\n**Verify:** verification file with per-agent ✓ and versions (`codex --version`, `opencode --version`, `pi --version`).\n\nSee plan section \"Task 29\".\n\n```json:metadata\n{\"files\":[\"docs/superpowers/verification/2026-milestone-6-smoke.md\"],\"verifyCommand\":\"verification file with per-agent ✓ and versions (codex --version, opencode --version, pi --version).\",\"acceptanceCriteria\":[\"`scripts/install-agents.sh` on a clean `~/.agents/skills` (move the old dir aside first) → links + pin recorded.\",\"**Codex** (with sandbox config): without the config, `grill-me-ui` fails with the exact T9 fix text; with it, the page opens, a Send is handled via `exec_command` wait + `write_stdin` polling, exit 3 re-waits, the turn is not ended while listening; `agent-profile` output matched what the model did.\",\"**OpenCode** (`OPENCODE=1`): wait with `timeout: 600000`; two Sends handled; Visualize draws via Task tool.\",\"**Pi**: wait with no timeout; Esc kills only the wait (hub still up: `curl 127.0.0.1:<port>/health`); resume replays queued Sends; Visualize draws inline; a wayfinder chart Finish leaves research tickets open and says so.\",\"Any parameter-name mismatch found is fixed in `lib/profile.mjs` + test (separate commit).\"],\"humanGate\":true}\n```",
+      "blockedBy": [
+        26,
+        27
+      ]
+    },
+    {
+      "id": 29,
+      "subject": "Task 30: Brief layout (if chosen)",
+      "status": "pending",
+      "description": "**Goal:** Production Brief layout on `core.js`, from the winning mockup.\n\n**Depends on:** T6, T20\n\n**Verify:** covered by T32 e2e.\n\nSee plan section \"Task 30\".\n\n```json:metadata\n{\"files\":[\"page/brief.html\",\"lib/server.mjs\",\"GRILL.layouts\"],\"verifyCommand\":\"covered by T32 e2e.\",\"acceptanceCriteria\":[\"Behaviour of `design/mockups/brief.template.html` (T4 criteria) driven by live `S` via `Grill.mount`; all core semantics (staging, pending, working, finished banner, explore table inline under the block, visualize, feedback composer under the sticky figure).\",\"Hooks: `current()` = focused block; `move(±1)` walks open/reopened blocks then answered lines in document order; `select(id)` scrolls the block into view and focuses its heading (`tabindex=-1`); `focusThread()` expands the thread and focuses its composer; `focusFree()` focuses the free-text field.\",\"Reopen control on an answered line stages `reopen`.\",\"When `finished.kind === \\\"map\\\"`, renders via `MapView` (D9).\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        5,
+        19
+      ]
+    },
+    {
+      "id": 30,
+      "subject": "Task 31: Studio layout (if chosen)",
+      "status": "pending",
+      "description": "**Goal:** Production Studio layout on `core.js`.\n\n**Depends on:** T6, T20\n\n**Verify:** covered by T32 e2e.\n\nSee plan section \"Task 31\".\n\n```json:metadata\n{\"files\":[\"page/studio.html\"],\"verifyCommand\":\"covered by T32 e2e.\",\"acceptanceCriteria\":[\"Behaviour of T5 criteria on live state; composer target chip stages `thread` (`@qN thread`), `answer` text (`@qN answer`), or `visual-feedback` (`visual`).\",\"Hooks: `move` walks cards in the timeline; `focusThread()`/`focusFree()` set the chip and focus the composer; clicking a region selects its card.\",\"Before the first draw: \\\"Agreed so far\\\" + Visualize CTA; during first draw: \\\"Drawing the first version…\\\".\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        5,
+        19
+      ]
+    },
+    {
+      "id": 31,
+      "subject": "Task 32: Layout e2e and layout precedence",
+      "status": "pending",
+      "description": "**Goal:** One e2e flow per built layout; D1/§6 precedence (explicit `--ui` > last used > Inbox).\n\n**Depends on:** T30 and/or T31 (whichever ran)\n\n**Verify:** `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/layouts.e2e.mjs` → PASS.\n\nSee plan section \"Task 32\".\n\n```json:metadata\n{\"files\":[\"test/layouts.e2e.mjs\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=… node skills/grilling-ui/test/layouts.e2e.mjs → PASS.\",\"acceptanceCriteria\":[\"Per built layout: stage an option with `1`, write a thread message, send, handled patch shows the reply, `g i` switches to Inbox with staged work intact (localStorage `grill:<id>`), `state.json` unchanged by switching.\",\"Precedence: fresh profile, bare URL → Inbox; visit `/brief` then bare URL → redirected to `/brief`; `hub.mjs url --ui inbox` → `/inbox` stays Inbox; an unbuilt layout path → 302 to `/inbox`.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        29,
+        30
+      ]
+    },
+    {
+      "id": 32,
+      "subject": "Task 33: Claim compare-and-set, actions, map watch/wait",
+      "status": "pending",
+      "description": "**Goal:** Hub endpoints for board actions and atomic claims; CLI `claim`; `watch/wait --map` with listener heartbeat.\n\n**Depends on:** T14\n\n**Verify:** `node --test skills/grilling-ui/test/claim.test.mjs` → pass.\n\nSee plan section \"Task 33\".\n\n```json:metadata\n{\"files\":[\"lib/maps.mjs\",\"lib/server.mjs\",\"hub.mjs\",\"test/claim.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/claim.test.mjs → pass.\",\"acceptanceCriteria\":[\"`claim(map, title, who, now, seq)` / `release(map, title, agentId)` pure functions per D10 (404 unknown, 409 not frontier or already claimed; release only by the claimant or when `agentId` matches `hubClaim.agentId`).\",\"`POST /m/<key>/claim {ticket}` (token + Origin): synchronous read → `claim` → write → append `{type:\\\"work\\\", seq, at, ticket}` to `events.jsonl` → `m` ping; returns `{ok, seq, hubClaim}` or the error code.\",\"`POST /m/<key>/action {type:\\\"refresh\\\"}` appends `{type:\\\"refresh\\\", seq, at}`.\",\"`hub.mjs claim --map K --ticket T --agent-id A [--release]` → exit 0 / 5 (conflict, prints `{\\\"conflict\\\":…}`) / 4 (unknown).\",\"`watch --map K` / `wait --map K` tail `maps/<key>/events.jsonl` and heartbeat `POST /m/<key>/heartbeat` (sets `listener`); `map.json.handled` is advanced by the agent through `map-patch` (`handled` allowed in map patches).\",\"Tests: 20 concurrent `fetch` claims on one ticket → exactly one 200, 19 × 409; claims on two different tickets both succeed; CLI claim conflict exit 5; release then re-claim works; `wait --map` returns the work event.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        13
+      ]
+    },
+    {
+      "id": 33,
+      "subject": "Task 34: Board page",
+      "status": "pending",
+      "description": "**Goal:** `/m/<mapKey>/` board with columns, freshness header, listener state, Refresh and Work actions, keyboard.\n\n**Depends on:** T33, T24 (map-view shared styles)\n\n**Verify:** covered by T36 e2e; manual check at 1440/390.\n\nSee plan section \"Task 34\".\n\n```json:metadata\n{\"files\":[\"page/board.html\",\"page/board.js\",\"page/core.js\",\"board.js\",\"Grill.transport\",\"Grill.keys\",\"lib/server.mjs\",\"board.html\"],\"verifyCommand\":\"covered by T36 e2e; manual check at 1440/390.\",\"acceptanceCriteria\":[\"Columns: Frontier · In progress (claimed) · Blocked · Done; Fog and Out of scope below. Card: title, type chip, blockedBy titles, assignee, link (http(s) only as anchor); Done cards show `gist`.\",\"Header: destination; \\\"Updated <relative time> · canonical: <link>\\\" (age re-rendered every 30 s); listener state from `listener.heartbeat` (< 180 s).\",\"Frontier card: \\\"Work this ticket\\\" button (+ `w`) → `POST claim`; on 200 the card moves to In progress showing \\\"queued\\\" until `seq <= map.handled`, then \\\"claimed by <agentId>\\\"; if the ticket later carries a `session` link (`tickets[].session` URL, allowed by `validateMap` as an http URL) show \\\"grilling now →\\\". 409 → toast \\\"Already claimed by …\\\".\",\"Refresh button → `POST action refresh`, shows \\\"refresh requested\\\" until the next map update.\",\"Title `<project> · <map title>`; favicon; SSE + presence via shared transport; `j/k`, `w`, `g i/b/s` (back to last grill session if `?from=<id>`), `?` cheatsheet.\",\"Map screen (T24) links to the board: \\\"Open board →\\\".\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        32,
+        23
+      ]
+    },
+    {
+      "id": 34,
+      "subject": "Task 35: `wayfinder-ui` board mode and board watcher",
+      "status": "pending",
+      "description": "**Goal:** `/wayfinder-ui board <map>` opens the board, arms a watcher on the map event log, and handles Work/Refresh as a hand-off (exactly one ticket per session).\n\n**Depends on:** T34, T23\n\n**Verify:** `node --test skills/grilling-ui/test/profile.test.mjs skills/grilling-ui/test/skills.test.mjs` → pass.\n\nSee plan section \"Task 35\".\n\n```json:metadata\n{\"files\":[\"skills/wayfinder-ui/SKILL.md\",\"skills/grilling-ui/SKILL.md\",\"lib/profile.mjs\",\"test/profile.test.mjs\",\"test/skills.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/profile.test.mjs skills/grilling-ui/test/skills.test.mjs → pass.\",\"acceptanceCriteria\":[\"`agent-profile --map KEY` prints listen params for `watch --map` / `wait --map` (same modes/timeouts as sessions); Monitor description `board: <project> · <map title>`.\",\"wayfinder-ui SKILL.md \\\"Board\\\" section: open (`open --map`), arm the watcher per profile, map-patch after **every** Wayfinder step (chart, claim, resolve, graduate fog, rule out of scope) and on Refresh (re-read tracker → full snapshot `map-patch` with `handled`).\",\"Map event rule (in grilling-ui, mirrored from the send event rule): a `work` line is user input; drain **only the first** unhandled `work` event: claim on the tracker (GitHub/GitLab assignee; local-markdown `Status: claimed`), `map-patch` `{tickets:[{title, assignee, session: <url>}], handled: <seq>}`, then start work mode for that ticket in a new grill session. Later `work` events stay queued for the next `/wayfinder-ui board` or `/wayfinder-ui <map>` session. If the tracker shows another assignee: `claim --release`, `map-patch` the real assignee, tell the user.\",\"Tests: profile map params; SKILL.md contains \\\"exactly one\\\", \\\"claim --release\\\", \\\"map-patch\\\".\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        33,
+        22
+      ]
+    },
+    {
+      "id": 35,
+      "subject": "Task 36: Board e2e and concurrency test",
+      "status": "pending",
+      "description": "**Goal:** Board render/Refresh/Work e2e; 5 sessions + 1 board on one hub with RSS budget.\n\n**Depends on:** T35\n\n**Verify:** `node --test skills/grilling-ui/test/concurrency.test.mjs` → pass; `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/board.e2e.mjs` → PASS.\n\nSee plan section \"Task 36\".\n\n```json:metadata\n{\"files\":[\"test/board.e2e.mjs\",\"test/concurrency.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/concurrency.test.mjs → pass; PLAYWRIGHT_PKG=… node skills/grilling-ui/test/board.e2e.mjs → PASS.\",\"acceptanceCriteria\":[\"E2E: map with 2 frontier, 1 blocked, 1 closed, fog, out-of-scope → columns correct; Refresh appends a `refresh` event; `w` on a frontier card → card in In progress \\\"queued\\\" → simulated agent `map-patch` with `handled` → \\\"claimed by <agentId>\\\"; second tab clicking the same ticket gets the conflict toast; listener text flips with heartbeat age; local path link is plain text.\",\"Concurrency (unit, no browser): 2 temp projects, 5 sessions (`new`), 1 map; 50 sends spread randomly with correct tokens in parallel → each `events.jsonl` has exactly its own sends with contiguous seqs; 8 SSE readers connected; `GET /admin/stats` `rss` < 80 MB.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        34
+      ]
+    },
+    {
+      "id": 36,
+      "subject": "Task 37: `sync-pocock.sh`",
+      "status": "pending",
+      "description": "**Goal:** Report and apply Pocock upstream changes safely: diffs per install, ahead-of-release warning, loud failures, wayfinder three-way merge, tests, pin bump, nothing committed.\n\n**Depends on:** T23, T28\n\n**Verify:** `node --test scripts/test/sync-pocock.test.mjs` → pass; `bash -n scripts/sync-pocock.sh`.\n\nSee plan section \"Task 37\".\n\n```json:metadata\n{\"files\":[\"scripts/sync-pocock.sh\",\"scripts/test/sync-pocock.test.mjs\"],\"verifyCommand\":\"node --test scripts/test/sync-pocock.test.mjs → pass; bash -n scripts/sync-pocock.sh.\",\"acceptanceCriteria\":[\"Inputs (env-overridable for tests): `CLAUDE_PLUGINS=${CLAUDE_PLUGINS:-$HOME/.claude/plugins}`, `POCOCK_MARKETPLACE=$CLAUDE_PLUGINS/marketplaces/mattpocock` (git repo), `REPO_ROOT`.\",\"Claude install: read `installed_plugins.json` `mattpocock-skills@mattpocock[0]` `{version, gitCommitSha, installPath}`; if ≠ `upstream.json.pocock.claude`, for each of `grilling, domain-modeling, grill-me, grill-with-docs, wayfinder` print `git -C $POCOCK_MARKETPLACE diff <pinned>..<installed> -- skills/**/<name>/` (fetch the pinned commit if missing: `git fetch origin <sha>`).\",\"Agents install: if `upstream.json.pocock.agents` exists and the current `contentSha` differs, print `diff -u` of the SKILL.md files between the Claude pinned copy (`git show <pinned>:<path>`) and the agents copy; print both versions; note editing the npx copy is unsupported.\",\"Warn when `git -C $POCOCK_MARKETPLACE rev-list --count <installed>..origin/main` > 0 (after `git fetch -q origin main`; offline → skip with a note).\",\"Fail (exit 3, message naming the skill) if a delegated skill folder is missing/renamed at the installed version, or `grilling`/`domain-modeling` gained `disable-model-invocation: true` in SKILL.md or `allow_implicit_invocation: false` in `agents/openai.yaml`.\",\"Wayfinder: `git merge-file -L ours -L base -L theirs skills/wayfinder-ui/upstream/wayfinder.md <base tmp> <theirs tmp>` with base = pinned, theirs = installed; conflicts left marked, exit status reported.\",\"Run `node --test skills/grilling-ui/test/*.test.mjs scripts/test/*.test.mjs`; on success bump `upstream.json` pins (claude and, if present, agents, and `wayfinder.vendoredFrom`); never `git commit`.\",\"Test: builds a fake marketplace git repo with two commits (v1 pin, v2 installed) in a temp dir, fake `installed_plugins.json`, temp REPO_ROOT copy → asserts diff printed, merge applied, pins bumped, and a v3 where `grilling` gains `disable-model-invocation: true` exits 3.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        22,
+        27
+      ]
+    },
+    {
+      "id": 37,
+      "subject": "Task 38: README, licenses, final verification",
+      "status": "pending",
+      "description": "**Goal:** Document install/usage per agent, record provenance and licenses, and run the full suite.\n\n**Depends on:** all\n\n**Verify:** - `node --test skills/grilling-ui/test/*.test.mjs scripts/test/*.test.mjs` → all pass\n\nSee plan section \"Task 38\".\n\n```json:metadata\n{\"files\":[\"README.md\"],\"verifyCommand\":\"- node --test skills/grilling-ui/test/*.test.mjs scripts/test/*.test.mjs → all pass\",\"acceptanceCriteria\":[\"`LICENSES/jason-ku-grill-with-ui.MIT` = `$JASON/LICENSE` text + header line \\\"Forked once from https://github.com/jasonku09/grill-with-ui at commit daafa1e\\\". `LICENSES/matt-pocock-skills.MIT` = Pocock's LICENSE (`$POCOCK/LICENSE`) + \\\"Vendored: skills/wayfinder-ui/upstream/wayfinder.md\\\".\",\"README sections: What it is (3 skills + board); Install — Claude Code (`claude plugin marketplace add ~/code/skills`, `claude plugin install intelligentrascal@intelligentrascal`, `/reload-plugins` after edits; dependency on `mattpocock-skills@mattpocock`; \\\"if Pocock's plugin is disabled, Claude Code disables this one too\\\"); Codex / OpenCode / Pi (`scripts/install-agents.sh`, `npx skills add -g mattpocock/skills`, the exact Codex config block); Usage (commands, resume, board, keyboard `?`); Runtime (`~/.intelligentrascal`, one hub, env vars `GRILL_HOME GRILL_NO_OPEN GRILL_OPENER`, logs); Upstream sync (`scripts/sync-pocock.sh`); Development (test commands, e2e with `PLAYWRIGHT_PKG`); Provenance (Jason fork at `daafa1e`, one-time; Pocock tracked); Deferred (§12).\",\"Full suite green; e2e suites green with Playwright; `claude plugin validate .` clean.\"],\"humanGate\":false}\n```",
+      "blockedBy": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36
+      ]
+    }
+  ],
+  "lastUpdated": "2026-09-25T14:39:30.872Z"
+}
