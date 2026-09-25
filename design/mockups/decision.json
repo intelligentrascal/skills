@@ -1,7 +1,5 @@
 {
-  "build": [
-    "studio"
-  ],
+  "build": [],
   "date": "2026-09-25",
   "method": "Rahil delegated the layout decision to Claude. Instead of a human stopwatch run, a fresh agent with no prior exposure ran the four spec §9.1 tasks in each layout through a real browser (screenshot-driven, randomised layout order per task) at 1440x900, plus tasks 1 and 4 at 390x844. Timings are looks/actions/ease, not ms. Full data: design/mockups/usability-results.json. Rahil can override by editing build[] before milestone 7.",
   "timings": {
@@ -214,5 +212,9 @@
       "studio"
     ]
   },
-  "notes": "Build Studio: only layout where the visual is a first-class, hover-linked surface (task 3 at first glance, ease 5), best phone result, best desktop average. Brief skipped: its wins (instant decision lookup, phone reading) overlap Inbox/Studio, and its single-key shortcuts fired while focus was moving to a text field. Fixes to carry into the Studio build (T31) and core: after Accept/stage move to the next open question; open-count badges count down as you stage; one clear free-text path (answer-in-words vs thread) so pushback is unambiguous; shortcuts must never fire while a scroll-to-field is in flight (focus the field synchronously). Inbox: open list scrolled to show the current round but keep earlier rounds reachable; reopened questions should not look settled (no green check on the old answer)."
+  "notes": "Build Studio: only layout where the visual is a first-class, hover-linked surface (task 3 at first glance, ease 5), best phone result, best desktop average. Brief skipped: its wins (instant decision lookup, phone reading) overlap Inbox/Studio, and its single-key shortcuts fired while focus was moving to a text field. Fixes to carry into the Studio build (T31) and core: after Accept/stage move to the next open question; open-count badges count down as you stage; one clear free-text path (answer-in-words vs thread) so pushback is unambiguous; shortcuts must never fire while a scroll-to-field is in flight (focus the field synchronously). Inbox: open list scrolled to show the current round but keep earlier rounds reachable; reopened questions should not look settled (no green check on the old answer).",
+  "decidedBy": "Rahil, 2026-09-25: \"inbox design is the winner\" (overrides the simulated usability recommendation of Studio)",
+  "simulatedRecommendation": [
+    "studio"
+  ]
 }

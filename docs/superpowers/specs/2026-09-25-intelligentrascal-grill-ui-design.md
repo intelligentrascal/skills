@@ -461,9 +461,9 @@ localStorage), which beats Inbox.
 - **Switching layouts:** by path, with a header switch. Nothing is written to state.
 - **Visual direction (Rahil, 2026-09-25).** Inbox and the board use Jason's page exactly:
   `tokens.css` holds Jason's `:root` values verbatim, and pairs below WCAG AA with those
-  values are documented exceptions in `test/tokens.test.mjs`. Studio layers
-  `theme-studio.css` (Apple DESIGN.md + Craft inspired, system fonts, recorded in
-  `design/mockups/DESIGN.md`) on top of the same token names. Shared rules:
+  values are documented exceptions in `test/tokens.test.mjs`. The Studio mockup's
+  `theme-studio.css` (Apple DESIGN.md + Craft inspired, recorded in
+  `design/mockups/DESIGN.md`) is kept for a future layout; nothing shipped uses it. Shared rules:
   - System fonts: serif headings, sans body.
   - No network.
   - Contrast checked on the real pairings.
@@ -479,9 +479,10 @@ localStorage), which beats Inbox.
 | **Brief** | Document | One column (~68ch), with sections derived from dep roots (each section is titled by its root question). Answered question = one prose line `title → chosen option` with a reopen control. Open or reopened question = a compact block: heading, full-text options as a vertical list, the recommendation dashed and pre-selected, the why in one line, a free-text field always visible, and the thread collapsed to bold first lines that expand inline. Deferred questions get their own section. At 1100 px and wider there is a left jump rail and the visual as a sticky figure on the right; below that the figure sits under the header. Also used for the Wayfinder Map screen. |
 | **Studio** | Visual-first conversation | The visual iframe takes about 60%. A conversation rail shows everything in one timeline, grouped under sticky round headers: question cards in full, answered cards collapsed to one line, thread messages placed by `at`, and visual feedback in the same stream. One composer with a target chip (`@qN thread`, `@qN answer`, `visual`). Hovering a card highlights its regions; clicking a region selects its card. Before the first draw, the main area shows "agreed so far" (derived from the answers) and a Visualize call to action. |
 
-**Built (milestone 1 result, `design/mockups/decision.json`):** Inbox and Studio. Brief was
-not built; the Wayfinder Map screen is the shared `map-view.js` module (plan D9), which
-every built layout uses.
+**Built (milestone 1 result, `design/mockups/decision.json`):** Inbox only. Rahil chose
+Inbox after the comparison (a simulated usability run had favoured Studio). Brief and Studio
+remain as mockups in `design/mockups/`; the Wayfinder Map screen is the shared `map-view.js`
+module (plan D9). The layout switch stays hidden while only one layout is built.
 
 ### Keyboard shortcuts (all layouts and the board)
 

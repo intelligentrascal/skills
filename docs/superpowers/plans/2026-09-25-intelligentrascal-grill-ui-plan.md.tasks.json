@@ -277,27 +277,29 @@
         5,
         19
       ],
-      "skipReason": "decision.json build=[studio]"
+      "skipReason": "decision.json build=[] (Rahil chose Inbox)"
     },
     {
       "id": 30,
       "subject": "Task 31: Studio layout (if chosen)",
-      "status": "pending",
+      "status": "skipped",
       "description": "**Goal:** Production Studio layout on `core.js`.\n\n**Depends on:** T6, T20\n\n**Verify:** covered by T32 e2e.\n\nSee plan section \"Task 31\".\n\n```json:metadata\n{\"files\":[\"page/studio.html\"],\"verifyCommand\":\"covered by T32 e2e.\",\"acceptanceCriteria\":[\"Behaviour of T5 criteria on live state; composer target chip stages `thread` (`@qN thread`), `answer` text (`@qN answer`), or `visual-feedback` (`visual`).\",\"Hooks: `move` walks cards in the timeline; `focusThread()`/`focusFree()` set the chip and focus the composer; clicking a region selects its card.\",\"Before the first draw: \\\"Agreed so far\\\" + Visualize CTA; during first draw: \\\"Drawing the first version…\\\".\"],\"humanGate\":false}\n```",
       "blockedBy": [
         5,
         19
-      ]
+      ],
+      "skipReason": "decision.json build=[] (Rahil chose Inbox)"
     },
     {
       "id": 31,
       "subject": "Task 32: Layout e2e and layout precedence",
-      "status": "pending",
+      "status": "skipped",
       "description": "**Goal:** One e2e flow per built layout; D1/§6 precedence (explicit `--ui` > last used > Inbox).\n\n**Depends on:** T30 and/or T31 (whichever ran)\n\n**Verify:** `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/layouts.e2e.mjs` → PASS.\n\nSee plan section \"Task 32\".\n\n```json:metadata\n{\"files\":[\"test/layouts.e2e.mjs\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=… node skills/grilling-ui/test/layouts.e2e.mjs → PASS.\",\"acceptanceCriteria\":[\"Per built layout: stage an option with `1`, write a thread message, send, handled patch shows the reply, `g i` switches to Inbox with staged work intact (localStorage `grill:<id>`), `state.json` unchanged by switching.\",\"Precedence: fresh profile, bare URL → Inbox; visit `/brief` then bare URL → redirected to `/brief`; `hub.mjs url --ui inbox` → `/inbox` stays Inbox; an unbuilt layout path → 302 to `/inbox`.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         29,
         30
-      ]
+      ],
+      "skipReason": "only Inbox built; D1 precedence/redirects covered by page.e2e"
     },
     {
       "id": 32,
@@ -393,5 +395,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T15:48:06.719Z"
+  "lastUpdated": "2026-09-25T15:48:53.286Z"
 }
