@@ -695,7 +695,10 @@
     }));
     restHighlight();
   }
-  function tick() { renderStatus(); renderSend(); }
+  // The footer's sent note follows the listener too, and a heartbeat ages past the limit without
+  // any state change: re-render everything when the listener flips, the clocks otherwise.
+  let shownListening = null;
+  function tick() { if (S && shownListening !== null && listener().on !== shownListening) render(); else { renderStatus(); renderSend(); } }
   // Focus survives a render. A layout keeps the textarea being typed in as the same element when
   // its question did not change (IME composition and undo live on the element); anything else
   // focused in the page (an option, a button, a link) that the render replaced gets focus back on
@@ -850,10 +853,19 @@
     if (S.finished) { if (dot) dot.className = "dot"; if (txt) txt.textContent = "finished"; if (hd) hd.classList.remove("working"); if (li) li.textContent = ""; setFavicon("finished"); return; }
     const working = a.status === "working";
     if (hd) hd.classList.toggle("working", working);
+    const l = listener();
+    const handled = a.handled ? " · handled #" + a.handled : "";
     if (working) { if (dot) dot.className = "dot working"; if (txt) txt.innerHTML = `<span class="spin"></span> Agent working · ${fmtMs(Date.now() - Date.parse(a.since || 0))}`; }
-    else { if (dot) dot.className = "dot"; if (txt) txt.textContent = `Agent waiting for you${a.since ? " · since " + timeOf(a.since) : ""}${a.handled ? " · handled #" + a.handled : ""}`; }
-    if (li) { const l = listener(); li.textContent = l.text; li.classList.toggle("off", !l.on); }
-    setFavicon(working ? "working" : "waiting");
+    else if (l.on) { if (dot) dot.className = "dot"; if (txt) txt.textContent = `Agent waiting for you${a.since ? " · since " + timeOf(a.since) : ""}${handled}`; }
+    else {
+      // Nobody is listening: the agent is not waiting for anything, so say what a Send does now
+      // (the status line carries it; the separate listener note would only repeat it).
+      const lp = lastPending();
+      if (dot) dot.className = "dot off";
+      if (txt) txt.textContent = lp ? `Sent #${lp.seq} · queued until an agent resumes${handled}` : `No agent listening${handled} · Sends will queue · resume the grill in your agent to continue`;
+    }
+    if (li) { li.textContent = working || l.on ? l.text : ""; li.classList.toggle("off", !l.on); }
+    setFavicon(working ? "working" : l.on ? "waiting" : "idle");
   }
   function renderFooter() {
     const list = $("staged-list"); if (!list) return;
@@ -867,7 +879,8 @@
     });
     if (local.vfeedback.length) parts.push(`visual +${local.vfeedback.length} msg`);
     const lp = lastPending();
-    const sent = lp ? `<span class="sent"><span class="spin"></span>Sent #${esc(lp.seq)} · waiting for the agent</span>` : "";
+    shownListening = listener().on;
+    const sent = lp ? `<span class="sent"><span class="spin"></span>Sent #${esc(lp.seq)} · ${listener().on ? "waiting for the agent" : "queued until an agent resumes"}</span>` : "";
     list.innerHTML = locked() ? "This grill is finished." : n ? `<b>${n} staged</b> · ${parts.join(" · ")}${sent ? " · " + sent : ""}` : sent || "Nothing staged. Pick an option or write in the discussion.";
     const fa = $("finish-area");
     if (fa) {

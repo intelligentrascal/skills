@@ -346,6 +346,23 @@ try {
   await page.locator("#visualize").click();
   check("toggling back restores the list and card", await page.locator("body.visualize").count() === 0 && await page.locator("nav .item").count() > 0 && await page.locator(".card").count() === 1 && (await page.locator("#visualize").textContent()).includes("Visual · v2"));
 
+  // listener state: a stale owner heartbeat in meta.json flips the header (the hub merges owner into state)
+  {
+    const metaFile = join(session, "meta.json");
+    const meta = JSON.parse(readFileSync(metaFile, "utf8"));
+    atomic(metaFile, JSON.stringify({ ...meta, owner: { ...meta.owner, heartbeat: new Date(Date.now() - 10 * 60 * 1000).toISOString() } }));
+    await page.waitForFunction(() => document.getElementById("agent-status").textContent.startsWith("No agent listening"), null, { timeout: 5000 }).catch(() => {});
+    const idleText = await page.locator("#agent-status").textContent();
+    check("stale heartbeat: the status says nobody is listening, not 'Agent waiting for you'", idleText === "No agent listening · handled #5 · Sends will queue · resume the grill in your agent to continue", idleText);
+    check("… the separate listener note is empty (no repeat) and the dot is muted (--ink-3)", (await page.locator("#listener").textContent()) === "" && await page.locator("#agent-dot.off").count() === 1
+      && await page.evaluate(() => getComputedStyle(document.getElementById("agent-dot")).backgroundColor) === "rgb(154, 146, 133)");
+    const favIdle = await favicon();
+    check("… and the favicon is the muted dot (--ink-3)", favIdle.status === "idle" && favIdle.href.includes(encodeURIComponent("#9a9285")), JSON.stringify(favIdle));
+    atomic(metaFile, JSON.stringify({ ...meta, owner: { ...meta.owner, heartbeat: new Date().toISOString() } }));
+    await page.waitForFunction(() => document.getElementById("listener").textContent.startsWith("agent listening"), null, { timeout: 5000 }).catch(() => {});
+    check("a fresh heartbeat: 'Agent waiting for you', green dot, waiting favicon", (await page.locator("#listener").textContent()) === "agent listening (Claude)" && (await page.locator("#agent-status").textContent()).startsWith("Agent waiting for you") && await page.locator("#agent-dot.off").count() === 0 && (await favicon()).status === "waiting");
+  }
+
   // every question settled → Finish flashes; finish fires at once with whatever is staged
   await page.waitForFunction(() => document.getElementById("finish").classList.contains("ready"), null, { timeout: 5000 });
   check("finish flashes when nothing is open", await page.locator("#finish.ready").count() === 1);
@@ -361,15 +378,15 @@ try {
   await page.waitForFunction(() => { const f = document.getElementById("finish"); return !!f && f.textContent.includes("Finishing…"); });
   check("finish button shows finishing; staging cleared", await page.locator("#finish").isDisabled() && await page.locator("#finish .spin").count() === 1 && (await page.locator("#send").textContent()) === "Send to Agent");
 
-  // listener state: a stale owner heartbeat in meta.json flips the header (the hub merges owner into state)
+  // listener state with a send pending: a stale heartbeat says the send is queued, in the status and the footer
   const metaFile = join(session, "meta.json");
   const meta = JSON.parse(readFileSync(metaFile, "utf8"));
   atomic(metaFile, JSON.stringify({ ...meta, owner: { ...meta.owner, heartbeat: new Date(Date.now() - 10 * 60 * 1000).toISOString() } }));
-  await page.waitForFunction(() => document.getElementById("listener").textContent.startsWith("no agent"), null, { timeout: 5000 }).catch(() => {});
-  check("listener flips to 'no agent listening: Sends will queue' when the heartbeat is stale", (await page.locator("#listener").textContent()) === "no agent listening: Sends will queue" && await page.locator("#listener.off").count() === 1);
+  await page.waitForFunction(() => document.getElementById("agent-status").textContent.startsWith("Sent #6"), null, { timeout: 5000 }).catch(() => {});
+  check("stale heartbeat with finish #6 pending: 'Sent #6 · queued until an agent resumes' (status and footer)", (await page.locator("#agent-status").textContent()) === "Sent #6 · queued until an agent resumes · handled #5" && (await page.locator("#staged-list").textContent()).includes("Sent #6 · queued until an agent resumes") && (await favicon()).status === "idle", `${await page.locator("#agent-status").textContent()} | ${await page.locator("#staged-list").textContent()}`);
   atomic(metaFile, JSON.stringify({ ...meta, owner: { ...meta.owner, heartbeat: new Date().toISOString() } }));
   await page.waitForFunction(() => document.getElementById("listener").textContent.startsWith("agent listening"), null, { timeout: 5000 }).catch(() => {});
-  check("listener flips back when the heartbeat is fresh again", (await page.locator("#listener").textContent()) === "agent listening (Claude)");
+  check("listener flips back when the heartbeat is fresh again", (await page.locator("#listener").textContent()) === "agent listening (Claude)" && (await page.locator("#staged-list").textContent()).includes("Sent #6 · waiting for the agent") && (await favicon()).status === "waiting");
 
   // hub gone → banner; `ensure` restarts it on the same port → banner clears on the same URL
   const pid0 = hubInfo(home).pid;

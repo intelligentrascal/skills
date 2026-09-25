@@ -29,6 +29,7 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
   .dot.working { background: var(--stage); animation: pulse 1.2s ease-in-out infinite; }
   .dot.gone { background: var(--ink-3); }
+  .dot.off { background: var(--ink-3); }
   @keyframes pulse { 50% { opacity: .3; } }
   @keyframes spin { to { transform: rotate(360deg); } }
   .spin { display: inline-block; width: 11px; height: 11px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -1px; flex-shrink: 0; }

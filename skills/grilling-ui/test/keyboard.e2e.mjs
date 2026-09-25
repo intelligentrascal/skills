@@ -357,6 +357,38 @@ go(); setTimeout(go, 300); setTimeout(go, 700);
   check("a mouse click shows no focus ring (Jason's look)", await page.evaluate(() => { const a = document.activeElement; return !!a && a.dataset.opt === "A" && !a.matches(":focus-visible") && getComputedStyle(a).outlineStyle === "none"; }));
   await page.locator("h1").click(); await press("u");
 
+  // Dogfood regression: 8 questions over rounds 1–3 at 796×726; from Q8, `a` then `k` ×4 then `2`,
+  // each pressed without a pause, must stage accept on Q8 and option B on Q4. Run with focus parked
+  // on "Add to discussion" (where the dogfood had it: it follows from question to question) and
+  // with the pointer resting on the list, whose rows are rebuilt under it on every key.
+  await handleAll();
+  const O2 = [{ k: "A", text: "Local time" }, { k: "B", text: "UTC" }];
+  const O3 = [{ k: "A", text: "Alpha" }, { k: "B", text: "Beta" }, { k: "C", text: "Gamma" }];
+  const q8 = (qid, round, status, extra = {}) => ({ id: qid, round, deps: [], title: `Question ${qid}`, body: "Pick one.", options: qid === "q4" || qid === "q8" ? O2 : O3, rec: { option: "A", why: "Simplest." }, status, durable: false, updated: false, thread: [], ...extra });
+  delete st.visual; delete st.note;
+  st.questions = [
+    q8("q1", 1, "answered", { answer: { kind: "accept", option: "A" } }), q8("q2", 1, "answered", { answer: { kind: "option", option: "B" } }),
+    q8("q3", 2, "answered", { answer: { kind: "accept", option: "A" } }),
+    q8("q4", 3, "open", { thread: [{ who: "user", text: "Do we need UTC?", at: now }, { who: "agent", text: "Probably not.", at: now }] }),
+    q8("q5", 3, "open"), q8("q6", 3, "open"), q8("q7", 3, "open"), q8("q8", 3, "open"),
+  ];
+  writeState();
+  await page.setViewportSize({ width: 796, height: 726 });
+  await page.waitForFunction(() => document.querySelectorAll("nav .item").length === 8, null, { timeout: 5000 });
+  for (const variant of ["focus on Add to discussion", "pointer resting on the list"]) {
+    await page.evaluate((k) => localStorage.removeItem(k), `grill:${id}`);
+    await page.reload(); await page.locator(".item").first().waitFor();
+    await page.locator(".item", { hasText: "Q8" }).click();
+    if (variant.startsWith("focus")) { await page.locator("#stage-thread").focus(); await page.keyboard.press("Escape"); }
+    else { const b = await page.locator("nav").boundingBox(); await page.mouse.move(b.x + 60, b.y + b.height / 2); }
+    await page.keyboard.press("a");
+    for (let i = 0; i < 4; i++) await page.keyboard.press("k");
+    await page.keyboard.press("2");
+    const s8 = await staged();
+    check(`Q8: a, k ×4, 2 without pauses stages accept on Q8 and B on Q4 (${variant})`, (await sel()) === "Q4" && s8.q8?.answer?.kind === "accept" && s8.q4?.answer?.option === "B"
+      && (await page.locator("#staged-list").textContent()).startsWith("2 staged") && await page.locator('.opt.staged[data-opt="B"]').count() === 1, `${await sel()} ${JSON.stringify(s8)}`);
+  }
+
   const real = errors.filter((e) => !e.includes("404"));
   check("no console errors", real.length === 0, real.join(" | "));
 } catch (e) {
