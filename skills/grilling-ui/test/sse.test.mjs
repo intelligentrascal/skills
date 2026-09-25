@@ -118,13 +118,17 @@ test("presence + /clients: counts distinct tabs, drops them after GRILL_PRESENCE
 });
 
 test("idle exit is held off while an /events client is open", async (t) => {
-  const { home, env } = homeFor(t, { GRILL_TICK_MS: "50", GRILL_IDLE_MS: "300", GRILL_FRESH_MS: "0" });
+  // GRILL_IDLE_MS leaves the SSE client ample time to connect after `new` (a loaded machine used
+  // to let the hub idle out in between); the tick stays small so the check is still prompt.
+  const { home, env } = homeFor(t, { GRILL_TICK_MS: "50", GRILL_IDLE_MS: "1500", GRILL_FRESH_MS: "0" });
   newIn(env);
   const r = reader(t, `${base(home)}/events`);
   await r.next("hello");
-  await sleep(700);
+  await sleep(2500); // well past idleMs with the client open
   assert.equal((await fetch(`${base(home)}/health`)).status, 200, "hub still up with a client");
   r.close();
-  await sleep(900);
-  await assert.rejects(fetch(`${base(home)}/health`), "hub exited once the client left");
+  // Every request restarts the idle clock, so each probe comes a full idle period after the last.
+  let gone = false;
+  for (let i = 0; i < 3 && !gone; i++) { await sleep(2500); gone = await fetch(`${base(home)}/health`).then(() => false, () => true); }
+  assert.ok(gone, "hub exited once the client left");
 });

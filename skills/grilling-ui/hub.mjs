@@ -18,7 +18,7 @@ const USAGE = `usage: hub.mjs <command> [options]
   wait  (--session DIR | --map KEY) --after N --timeout S --agent-id ID
   map-patch --map KEY [--agent-id ID] [--file P]
   claim --map KEY --ticket TITLE --agent-id ID [--release]
-  agent-profile [--agent A] [--session DIR]`;
+  agent-profile [--agent A] [--session DIR] [--agent-id ID]`;
 
 // Each command is loaded lazily so a short CLI call imports only what it needs.
 const cmds = {

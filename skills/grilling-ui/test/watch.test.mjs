@@ -9,7 +9,8 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { HUB, hubInfo, mkHome, run, runAsync, sleep, stopHub, tmp, waitUntil } from "./helpers.mjs";
 import { projectKey } from "../lib/home.mjs";
-import { lastSeq, readEvents, resolveMapKey, tailLog } from "../lib/events.mjs";
+import { lastSeq, readEvents, resolveMapKey, startHeartbeat, tailLog } from "../lib/events.mjs";
+import http from "node:http";
 import * as sessions from "../lib/sessions.mjs";
 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; } };
@@ -58,6 +59,22 @@ test("tailLog: drains what is on disk past `after`, then tails; skips partial an
     await waitUntil(() => got.length === 4, 3000);
     await sleep(100);
     assert.deepEqual(got, [2, 3, 4, 5]);
+  } finally { stop(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("tailLog: a multibyte character split across two appends arrives intact", async () => {
+  const dir = tmp("grill-tail-"), file = join(dir, "events.jsonl");
+  writeFileSync(file, "");
+  const line = Buffer.from(JSON.stringify({ type: "send", seq: 1, note: "é漢字🙂 ok" }) + "\n");
+  const cut = line.indexOf(Buffer.from("漢")) + 1; // inside the 3-byte 漢
+  const got = [];
+  const stop = tailLog(file, 0, (l, e) => got.push(e.note));
+  try {
+    appendFileSync(file, line.subarray(0, cut));
+    await sleep(1300); // at least one drain (the 1 s safety net) reads the first half alone
+    appendFileSync(file, line.subarray(cut));
+    await waitUntil(() => got.length === 1, 3000);
+    assert.deepEqual(got, ["é漢字🙂 ok"]);
   } finally { stop(); rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -237,4 +254,87 @@ test("--map: watch and wait tail maps/<key>/events.jsonl, print work/refresh/act
   const bad = await runAsync(h.env, ["wait", "--map", "../x", "--after", "0", "--timeout", "1", "--agent-id", "a1"], { cwd });
   assert.equal(bad.code, 2);
   assert.match(bad.err, /^grill: .*map key/);
+});
+
+test("no --after: starts from state.agent.handled (session) or map.json handled (map), not the log's end", async (t) => {
+  const h = setup(t);
+  const s = newIn(h.env);
+  appendFileSync(join(s.session, "events.jsonl"), ev(1) + ev(2) + ev(3));
+  const st = JSON.parse(readFileSync(join(s.session, "state.json"), "utf8"));
+  writeFileSync(join(s.session, "state.json"), JSON.stringify({ ...st, agent: { ...st.agent, handled: 1 } }));
+  const r = await runAsync(h.env, ["wait", "--session", s.session, "--timeout", "5", "--agent-id", s.agentId]);
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(r.out.split("\n").map((l) => JSON.parse(l).seq), [2, 3]);
+
+  const cwd = tmp("grill-proj-");
+  const dir = join(h.home, "maps", projectKey(cwd), "9");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "meta.json"), JSON.stringify({ token: "t0k" }));
+  writeFileSync(join(dir, "map.json"), JSON.stringify({ title: "M", handled: 2 }));
+  writeFileSync(join(dir, "events.jsonl"), ev(1, "work") + ev(2, "work") + ev(3, "refresh"));
+  const m = await runAsync(h.env, ["wait", "--map", "9", "--timeout", "5", "--agent-id", "a1"], { cwd });
+  assert.equal(m.code, 0, m.err);
+  assert.deepEqual(m.out.split("\n").map((l) => JSON.parse(l).seq), [3]);
+});
+
+test("wait: --timeout is clamped to 1..86400 s (a huge value does not fire at once; 0 waits 1 s)", async (t) => {
+  const h = setup(t);
+  const s = newIn(h.env);
+  const w = h.spawn(["wait", "--session", s.session, "--after", "0", "--timeout", "1e12", "--agent-id", s.agentId]);
+  await sleep(1500);
+  assert.equal(w.exitCode, null, `still waiting: ${w.err}`);
+  w.kill("SIGKILL");
+  const t0 = Date.now();
+  const z = await runAsync(h.env, ["wait", "--session", s.session, "--after", "0", "--timeout", "0", "--agent-id", s.agentId]);
+  assert.equal(z.code, 3, z.err);
+  assert.ok(Date.now() - t0 >= 950, "waited at least 1 s");
+});
+
+// A stand-in server on 127.0.0.1: `handler(req, res)`; returns { port, close }.
+async function fakeServer(t, handler) {
+  const srv = http.createServer(handler);
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  t.after(() => new Promise((r) => { srv.closeAllConnections?.(); srv.close(r); }));
+  return srv.address().port;
+}
+function hbFixture(port, pid = 999999, started = "then") {
+  const home = tmp("grill-hb-"), meta = join(home, "meta.json");
+  writeFileSync(join(home, "hub.json"), JSON.stringify({ port, pid, started }));
+  writeFileSync(meta, JSON.stringify({ token: "t" }));
+  return { home, meta };
+}
+
+test("heartbeat: a foreign server answering 404 on the hub's port is not our hub → ensure again", async (t) => {
+  const port = await fakeServer(t, (req, res) => { res.writeHead(404); res.end("nope"); });
+  const { home, meta } = hbFixture(port);
+  let ensures = 0;
+  const stop = startHeartbeat({ home, route: "/s/x/heartbeat", meta, agentId: "a", env: process.env, ms: 100, onTaken: () => assert.fail("not taken"), ensure: async () => { ensures++; } });
+  try { await waitUntil(() => ensures >= 3, 3000); } finally { stop(); rmSync(home, { recursive: true, force: true }); }
+});
+
+test("heartbeat: our own hub answering 404 (its /health matches hub.json) is not re-ensured", async (t) => {
+  const port = await fakeServer(t, (req, res) => {
+    if (req.url === "/health") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ pid: 4242, started: "now", version: "v", codeTime: 0 })); }
+    res.writeHead(404); res.end("{}");
+  });
+  const { home, meta } = hbFixture(port, 4242, "now");
+  let ensures = 0;
+  const stop = startHeartbeat({ home, route: "/m/p/k/heartbeat", meta, agentId: "a", env: process.env, ms: 60, onTaken: () => {}, ensure: async () => { ensures++; } });
+  try {
+    await sleep(500);
+    assert.equal(ensures, 1, "only the initial ensure");
+  } finally { stop(); rmSync(home, { recursive: true, force: true }); }
+});
+
+test("heartbeat: 401 (wrong token) is reported once on stderr, not re-ensured, listening goes on", async (t) => {
+  let hits = 0;
+  const port = await fakeServer(t, (req, res) => { hits++; res.writeHead(401, { "content-type": "application/json" }); res.end('{"error":"session token required"}'); });
+  const { home, meta } = hbFixture(port);
+  let ensures = 0; const warns = [];
+  const stop = startHeartbeat({ home, route: "/s/x/heartbeat", meta, agentId: "a", env: process.env, ms: 60, onTaken: () => assert.fail("not taken"), ensure: async () => { ensures++; }, warn: (m) => warns.push(m) });
+  try {
+    await waitUntil(() => hits >= 4, 3000);
+    assert.equal(warns.length, 1); assert.match(warns[0], /401/);
+    assert.equal(ensures, 1);
+  } finally { stop(); rmSync(home, { recursive: true, force: true }); }
 });

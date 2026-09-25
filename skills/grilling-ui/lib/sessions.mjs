@@ -5,7 +5,10 @@
 //   grill-sessions/<projectKey>/<id>/          id = <YYYYMMDD-HHMMSS>-<rand4>, unique across projects
 //     state.json    written only by `patch` (and `new`)
 //     meta.json     { token, owner: { agentId, agent, heartbeat } } (D3), 0600, atomic writes;
-//                   written by new/resume/patch (CLI) and by the hub (heartbeats)
+//                   created by `new`; after that the hub is its single writer (heartbeats, and
+//                   POST /s/<id>/take for resume), each a synchronous read-modify-write. The CLI
+//                   writes it directly (resume's take, patch's heartbeat) only when the hub
+//                   cannot be reached: then nothing else is writing it.
 //     events.jsonl  sends, appended by the hub
 //
 // Exit codes: 0 ok; 1 hub/home or write failure; 2 bad input or a rejected patch; 4 ownership
@@ -44,6 +47,8 @@ export function agentFromEnv(env = process.env) {
   if (env.PI_CODING_AGENT === "true") return "pi";
   return "unknown";
 }
+// What an owner's `agent` may be (the hub's take route checks it).
+export const AGENT_RE = /^[^\x00-\x1f\x7f]{1,64}$/;
 const agentName = (flag, env) => (typeof flag === "string" && flag.trim() ? flag.trim().toLowerCase() : agentFromEnv(env));
 
 // ---- events.jsonl (readEvents/lastSeq live in events.mjs, re-exported here) ----
@@ -186,15 +191,17 @@ export function takeSession(dir, agent, now = new Date(), rand = randHex) {
 //   { choose: rows }                              no --session and not exactly one idle unfinished session
 //   { inUse: true, agent, ageSec }                --session in use and no take
 //   { session, agentId, handled, pending }        taken
-export function resumeSession({ home, cwd = process.cwd(), session, take = false, agent = "unknown", freshMs = 180_000, now = new Date() }) {
+// `taker(dir, agent, now)` does the take (default: takeSession, a direct write; the CLI passes
+// one that goes through the hub, and then the result is a Promise).
+export function resumeSession({ home, cwd = process.cwd(), session, take = false, agent = "unknown", freshMs = 180_000, now = new Date(), taker = takeSession }) {
   if (!session) {
     const rows = listSessions(home, projectKeyOf(projectRoot(cwd)), { freshMs, now: now.getTime() });
     if (rows.length !== 1 || rows[0].inUse) return { choose: rows };
-    return takeSession(rows[0].session, agent, now);
+    return taker(rows[0].session, agent, now);
   }
   const meta = readMeta(session);
   if (!take && inUse(meta, freshMs, now.getTime())) return { inUse: true, agent: meta.owner.agent ?? null, ageSec: heartbeatAge(meta, now.getTime()) };
-  return takeSession(session, agent, now);
+  return taker(session, agent, now);
 }
 
 // ---- CLI ----
@@ -212,6 +219,29 @@ async function hubOrDie(env) {
   const { HomeError } = await import("./home.mjs");
   try { return await ensureHub(env); } catch (e) { die(e instanceof HomeError || e instanceof EnsureError ? e.message : `ensure failed: ${oneLine(e.message)}`, 1); }
 }
+
+// POST a session route on the hub with the session's token. null when the hub cannot be reached
+// (or the session has no token to send); else { status, reply }.
+async function hubSessionPost(port, dir, sub, body) {
+  const token = readMeta(dir)?.token;
+  if (!Number.isInteger(port) || port <= 0 || typeof token !== "string" || !token) return null;
+  try {
+    const r = await fetch(`http://127.0.0.1:${port}/s/${path.basename(dir)}/${sub}`, {
+      method: "POST", headers: { "content-type": "application/json", "x-grill-token": token },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(5000),
+    });
+    return { status: r.status, reply: await r.json().catch(() => ({})) };
+  } catch { return null; }
+}
+// resume's take through the hub (the single writer of meta.json); a direct write only when the
+// hub cannot be reached.
+const hubTaker = (port) => async (dir, agent, now) => {
+  const r = await hubSessionPost(port, dir, "take", { agent });
+  if (!r) return takeSession(dir, agent, now);
+  if (r.status !== 200 || typeof r.reply.agentId !== "string") die(`could not take the session (HTTP ${r.status}): ${oneLine(r.reply.error ?? "")}`, 1);
+  const handled = handledOf(readJson(stateFile(dir)));
+  return { session: dir, agentId: r.reply.agentId, handled, pending: pendingEvents(dir, handled).length };
+};
 
 export async function cmdNew(o, env = process.env) {
   for (const k of ["topic", "doc", "agent", "phase", "map-key"]) if (o[k] === true) die(`--${k} needs a value`);
@@ -233,12 +263,14 @@ export function cmdSessions(o, env = process.env) {
 
 export async function cmdResume(o, env = process.env) {
   if (o.agent === true) die("--agent needs a value");
+  const agent = agentName(o.agent, env);
+  if (!AGENT_RE.test(agent)) die("--agent must be a name of 1-64 printable characters");
   const session = o.session === undefined ? undefined : mustSession(o);
   if (session && !fs.existsSync(stateFile(session))) die(`no state.json in ${session}; not a grill session`);
   const hub = await hubOrDie(env);
   let r;
   try {
-    r = resumeSession({ home: hub.home, session, take: !!o.take, agent: agentName(o.agent, env), freshMs: envMs("GRILL_FRESH_MS", 180_000, env) });
+    r = await resumeSession({ home: hub.home, session, take: !!o.take, agent, freshMs: envMs("GRILL_FRESH_MS", 180_000, env), taker: hubTaker(hub.port) });
   } catch (e) { die(`could not resume: ${e.code || oneLine(e.message)}`, 1); }
   if (r.choose || r.inUse) { print(r); return done(r.inUse ? 4 : 0); }
   const id = path.basename(r.session);
@@ -273,9 +305,10 @@ export async function cmdPatch(o, env = process.env) {
   if (!o["agent-id"] || o["agent-id"] === true) die("--agent-id <id> is required (printed by new or resume)");
   const agentId = String(o["agent-id"]);
   // Best effort (spec §5 Crash recovery): the patch is a file write and must not depend on the hub.
+  let hub = null;
   try {
     const { ensureHub } = await import("./lifecycle.mjs");
-    await ensureHub(env);
+    hub = await ensureHub(env);
   } catch (e) { process.stderr.write(`grill: warning: the hub is not running (${oneLine(e.message)}); the patch still applies\n`); }
   const file = stateFile(session);
   const text = readPatchText(o, "state.json");
@@ -297,7 +330,12 @@ export async function cmdPatch(o, env = process.env) {
   }
   let bytes;
   try { bytes = writeJson(file, next); } catch (e) { die(`could not write state.json: ${e.code || oneLine(e.message)}`, 1); }
-  try { touchHeartbeat(session, agentId); } catch { /* the patch landed; a missed heartbeat is harmless */ }
+  // The heartbeat goes through the hub (meta.json's single writer); directly only when it is down.
+  try {
+    const hb = await hubSessionPost(hub?.port, session, "heartbeat", { agentId });
+    if (!hb) touchHeartbeat(session, agentId);
+    else if (hb.status === 409) process.stderr.write(`grill: warning: the session was taken by ${hb.reply.owner?.agent ?? "another agent"} while this patch ran; stop and tell the user\n`);
+  } catch { /* the patch landed; a missed heartbeat is harmless */ }
   // One short line, never the state itself: keeping the state out of the agent's context is the point.
   const qs = Array.isArray(next.questions) ? next.questions : [];
   print({ ok: true, questions: qs.length, open: qs.filter(isOpen).length, handled: handledOf(next), bytes });

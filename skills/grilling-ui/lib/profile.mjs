@@ -24,14 +24,20 @@ export function detectAgent(env = process.env, flag) {
 
 // Monitor: default 300000, capped at 1800000, minimum 1000 (Claude Code Monitor tool schema).
 const MONITOR_MAX_MS = 1_800_000, MONITOR_MIN_MS = 1000;
+// POSIX shell quoting for the printed commands: single quotes, each ' written as '\''. An agentId
+// of plain id characters (or the placeholder) stays bare.
+export const shq = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
+const shArg = (s) => (/^[A-Za-z0-9_-]+$/.test(String(s)) ? String(s) : shq(s));
+// How a listener ends (every agent): taken (exit 4 / a {"type":"taken"} line) or an error (exit 1/2).
+export const STOP_RULES = 'Exit 4 or a {"type":"taken"} line: another agent took the session; stop listening, tell the user, and do not restart the listener. Exit 1 or 2: report the error line to the user; do not loop.';
 // Effect's Config.boolean truthy spellings (OpenCode runtime flags).
 const effectBool = (v) => v === undefined ? undefined : ["true", "yes", "on", "1", "y"].includes(String(v).toLowerCase());
 
 export function profile(agent, { skill = "<skill>", session, agentId, handled, project, topic, env = process.env } = {}) {
-  const S = session ?? "<session>", H = handled ?? "<handled>", A = agentId ?? "<agentId>";
-  const hub = `node "${skill}/hub.mjs"`;
-  const wait = (secs) => `${hub} wait --session "${S}" --after ${H} --timeout ${secs} --agent-id ${A}`;
-  const waitRepeat = "Exit 0: handle every printed send as one batch, patch agent.handled, then start a new wait with the new handled. Exit 3 (idle timeout): start a new wait with the same handled. Never end the turn while listening; if you must stop, say the listener is inactive (Sends queue and replay on resume).";
+  const S = shq(session ?? "<session>"), H = handled ?? "<handled>", A = agentId === undefined ? "<agentId>" : shArg(agentId);
+  const hub = `node ${shq(`${skill}/hub.mjs`)}`;
+  const wait = (secs) => `${hub} wait --session ${S} --after ${H} --timeout ${secs} --agent-id ${A}`;
+  const waitRepeat = `Exit 0: handle every printed send as one batch, patch agent.handled, then start a new wait with the new handled. Exit 3 (idle timeout): start a new wait with the same handled. ${STOP_RULES} Never end the turn while listening; if you must stop, say the listener is inactive (Sends queue and replay on resume).`;
   const base = { agent, mode: "wait" };
 
   if (agent === "claude") {
@@ -39,11 +45,11 @@ export function profile(agent, { skill = "<skill>", session, agentId, handled, p
     return {
       ...base, mode: "monitor",
       listen: { tool: "Monitor", params: {
-        command: `${hub} watch --session "${S}" --after ${H} --agent-id ${A}`,
+        command: `${hub} watch --session ${S} --after ${H} --agent-id ${A}`,
         description: `grill: ${project ? path.basename(project) : "<project>"} · ${topic ?? "<topic>"}`,
         timeout_ms: ms,
       } },
-      repeat: "Each Monitor event is a send: handle it and patch agent.handled. On the expiry notice, re-arm the same Monitor with the current `handled`. Stop it with TaskStop only at Finish.",
+      repeat: `Each Monitor event is a send: handle it and patch agent.handled. On the expiry notice, re-arm the same Monitor with the current \`handled\`. ${STOP_RULES} Stop it with TaskStop only at Finish.`,
       draw: { tool: "Agent", background: true },
       research: "subagent",
       loadSkill: "Call the Skill tool with the plugin-qualified name, e.g. mattpocock-skills:grilling.",
@@ -108,16 +114,20 @@ export function cmdAgentProfile(o) {
   let agent;
   try { agent = detectAgent(process.env, o.agent); } catch (e) { die(e.message); }
   const ctx = { skill: skillDir(), env: process.env };
+  // The agentId is the caller's own (printed by new/resume), never read from meta.json: after a
+  // take, meta.json names the new owner, and printing that to the old one would hand it the session.
+  if (o["agent-id"] !== undefined) {
+    if (typeof o["agent-id"] !== "string" || !o["agent-id"]) die("--agent-id needs a value");
+    ctx.agentId = o["agent-id"];
+  }
   if (o.session !== undefined) {
     if (typeof o.session !== "string") die("--session needs a folder");
     const dir = path.resolve(o.session);
     const state = fs.existsSync(path.join(dir, "state.json")) ? readJson(path.join(dir, "state.json")) : null;
     if (!state) die(`not a grill session (no readable state.json): ${dir}`);
-    const meta = readJson(path.join(dir, "meta.json"));
     Object.assign(ctx, {
       session: dir,
       handled: Number.isInteger(state.agent?.handled) ? state.agent.handled : 0,
-      agentId: meta?.owner?.agentId,
       project: state.project,
       topic: state.topic,
     });

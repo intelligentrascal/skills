@@ -11,7 +11,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { envMs, isObj, rand, readJson, writeJson } from "./util.mjs";
 import { ClaimError, PatchError, QUEUED, applyMapPatch, claim, mapDirOf, mapEventsFile, mapFile, mapMetaFile, readMapMeta, release, validateMap } from "./maps.mjs";
-import { eventsFile, lastSeq, publicOwner, readMeta, sessionDirById, stateFile, touchHeartbeat } from "./sessions.mjs";
+import { AGENT_RE, eventsFile, lastSeq, publicOwner, readMeta, sessionDirById, stateFile, takeSession, touchHeartbeat } from "./sessions.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // Page files are read per request (D7: page edits need no hub restart). GRILL_PAGE_DIR is a test hook.
@@ -176,6 +176,11 @@ export function createHub({ home, version, codeTime = 0, log = () => {}, env = p
 //   GET  /s/<id>/events.jsonl          the raw send log
 //   POST /s/<id>/send       {actions}  token + Origin → appends {type:"send",seq,at,session,actions} → {ok,seq}
 //   POST /s/<id>/heartbeat  {agentId}  token + Origin → meta.owner.heartbeat (409 if not the owner)
+//   POST /s/<id>/take       {agent}    token + Origin → a fresh owner {agentId, agent, heartbeat now}
+//                                      → {ok, agentId, handled, pending} (resume, D3)
+// The hub is the single writer of meta.json's owner while it runs (like D4 for map.json):
+// heartbeat and take each read-modify-write meta.json in one synchronous block (no await between
+// the read and the write), so a take and an old owner's heartbeat can never interleave.
 //
 // hub gains: pageDir, builtLayouts(), sessionDir(id), onSession (array of (id, dir) hooks called
 // on every request that resolves a session; T12 attaches its lazy dir watch there),
@@ -232,10 +237,15 @@ function addSessionRoutes(hub) {
     const dir = hub.sessionDir(id);
     if (!dir) return notFoundPage(res);
     const built = hub.builtLayouts();
-    if (!built.includes(layout)) return send(res, 302, "", "text/plain", { location: `/s/${id}/inbox` });
+    // An unbuilt layout falls back to the inbox; a missing inbox is a broken install, not a
+    // redirect loop.
+    const fallback = () => layout !== "inbox" && built.includes("inbox")
+      ? send(res, 302, "", "text/plain", { location: `/s/${id}/inbox` })
+      : send(res, 500, `page files missing: no inbox.html in ${hub.pageDir}`);
+    if (!built.includes(layout)) return fallback();
     let html;
     try { html = fs.readFileSync(path.join(hub.pageDir, `${layout}.html`), "utf8"); }
-    catch { return send(res, 302, "", "text/plain", { location: `/s/${id}/inbox` }); }
+    catch { return fallback(); }
     const boot = bootScript({ kind: "session", id, token: readMeta(dir)?.token ?? "", base: `/s/${id}/`, layouts: built });
     send(res, 200, html.replace(BOOT_MARK, () => boot), HTML);
   };
@@ -300,6 +310,16 @@ function addSessionRoutes(hub) {
       }
       json(res, 200, { ok: true, heartbeat: now.toISOString() });
     }],
+    ["POST", new RegExp(`^/s/${ID}/take$`), async (req, res, m) => {
+      const id = m[1], dir = mustSession(id);
+      hub.checkSessionPost(req, dir);
+      const body = await readJsonBody(req);
+      if (typeof body.agent !== "string" || !AGENT_RE.test(body.agent)) throw httpError(400, "agent must be a name of 1-64 printable characters");
+      // synchronous from here: read meta → mint the owner → atomic write
+      const r = takeSession(dir, body.agent);
+      hub.log(`take ${id}: owner is now ${body.agent}`);
+      json(res, 200, { ok: true, agentId: r.agentId, handled: r.handled, pending: r.pending });
+    }],
   );
 }
 
@@ -307,7 +327,7 @@ function addSessionRoutes(hub) {
 //   GET /events                     hub-wide SSE: `retry: 2000`, `event: hello {pid, started}` on
 //                                   connect, then `event: s {"id"}` / `event: m {"key"}` pings; a
 //                                   `: keep-alive` comment every GRILL_SSE_KEEPALIVE_MS (25 s)
-//   GET /s/<id>/presence?tab=<t>    204; records tab → now
+//   GET /s/<id>/presence?tab=<t>    204; records tab → now (403 for a foreign Origin/Sec-Fetch-Site)
 //   GET /s/<id>/clients             {count: tabs seen in the last GRILL_PRESENCE_MS (45 s), lastSeen, hubStarted}
 //
 // hub gains: broadcast(event, obj), watchDir(kind, key, dir, files) (lazy fs.watch on a folder,
@@ -372,7 +392,16 @@ function addLiveRoutes(hub) {
     return { count, lastSeen: p?.lastSeen ? new Date(p.lastSeen).toISOString() : null, hubStarted: hub.started };
   };
   // Shared by /s and /m presence routes; `resolve` 404s an unknown session/map.
+  // A GET carries no token, so presence only counts the hub's own pages: a foreign Origin, or a
+  // Sec-Fetch-Site other than same-origin/none (another site, or another localhost port, which
+  // browsers call same-site), is 403. No such headers (curl, tests) is allowed.
+  hub.presenceOk = (req) => {
+    if (!hub.originOk(req)) return false;
+    const site = req.headers["sec-fetch-site"];
+    return site === undefined || site === "same-origin" || site === "none";
+  };
   hub.presenceRoute = (kind, resolve) => (req, res, m, url) => {
+    if (!hub.presenceOk(req)) throw httpError(403, "cross-origin request rejected");
     const key = resolve(m);
     const tab = url.searchParams.get("tab");
     if (!tab || !TAB_RE.test(tab)) throw httpError(400, "tab must be 1-64 of [A-Za-z0-9_-]");

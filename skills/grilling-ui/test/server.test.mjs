@@ -289,3 +289,70 @@ test("session routes: unknown id or unsafe id is 404 for every endpoint", async 
   mkdirSync(ghost);
   assert.equal((await fetch(`${origin}/s/20990101-000000-eeee/state`)).status, 404);
 });
+
+test("take: token + Origin; mints the new owner in the hub; the old owner's heartbeat is then 409 and meta keeps the new owner", async (t) => {
+  const { home, env } = homeFor(t);
+  const s = newIn(env);
+  const meta0 = metaOf(s.session);
+  const take = (body, h = { "x-grill-token": meta0.token }) => post(s.url + "take", body, h);
+  assert.equal((await take({ agent: "codex" }, {})).status, 401);
+  assert.equal((await take({ agent: "codex" }, { "x-grill-token": meta0.token, origin: "http://evil.example" })).status, 403);
+  assert.equal((await take({})).status, 400);
+  assert.equal((await take({ agent: "" })).status, 400);
+  assert.equal(metaOf(s.session).owner.agentId, s.agentId, "rejected takes change nothing");
+  const r = await take({ agent: "codex" });
+  assert.equal(r.status, 200);
+  const body = await r.json();
+  assert.equal(body.ok, true);
+  assert.match(body.agentId, /^[0-9a-f]{12}$/);
+  assert.notEqual(body.agentId, s.agentId);
+  const meta1 = metaOf(s.session);
+  assert.deepEqual({ agentId: meta1.owner.agentId, agent: meta1.owner.agent }, { agentId: body.agentId, agent: "codex" });
+  assert.equal(meta1.token, meta0.token, "take keeps the token");
+  const old = await post(s.url + "heartbeat", { agentId: s.agentId }, { "x-grill-token": meta0.token });
+  assert.equal(old.status, 409);
+  assert.equal((await old.json()).owner.agent, "codex");
+  assert.equal(metaOf(s.session).owner.agentId, body.agentId, "meta keeps the new owner");
+
+  // resume --take goes through the hub's take route (the hub logs each take)
+  const cwd = tmp("grill-p-");
+  const r2 = JSON.parse(run(env, ["resume", "--session", s.session, "--take", "--agent", "pi"], { cwd }));
+  assert.equal(metaOf(s.session).owner.agentId, r2.agentId);
+  assert.equal(metaOf(s.session).owner.agent, "pi");
+  const log = readFileSync(join(home, "logs", "hub.log"), "utf8");
+  assert.match(log, new RegExp(`take ${s.id}: owner is now pi`));
+  // the owner's patch refreshes the heartbeat (through the hub); the owner stays pi
+  const hb = metaOf(s.session).owner.heartbeat;
+  await new Promise((r) => setTimeout(r, 15));
+  JSON.parse(run(env, ["patch", "--session", s.session, "--agent-id", r2.agentId], { input: JSON.stringify({ agent: { status: "waiting" } }) }));
+  assert.ok(Date.parse(metaOf(s.session).owner.heartbeat) > Date.parse(hb));
+  assert.equal(metaOf(s.session).owner.agentId, r2.agentId);
+});
+
+test("presence: a foreign Origin or a cross-site/same-site Sec-Fetch-Site is 403 (sessions and maps)", async (t) => {
+  const { env } = homeFor(t);
+  const s = newIn(env);
+  const origin = new URL(s.url).origin;
+  const cwd = tmp("grill-p-");
+  const m = JSON.parse(run(env, ["map-patch", "--map", "b1"], { cwd, input: JSON.stringify({ title: "B" }) }));
+  const mapBase = m.url;
+  for (const base of [s.url, mapBase]) {
+    const pres = (h) => fetch(`${base}presence?tab=t1`, { headers: h }).then((r) => r.status);
+    assert.equal(await pres({ origin: "http://evil.example" }), 403, base);
+    assert.equal(await pres({ origin: "null" }), 403, base);
+    assert.equal(await pres({ "sec-fetch-site": "cross-site" }), 403, base);
+    assert.equal(await pres({ "sec-fetch-site": "same-site" }), 403, base);
+    assert.equal(await pres({ origin, "sec-fetch-site": "same-origin" }), 204, base);
+    assert.equal(await pres({}), 204, base);
+  }
+});
+
+test("layouts: a missing inbox.html is a 500 'page files missing', never a redirect to itself", async (t) => {
+  const { env } = homeFor(t, { GRILL_PAGE_DIR: tmp("grill-empty-page-") });
+  const s = newIn(env);
+  for (const p of ["", "inbox", "studio"]) {
+    const r = await fetch(s.url + p, { redirect: "manual" });
+    assert.equal(r.status, 500, p);
+    assert.match(await r.text(), /page files missing/);
+  }
+});
