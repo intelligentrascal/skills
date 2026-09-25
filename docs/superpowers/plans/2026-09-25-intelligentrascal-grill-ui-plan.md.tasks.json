@@ -81,7 +81,7 @@
     {
       "id": 9,
       "subject": "Task 10: Sessions — new, sessions, resume/ownership, pending, patch CLI",
-      "status": "in_progress",
+      "status": "completed",
       "description": "**Goal:** Session folders per D2/D3, ownership with heartbeat and `--take`, resume selection, `pending`, and the `patch` CLI with Jason's exit/one-line contract.\n\n**Depends on:** T9\n\n**Verify:** `node --test skills/grilling-ui/test/sessions.test.mjs` → pass.\n\nSee plan section \"Task 10\".\n\n```json:metadata\n{\"files\":[\"lib/sessions.mjs\",\"test/sessions.test.mjs\",\"hub.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/sessions.test.mjs → pass.\",\"acceptanceCriteria\":[\"`new`: runs `ensure`; creates `grill-sessions/<projectKey>/<id>/` with `state.json` `{id, topic, doc, project, projectKey, cwd, branch, created, agent:{status:\\\"working\\\",since}, terms:[], questions:[]}` (+ `phase`, `mapKey` when given), empty `events.jsonl`, `meta.json` `{token: rand(32), owner: {agentId: rand(12), agent, heartbeat: now}}`. `--doc` default `docs/<slug(topic)>-design.md`. Prints `{session, id, projectKey, agentId, url, doc}` (url = `http://127.0.0.1:<port>/s/<id>/`).\",\"`sessions [--all]`: this project's sessions newest first (port `$JASON/server.mjs:106-123`) with added `branch, cwd, ageSec, inUse` (heartbeat < `GRILL_FRESH_MS`), `owner.agent`.\",\"`resume`: without `--session`: unfinished sessions of this project; exactly one and not in use → pick it; otherwise print `{\\\"choose\\\":[rows]}` and exit 0 (skill asks the user). With `--session`: if in use and no `--take` → print `{\\\"inUse\\\":true,\\\"agent\\\":..,\\\"ageSec\\\":..}` exit 4; else mint a new agentId, write owner, print `{session, agentId, url, handled, pending: <count past handled>}`.\",\"`patch --session DIR --agent-id ID [--file P]`: port `$JASON/server.mjs:452-483` (stdin via `tty.isatty(0)` guard, one-line errors, exit 2 on rejects, exit 1 on write failure); runs `ensure` first (best effort: a hub failure prints a warning to stderr but the patch still applies); refreshes `meta.owner.heartbeat` when `--agent-id` matches the owner; if it does not match, rejects with `\\\"session is owned by another agent (<agent>, <age>); resume --take to take it\\\"` exit 4.\",\"`pending --session DIR`: port `$JASON/server.mjs:126-133`.\",\"CLI-level tests ported from `$JASON/test/server.test.mjs:35-61` (key/worktree), `199-289` (sessions/pending), `487-612` (patch CLI) with the new key format and `--agent-id`.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         8
@@ -136,7 +136,7 @@
     {
       "id": 15,
       "subject": "Task 16: `agent-profile`",
-      "status": "in_progress",
+      "status": "completed",
       "description": "**Goal:** Detect the agent and print exact listening/draw parameters the skill follows verbatim.\n\n**Depends on:** T7\n\n**Verify:** `node --test skills/grilling-ui/test/profile.test.mjs` → pass.\n\nSee plan section \"Task 16\".\n\n```json:metadata\n{\"files\":[\"lib/profile.mjs\",\"test/profile.test.mjs\",\"hub.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/profile.test.mjs → pass.\",\"acceptanceCriteria\":[\"`detectAgent(env, flag)`: flag wins; else D13 env order claude → codex → opencode → pi; else `\\\"unknown\\\"`.\",\"`profile(agent, {skill, session, agentId, handled, project, topic})` returns JSON with `agent`, `mode` (`monitor|wait`), `listen` (exact tool + params, placeholders `<session> <handled> <agentId>` filled when given), `repeat` (what to do on expiry/exit 3), `draw` (`{tool, background}`), `research` (`subagent|leave-open`), `loadSkill` (how to call a skill by name), `notes` (≤ 3 lines).\",\"Values (verify Codex/OpenCode/Pi tool and param names against `$RESEARCH` sources while implementing — Codex: `grep -rn yield_time_ms $RESEARCH/openai-codex/codex-rs`; OpenCode: `$RESEARCH/sst-opencode/packages/opencode/src/tool/` bash tool; Pi: `$RESEARCH/badlogic-pi-mono/packages/coding-agent/src/core/tools/bash.ts` — and adjust the names in this table, keeping the timeouts):\",\"Tests with env fixtures for all five plus `--agent` override; snapshot of the claude Monitor params (exact strings).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         6
@@ -392,5 +392,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T14:54:03.004Z"
+  "lastUpdated": "2026-09-25T15:04:43.834Z"
 }

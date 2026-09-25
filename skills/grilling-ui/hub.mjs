@@ -24,6 +24,12 @@ const USAGE = `usage: hub.mjs <command> [options]
 const cmds = {
   ensure: async (o) => (await import("./lib/lifecycle.mjs")).cmdEnsure(o),
   serve: async (o) => (await import("./lib/lifecycle.mjs")).cmdServe(o),
+  new: async (o) => (await import("./lib/sessions.mjs")).cmdNew(o),
+  sessions: async (o) => (await import("./lib/sessions.mjs")).cmdSessions(o),
+  resume: async (o) => (await import("./lib/sessions.mjs")).cmdResume(o),
+  patch: async (o) => (await import("./lib/sessions.mjs")).cmdPatch(o),
+  pending: async (o) => (await import("./lib/sessions.mjs")).cmdPending(o),
+  "agent-profile": async (o) => (await import("./lib/profile.mjs")).cmdAgentProfile(o),
 };
 
 const o = parseArgs(process.argv.slice(2));
