@@ -257,6 +257,8 @@
   .keys-foot .keys-note { color: var(--ink-3); font-size: 12px; }
   .keys-foot button { font-size: 12px; padding: 4px 10px; }
   @media (max-width: 760px) { .toast { left: 16px; right: 16px; top: 12px; bottom: auto; transform: translateY(-6px); } .keys-panel td:first-child { width: auto; } }
+  /* 7. Options are keyboard-reachable radios (Tab, Enter/Space): a focus ring for keyboard focus only. */
+  .opt:focus { outline: none; } .opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 </style>
 </head>
 <body>
@@ -300,6 +302,32 @@
     pendingActions, isExploring, pendingOfType, isVisualizing, sendState, stageAnswer, stageThread, stageDefer, stageReopen,
     clearStaged, removeThread, stageFeedback, removeFeedback, explore, visualize, select, save, draft, DRAW_STUCK_NOTE } = G;
   const local = G.local;
+  const ID = (x) => esc(String(x ?? "").toUpperCase());
+  // Replace `box`'s children with `html`'s, except the direct child matching `keep` when its
+  // data-for is the same in both: that element stays (the textarea being typed in keeps its IME
+  // composition, undo history, caret and focus). Its textareas take the new value only when the
+  // draft changed elsewhere (staged, cleared, typed in another tab), and the new placeholder/label.
+  function patchKeeping(box, html, keep, attrsFrom) {
+    const tmp = document.createElement(box.tagName); tmp.innerHTML = html;
+    const neuBox = attrsFrom ? tmp.firstElementChild : tmp;
+    const oldBox = attrsFrom ? box.firstElementChild : box;
+    const pick = (b) => (b ? [...b.children].find((c) => c.matches(keep)) : null);
+    const old = pick(oldBox), neu = pick(neuBox);
+    if (!oldBox || !neuBox || (attrsFrom && oldBox.tagName !== neuBox.tagName) || !old || !neu || old.dataset.for !== neu.dataset.for) { box.innerHTML = html; return; }
+    for (const c of [...oldBox.childNodes]) if (c !== old) c.remove();
+    const kids = [...neuBox.childNodes], i = kids.indexOf(neu);
+    for (const c of kids.slice(0, i)) oldBox.insertBefore(c, old);
+    for (const c of kids.slice(i + 1)) oldBox.appendChild(c);
+    if (attrsFrom) {
+      for (const a of [...oldBox.attributes]) if (!neuBox.hasAttribute(a.name)) oldBox.removeAttribute(a.name);
+      for (const a of [...neuBox.attributes]) if (oldBox.getAttribute(a.name) !== a.value) oldBox.setAttribute(a.name, a.value);
+    }
+    for (const n of neu.querySelectorAll("textarea")) {
+      const o = n.id && old.querySelector("#" + CSS.escape(n.id)); if (!o) continue;
+      if (o.value !== n.value) o.value = n.value;
+      for (const a of ["placeholder", "aria-label"]) if (o.getAttribute(a) !== n.getAttribute(a)) o.setAttribute(a, n.getAttribute(a) || "");
+    }
+  }
 
   function renderVisual() {
     const v = visual(); const strip = $("visual-strip"); const frame = $("visual-frame");
@@ -342,7 +370,7 @@
         const mark = s ? `<span class="mark staged">staged</span>`
           : pendingActions(q.id).some((a) => a.type !== "explore") ? `<span class="mark pending"><span class="spin"></span>sent</span>`
           : `<span class="mark ${esc(q.status)}">${q.status === "answered" ? CHECK + esc((q.answer && q.answer.option) || "text") : esc(q.status)}</span>`;
-        el.innerHTML = `<span class="id">${esc(q.id).toUpperCase()}</span><span class="t">${esc(q.title)}</span>${mark}`;
+        el.innerHTML = `<span class="id">${ID(q.id)}</span><span class="t">${esc(q.title)}</span>${mark}`;
         el.onclick = () => select(q.id);
         // hover outlines the question's regions in the visual (T20); mousemove, not mouseenter: a
         // list rebuilt under a resting pointer must not steal the outline (inbox.template.html)
@@ -364,8 +392,8 @@
     if (!q) { main.innerHTML = `<p class="empty">${G.S && qs().length ? "Pick a question on the left." : "No questions yet."}</p>`; return; }
     const s = local.staged[q.id] || {}; const lk = locked(); const d = local.drafts[q.id] || {};
     const rec = q.rec || {};
-    const crumb = [`${esc(q.id).toUpperCase()} · round ${esc(q.round)}`];
-    crumb.push(q.deps && q.deps.length ? `<span>after ${q.deps.map((x) => `<a href="#" data-go="${esc(x)}">${esc(x).toUpperCase()}</a>`).join(", ")}</span>` : `<span>root</span>`);
+    const crumb = [`${ID(q.id)} · round ${esc(q.round)}`];
+    crumb.push(q.deps && q.deps.length ? `<span>after ${q.deps.map((x) => `<a href="#" data-go="${esc(x)}">${ID(x)}</a>`).join(", ")}</span>` : `<span>root</span>`);
     if (q.durable) crumb.push(`<span>durable</span>`);
     if (q.updated) crumb.push(`<span class="upd">recommendation updated</span>`);
     if (q.status === "deferred") crumb.push(`<span>deferred</span>`);
@@ -374,7 +402,8 @@
     const pendAnswer = pend.filter((a) => a.type === "answer").pop() || null;
     const opts = (q.options || []).map((o) => {
       const isRec = rec.option === o.k, chosen = q.answer && q.answer.option === o.k, staged = s.answer && s.answer.option === o.k, pending = !staged && pendAnswer && pendAnswer.option === o.k;
-      return `<li class="opt${isRec ? " rec" : ""}${chosen ? " chosen" : ""}${staged ? " staged" : ""}${pending ? " pending" : ""}" data-opt="${esc(o.k)}"><span class="k">${esc(o.k)}</span><span>${isRec ? `<div class="tag">Recommended</div>` : ""}${esc(o.text)}</span>${pending ? `<span class="check pending"><span class="spin"></span></span>` : `<span class="check">${CHECK}</span>`}</li>`;
+      const checked = staged || (!s.answer && (pending || (!pendAnswer && chosen)));
+      return `<li class="opt${isRec ? " rec" : ""}${chosen ? " chosen" : ""}${staged ? " staged" : ""}${pending ? " pending" : ""}" data-opt="${esc(o.k)}" role="radio" aria-checked="${checked ? "true" : "false"}"${lk ? ' aria-disabled="true"' : ' tabindex="0"'}><span class="k">${esc(o.k)}</span><span>${isRec ? `<div class="tag">Recommended</div>` : ""}${esc(o.text)}</span>${pending ? `<span class="check pending"><span class="spin"></span></span>` : `<span class="check">${CHECK}</span>`}</li>`;
     }).join("") + (q.status === "answered" && q.answer && q.answer.kind === "text" && q.answer.text
       ? `<li class="opt chosen text-answer"><span class="k"></span><span><div class="tag">Your answer</div>${esc(q.answer.text)}</span><span class="check">${CHECK}</span></li>` : "")
       + (pendAnswer && pendAnswer.kind === "text" && pendAnswer.text
@@ -387,9 +416,9 @@
     else if (s.answer) stagedLine = s.answer.kind === "accept" ? `Staged: accept ${esc(s.answer.option)}` : s.answer.option ? `Staged: option ${esc(s.answer.option)}` : `Staged text: “${esc(s.answer.text)}”`;
     if (stagedLine) stagedLine = `<div class="staged-line">${stagedLine}<a href="#" id="clear-staged">clear</a></div>`;
     const pendBits = pend.filter((a) => a.type === "defer" || a.type === "reopen").map((a) => a.type);
-    if (pendBits.length) stagedLine += `<div class="pending-line"><span class="spin"></span>Sent: ${pendBits.join(", ")} this question · waiting for the agent</div>`;
+    if (pendBits.length) stagedLine += `<div class="pending-line"><span class="spin"></span>Sent: ${pendBits.map(esc).join(", ")} this question · waiting for the agent</div>`;
     const controls = lk ? "" : `
-        <div class="answer-row">
+        <div class="answer-row" data-for="${esc(q.id)}">
           <textarea id="free" aria-label="Your answer" placeholder="${q.status === "answered" ? "Change your answer, or add nuance…" : (q.options || []).length ? "Free-text answer, if none of the options fit…" : "Your answer…"}">${esc(d.free || "")}</textarea>
           <button id="stage-text" type="button">Stage text</button>
         </div>
@@ -399,19 +428,22 @@
     const exploreBtn = (q.options || []).length && !lk
       ? `<button id="explore" type="button"${exploring || gate.disabled ? " disabled" : ""}${gate.disabled && gate.why ? ` title="${esc(gate.why)}"` : ""}>${exploring ? `<span class="spin"></span> Exploring…` : q.explore ? "Explore again" : "Explore deeper"}</button>` : "";
     const picked = (q.status === "answered" && q.answer) || !!s.answer || !!pendAnswer;
-    main.innerHTML = `<article class="card${lk ? " locked" : ""}${picked ? " picked" : ""}" data-q="${esc(q.id)}">
+    patchKeeping(main, `<article class="card${lk ? " locked" : ""}${picked ? " picked" : ""}" data-q="${esc(q.id)}">
         <div class="crumb">${crumb.join("")}</div>
         <div class="title-row"><h2 id="card-title" tabindex="-1">${esc(q.title)}</h2>${exploreBtn}</div>
         <p class="body">${esc(q.body)}</p>
-        ${opts ? `<ul class="opts">${opts}</ul>` : ""}
+        ${opts ? `<ul class="opts" role="radiogroup" aria-label="Options for ${ID(q.id)}">${opts}</ul>` : ""}
         ${why}${stagedLine}${controls}
-      </article>`;
+      </article>`, ".answer-row", true);
     const card = main.querySelector(".card");
     card.onmousemove = () => G.hover(q.id);
     card.onmouseleave = main.onmouseleave = () => G.hover(null);
     main.querySelectorAll("[data-go]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); select(a.dataset.go); }));
     if (lk) return;
-    main.querySelectorAll(".opt:not(.text-answer)").forEach((o) => (o.onclick = () => stageAnswer(q.id, { kind: o.dataset.opt === rec.option ? "accept" : "option", option: o.dataset.opt })));
+    main.querySelectorAll(".opt:not(.text-answer)").forEach((o) => {
+      o.onclick = () => stageAnswer(q.id, { kind: o.dataset.opt === rec.option ? "accept" : "option", option: o.dataset.opt });
+      o.onkeydown = (e) => { if ((e.key === "Enter" || e.key === " ") && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); o.onclick(); } };
+    });
     const ex = $("explore"); if (ex) ex.onclick = () => explore(q.id);
     $("stage-text").onclick = () => { const t = $("free").value.trim(); if (t) { draft(q.id).free = ""; stageAnswer(q.id, { kind: "text", text: t }); } };
     $("free").oninput = (e) => { draft(q.id).free = e.target.value; save(); };
@@ -439,10 +471,10 @@
           `<tr><td class="k${rec.option === r.option ? " rec" : ""}">${esc(r.option)}</td><td class="pro">${li(r.pros)}</td><td class="con">${li(r.cons)}</td></tr>`).join("")}</tbody></table>`;
     }
     if (isExploring(q.id)) exp += `<div class="explore-wait"><span class="spin"></span> Exploring: the agent is writing a pros and cons table for this question.</div>`;
-    aside.innerHTML = `
-      <div class="head"><h3>Discussion</h3><div class="sub">${esc(q.id).toUpperCase()} · ${esc(q.title)}<span class="count">${thread.length} message${thread.length === 1 ? "" : "s"}</span></div></div>
+    patchKeeping(aside, `
+      <div class="head"><h3>Discussion</h3><div class="sub">${ID(q.id)} · ${esc(q.title)}<span class="count">${thread.length} message${thread.length === 1 ? "" : "s"}</span></div></div>
       <div class="msgs" data-thread>${exp}${msgs || (exp ? "" : `<div class="empty-thread">Nothing yet. Ask anything about this question; the agent answers here on the next send.</div>`)}</div>
-      ${lk ? "" : `<div class="compose"><textarea id="thread-in" aria-label="Message about ${esc(q.id).toUpperCase()}" placeholder="Dig deeper on ${esc(q.id).toUpperCase()}…">${esc(d.thread || "")}</textarea><button id="stage-thread" type="button">Add to discussion</button></div>`}`;
+      ${lk ? "" : `<div class="compose" data-for="q:${esc(q.id)}"><textarea id="thread-in" aria-label="Message about ${ID(q.id)}" placeholder="Dig deeper on ${ID(q.id)}…">${esc(d.thread || "")}</textarea><button id="stage-thread" type="button">Add to discussion</button></div>`}`, ".compose");
     aside.querySelectorAll("[data-rm]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); removeThread(q.id, Number(a.dataset.rm)); }));
     if (lk) return;
     $("stage-thread").onclick = () => { const t = $("thread-in").value.trim(); if (t) stageThread(q.id, t); };
@@ -454,10 +486,10 @@
     const msgs = thread.map(msgHtml).join("")
       + pendingOfType("visual-feedback").map((a) => `<div class="msg user pending"><div class="who"><span class="spin"></span>you · sending</div><div class="text">${esc(a.text)}</div></div>`).join("")
       + local.vfeedback.map((t, i) => `<div class="msg user staged"><div class="who">you · staged</div><div class="text">${esc(t)}</div>${lk ? "" : `<a href="#" class="rm" data-rmf="${i}" title="Remove">×</a>`}</div>`).join("");
-    aside.innerHTML = `
+    patchKeeping(aside, `
       <div class="head"><h3>Visual feedback</h3><div class="sub">${v.kind === "diagram" ? "Diagram" : "Prototype"} · v${esc(v.version)}<span class="count">${thread.length} message${thread.length === 1 ? "" : "s"}</span></div></div>
       <div class="msgs" data-thread>${msgs || `<div class="empty-thread">Nothing yet. Say what is wrong or missing in the visual; the agent redraws it on the next send. If a note contradicts an answered question, that question is reopened for you.</div>`}</div>
-      ${lk ? "" : `<div class="compose"><textarea id="feedback-in" aria-label="Feedback on the visual" placeholder="Feedback on the visual…">${esc(d.thread || "")}</textarea><button id="stage-feedback" type="button">Add feedback</button></div>`}`;
+      ${lk ? "" : `<div class="compose" data-for="visual"><textarea id="feedback-in" aria-label="Feedback on the visual" placeholder="Feedback on the visual…">${esc(d.thread || "")}</textarea><button id="stage-feedback" type="button">Add feedback</button></div>`}`, ".compose");
     aside.querySelectorAll("[data-rmf]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); removeFeedback(Number(a.dataset.rmf)); }));
     if (lk) return;
     $("stage-feedback").onclick = () => { const t = $("feedback-in").value.trim(); if (t) stageFeedback(t); };

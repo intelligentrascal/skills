@@ -132,6 +132,8 @@ const STATUSES = ["open", "answered", "deferred", "reopened"];
 const ANSWER_KINDS = ["accept", "option", "text"];
 const PHASES = ["destination", "frontier", "ticket"];
 const KINDS = ["doc", "map", "no-map"];
+// An option key is a short label ("A", "B", "1"): the page shows it and keys staging and sends on it.
+export const OPTION_KEY = /^[A-Za-z0-9]{1,4}$/;
 export function validateState(s) {
   const need = (ok, msg) => { if (!ok) bad(msg); };
   const str = (v) => typeof v === "string";
@@ -180,13 +182,18 @@ export function validateState(s) {
     need(STATUSES.includes(q.status), `${w}.status must be one of ${STATUSES.join("|")}`);
     need(isObj(q.rec), `${w}.rec must be an object ({"option","why"} or {"text","why"})`);
     texts(q.rec, ["option", "text", "why"], `${w}.rec`);
+    if (isObj(q.rec) && typeof q.rec.option === "string") need(OPTION_KEY.test(q.rec.option),
+      `${w}.rec.option must be 1-4 letters or digits (like "A"), got ${JSON.stringify(q.rec.option)}`);
     check(q, "body", str, `${w}.body must be a string`);
     check(q, "deps", strs, `${w}.deps must be an array of question ids`);
     check(q, "options", (v) => Array.isArray(v) && v.every((x) => isObj(x) && str(x.k) && (!("text" in x) || str(x.text))),
       `${w}.options must be an array of {"k","text"} with string k and text`);
+    (Array.isArray(q.options) ? q.options : []).forEach((o, j) => need(OPTION_KEY.test(o.k),
+      `${w}.options[${j}].k must be 1-4 letters or digits (like "A"), got ${JSON.stringify(o.k)}`));
     if ("answer" in q) {
       need(isObj(q.answer) && ANSWER_KINDS.includes(q.answer.kind), `${w}.answer.kind must be one of ${ANSWER_KINDS.join("|")}`);
       texts(q.answer, ["option", "text"], `${w}.answer`);
+      check(q.answer, "option", (v) => OPTION_KEY.test(v), `${w}.answer.option must be 1-4 letters or digits (an option key like "A"), got ${JSON.stringify(q.answer.option)}`);
     }
     if ("explore" in q) {
       const e = q.explore;

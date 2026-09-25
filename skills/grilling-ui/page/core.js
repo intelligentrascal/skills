@@ -49,9 +49,70 @@
   let L = null; // the mounted layout
   const storeKey = "grill:" + (G.id || "");
   const fresh = () => ({ staged: {}, pending: [], drafts: {}, view: "questions", vfeedback: [] });
-  const local = fresh();
-  { const v = store.get(storeKey); if (v) { try { Object.assign(local, JSON.parse(v)); } catch {} } }
-  const save = () => store.set(storeKey, JSON.stringify(local));
+  // Staging is shared by every tab on this session through localStorage. A tab never writes a
+  // stale snapshot: save() re-reads the stored value and applies only what this tab changed since
+  // it last read or wrote it (`synced`), per question id (staged), per id and field (drafts), and
+  // per list item (pending by seq, visual feedback by text). A `storage` event from another tab
+  // replaces `local` (in place: layouts hold a reference) and re-renders; the view stays this tab's.
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const clone = (v) => JSON.parse(JSON.stringify(v));
+  const objOr = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
+  const listOr = (v) => (Array.isArray(v) ? v : []);
+  function parseLocal(text) {
+    const o = fresh();
+    if (text) { try { const v = JSON.parse(text); if (v && typeof v === "object") Object.assign(o, v); } catch {} }
+    o.staged = objOr(o.staged); o.drafts = objOr(o.drafts); o.pending = listOr(o.pending); o.vfeedback = listOr(o.vfeedback);
+    return o;
+  }
+  function mergeMap(stored, mine, was) {
+    stored = objOr(stored); mine = objOr(mine); was = objOr(was);
+    const out = { ...stored };
+    for (const k of new Set([...Object.keys(mine), ...Object.keys(was)])) {
+      if (same(mine[k], was[k])) continue; // this tab did not touch it: the stored value stands
+      if (k in mine) out[k] = mine[k]; else delete out[k];
+    }
+    return out;
+  }
+  function mergeList(stored, mine, was, key) {
+    const count = (l) => { const m = new Map(); for (const x of l) { const k = key(x); m.set(k, (m.get(k) || 0) + 1); } return m; };
+    const cm = count(listOr(mine)), cw = count(listOr(was));
+    const out = listOr(stored).slice();
+    for (const [k, n] of cw) for (let r = n - (cm.get(k) || 0); r > 0; r--) { const i = out.findIndex((x) => key(x) === k); if (i >= 0) out.splice(i, 1); }
+    const add = new Map([...cm].map(([k, n]) => [k, n - (cw.get(k) || 0)]));
+    for (const x of listOr(mine)) { const k = key(x); if (add.get(k) > 0) { add.set(k, add.get(k) - 1); out.push(x); } }
+    return out;
+  }
+  function merge3(stored, mine, was) {
+    const drafts = {};
+    const sd = objOr(stored.drafts), md = objOr(mine.drafts), wd = objOr(was.drafts);
+    for (const id of new Set([...Object.keys(sd), ...Object.keys(md), ...Object.keys(wd)])) {
+      const d = mergeMap(sd[id], md[id], wd[id]);
+      if (Object.keys(d).length) drafts[id] = d;
+    }
+    const seqs = new Set();
+    const pending = mergeList(stored.pending, mine.pending, was.pending, (p) => String(p && p.seq))
+      .filter((p) => p && !seqs.has(p.seq) && seqs.add(p.seq));
+    const scalar = (k) => (same(mine[k], was[k]) ? stored[k] : mine[k]);
+    return { ...stored, staged: mergeMap(stored.staged, mine.staged, was.staged), drafts, pending,
+      vfeedback: mergeList(stored.vfeedback, mine.vfeedback, was.vfeedback, String), view: scalar("view"), mapView: scalar("mapView") };
+  }
+  const local = parseLocal(store.get(storeKey));
+  let synced = clone(local); // the stored value as this tab last read or wrote it
+  function replaceLocal(v) { for (const k of Object.keys(local)) delete local[k]; Object.assign(local, v); if (local.mapView === undefined) delete local.mapView; }
+  function save() {
+    const merged = merge3(parseLocal(store.get(storeKey)), local, synced);
+    replaceLocal(merged);
+    synced = clone(merged);
+    store.set(storeKey, JSON.stringify(merged));
+  }
+  // Another tab wrote this session's staging: take it, keeping this tab's own view.
+  function adoptStored() {
+    const stored = parseLocal(store.get(storeKey));
+    const merged = merge3(stored, local, synced);
+    merged.view = local.view; merged.mapView = local.mapView;
+    replaceLocal(merged);
+    synced = stored;
+  }
 
   // ---- data helpers ----
   const qs = () => (S && Array.isArray(S.questions) ? S.questions : []);
@@ -182,9 +243,10 @@
       else if (ev === "_err") { errors++; if (errors >= SSE_MAX_ERRORS) setMode("poll"); refetch(); } // the fetch tells a dead hub from a dead stream
       else if (ev === "_state") { errors = d.mode === "poll" ? SSE_MAX_ERRORS : 0; setMode(d.mode === "poll" ? "poll" : "sse"); }
       else if (ev === "hello") {
-        const id = `${d.pid}:${d.started}`;
-        if (hubId !== null && id !== hubId) presence(); // a new hub process: tell it this tab exists at once (it also re-attaches the folder watch)
-        hubId = id; errors = 0; setMode("sse");
+        // Every hello, cheap: a new hub process (a restart or handoff) learns about this tab at once
+        // (it also re-attaches the folder watch), whether or not this tab saw the previous hub's hello.
+        presence();
+        hubId = `${d.pid}:${d.started}`; errors = 0; setMode("sse");
         refetch(); // pings sent while disconnected were missed
       } else if (ev === o.kind && d[field] === o.key) refetch();
     }
@@ -222,6 +284,13 @@
       } else openES();
       presence();
       setInterval(presence, PRESENCE_EVERY_MS);
+      // Back from the bfcache: the page slept through pings, and its stream may be closed.
+      window.addEventListener("pageshow", (e) => {
+        if (!e.persisted) return;
+        presence();
+        if (owns() && (!es || es.readyState === EventSource.CLOSED)) { closeES(); openES(); }
+        refetch();
+      });
       refetch();
     }
     return {
@@ -259,18 +328,19 @@
     let gAt = 0;
 
     // toast: role=status, one at a time; an `undo` callback adds an Undo button (and makes `u` undo)
-    let toastEl = null, toastTimer = null, pendingUndo = null;
+    // The live region exists from the start (empty), so screen readers announce the first toast too.
+    let toastEl = document.getElementById("grill-toast"), toastTimer = null, pendingUndo = null;
+    if (!toastEl) {
+      toastEl = document.createElement("div");
+      toastEl.id = "grill-toast"; toastEl.className = "toast";
+      toastEl.setAttribute("role", "status"); toastEl.setAttribute("aria-live", "polite");
+      document.body.appendChild(toastEl);
+    }
     function hideToast() {
       clearTimeout(toastTimer); toastTimer = null; pendingUndo = null;
       if (toastEl) { toastEl.classList.remove("show"); const b = toastEl.querySelector("button"); if (b && b === document.activeElement) b.blur(); }
     }
     function toast(text, { undo = null, ms = TOAST_MS } = {}) {
-      if (!toastEl) {
-        toastEl = document.createElement("div");
-        toastEl.id = "grill-toast"; toastEl.className = "toast";
-        toastEl.setAttribute("role", "status"); toastEl.setAttribute("aria-live", "polite");
-        document.body.appendChild(toastEl);
-      }
       hideToast();
       toastEl.innerHTML = `<span class="toast-text">${esc(text)}</span>${undo ? `<button type="button" class="toast-undo" aria-keyshortcuts="u">Undo</button>` : ""}`;
       pendingUndo = undo;
@@ -324,7 +394,7 @@
 
     document.addEventListener("keydown", (e) => {
       if (e.isComposing || e.keyCode === 229) return;
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key === "Enter") { e.preventDefault(); sendKey(); return; }
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key === "Enter") { e.preventDefault(); if (!e.repeat) sendKey(); return; }
       if (e.key === "Escape") {
         if (closeOverlays()) { e.preventDefault(); return; }
         const a = document.activeElement; if (inField(a)) a.blur();
@@ -335,7 +405,8 @@
       if (e.key === "?") { e.preventDefault(); openSheet(); return; }
       if (gAt) {
         const fresh = Date.now() - gAt < 1000; gAt = 0;
-        if (fresh) { if (go(e.key)) e.preventDefault(); return; }
+        if (fresh && go(e.key)) { e.preventDefault(); return; }
+        // not a destination: the key acts as it would have without the `g`
       }
       if (e.key === "g") { gAt = Date.now(); e.preventDefault(); return; }
       if (e.key === "u" && undoNow()) { e.preventDefault(); return; }
@@ -387,13 +458,15 @@
   // ---- staging ----
   const st = (id) => (local.staged[id] = local.staged[id] || {});
   const prune = (id) => { const s = local.staged[id]; if (s && !s.answer && !s.defer && !s.reopen && !(s.thread && s.thread.length)) delete local.staged[id]; };
-  function stageAnswer(id, answer) { const s = st(id); s.answer = answer; delete s.defer; delete s.reopen; commit(); }
-  function stageThread(id, text) { const s = st(id); (s.thread = s.thread || []).push(text); if (local.drafts[id]) delete local.drafts[id].thread; commit(); }
-  function stageDefer(id) { const s = st(id); s.defer = true; delete s.answer; delete s.reopen; commit(); }
-  function stageReopen(id) { const s = st(id); s.reopen = true; delete s.answer; delete s.defer; commit(); }
-  function clearStaged(id) { const s = local.staged[id]; if (s) { delete s.answer; delete s.defer; delete s.reopen; prune(id); } commit(); }
-  function removeThread(id, i) { const s = local.staged[id]; if (s && s.thread) { s.thread.splice(i, 1); prune(id); } commit(); }
+  function stageAnswer(id, answer) { const s = st(id); s.answer = answer; delete s.defer; delete s.reopen; restaged(); }
+  function stageThread(id, text) { const s = st(id); (s.thread = s.thread || []).push(text); if (local.drafts[id]) delete local.drafts[id].thread; restaged(); }
+  function stageDefer(id) { const s = st(id); s.defer = true; delete s.answer; delete s.reopen; restaged(); }
+  function stageReopen(id) { const s = st(id); s.reopen = true; delete s.answer; delete s.defer; restaged(); }
+  function clearStaged(id) { const s = local.staged[id]; if (s) { delete s.answer; delete s.defer; delete s.reopen; prune(id); } restaged(); }
+  function removeThread(id, i) { const s = local.staged[id]; if (s && s.thread) { s.thread.splice(i, 1); prune(id); } restaged(); }
   function commit() { save(); render(); }
+  // A staging change clears a failed send's message (it is about staging that no longer exists).
+  function restaged() { sendError = null; commit(); }
   const draft = (id) => (local.drafts[id] = local.drafts[id] || {});
   // ---- pending: sent, not yet recorded by the agent (agent.handled < seq) ----
   const pendingActions = (id) => local.pending.flatMap((p) => p.actions.filter((a) => a.q === id));
@@ -408,8 +481,8 @@
     for (const s of Object.values(local.staged)) n += (s.answer ? 1 : 0) + (s.defer ? 1 : 0) + (s.reopen ? 1 : 0) + (s.thread ? s.thread.length : 0);
     return n;
   }
-  function stageFeedback(text) { local.vfeedback.push(text); if (local.drafts.__visual) delete local.drafts.__visual.thread; commit(); }
-  function removeFeedback(i) { local.vfeedback.splice(i, 1); commit(); }
+  function stageFeedback(text) { local.vfeedback.push(text); if (local.drafts.__visual) delete local.drafts.__visual.thread; restaged(); }
+  function removeFeedback(i) { local.vfeedback.splice(i, 1); restaged(); }
   function buildActions() {
     const out = [];
     for (const [q, s] of Object.entries(local.staged)) {
@@ -424,6 +497,7 @@
   function sendState(needStaged = true) {
     const a = (S && S.agent) || {};
     if (locked()) return { disabled: true, why: "" };
+    if (inFlight) return { disabled: true, why: "" }; // one POST at a time
     if (gone) return { disabled: true, why: "hub down" };
     if (!S) return { disabled: true, why: "" };
     if (needStaged && !stagedCount()) return { disabled: true, why: "" };
@@ -440,42 +514,66 @@
     }
     return { disabled: false, why: "" };
   }
+  // One send, finish, visualize or explore POST at a time (a double click, ⌘↵ twice, a key and a
+  // click): set before the first await and shown at once, since sendState() reads it.
+  let inFlight = false;
+  // A failed POST's message stays under Send until the next successful send or staging change.
+  let sendError = null;
   async function post(actions) {
     let r, j = {};
     try {
       r = await fetch(BASE + "send", { method: "POST", headers: { "content-type": "application/json", "x-grill-token": G.token || "" }, body: JSON.stringify({ actions }) });
       j = await r.json().catch(() => ({}));
     } catch { r = null; conn.trouble(); }
-    if (!j.ok) { const w = $("send-why"); if (w) w.textContent = "Send failed: " + (j.error || (r && r.status) || "hub down"); }
+    sendError = j.ok ? null : "Send failed: " + (j.error || (r && r.status) || "hub down");
     return j.ok ? j : null;
   }
+  async function flight(actions) {
+    inFlight = true; render();
+    try { return await post(actions); } finally { inFlight = false; }
+  }
   const record = (j, actions) => local.pending.push({ seq: j.seq, at: new Date().toISOString(), actions });
+  // What a send ships: staging can change while the POST is in flight, so only what was sent is
+  // taken out of it afterwards (an answer that still matches, the flags, each sent message once).
+  const snapStaged = () => clone({ staged: local.staged, vfeedback: local.vfeedback });
+  function dropSent(snap) {
+    for (const [id, was] of Object.entries(snap.staged)) {
+      const s = local.staged[id]; if (!s) continue;
+      if (was.answer && same(s.answer, was.answer)) delete s.answer;
+      if (was.defer) delete s.defer;
+      if (was.reopen) delete s.reopen;
+      for (const t of was.thread || []) { const i = (s.thread || []).indexOf(t); if (i >= 0) s.thread.splice(i, 1); }
+      if (s.thread && !s.thread.length) delete s.thread;
+      prune(id);
+    }
+    for (const t of snap.vfeedback) { const i = local.vfeedback.indexOf(t); if (i >= 0) local.vfeedback.splice(i, 1); }
+  }
   async function send() {
     const { disabled } = sendState(); if (disabled) return;
-    const actions = buildActions();
-    const j = await post(actions);
-    if (j) { record(j, actions); local.staged = {}; local.vfeedback = []; confirmFinish = false; commit(); }
+    const snap = snapStaged(), actions = buildActions();
+    const j = await flight(actions);
+    if (j) { record(j, actions); dropSent(snap); confirmFinish = false; commit(); } else render();
   }
   // Finish is not staged: confirming ships everything staged plus the finish action in one event, right away.
   async function finishNow() {
     if (sendState(false).disabled || isFinishing()) return;
-    const actions = buildActions().concat([{ type: "finish" }]);
-    const j = await post(actions);
-    if (j) { record(j, actions); local.staged = {}; local.vfeedback = []; confirmFinish = false; commit(); }
+    const snap = snapStaged(), actions = buildActions().concat([{ type: "finish" }]);
+    const j = await flight(actions);
+    if (j) { record(j, actions); dropSent(snap); confirmFinish = false; commit(); } else render();
   }
   // Visualize is not staged either: the first click (and Regenerate) is a generate request, like Explore deeper.
   async function visualize() {
     if (sendState(false).disabled || isVisualizing()) return;
     const actions = [{ type: "visualize" }];
-    const j = await post(actions);
-    if (j) { record(j, actions); local.view = "visualize"; commit(); }
+    const j = await flight(actions);
+    if (j) { record(j, actions); local.view = "visualize"; commit(); } else render();
   }
   // Explore deeper skips staging: one click, one event, so the table is on its way at once.
   async function explore(id) {
     if (sendState(false).disabled || isExploring(id)) return;
     const actions = [{ q: id, type: "explore" }];
-    const j = await post(actions);
-    if (j) { record(j, actions); commit(); }
+    const j = await flight(actions);
+    if (j) { record(j, actions); commit(); } else render();
   }
 
   // ---- selection and view (the layout reveals; the core decides) ----
@@ -495,13 +593,21 @@
   // ---- this page's shortcuts (§7 table), on the current question ----
   let kb = null;
   const EXPLORE_UNDO_MS = 3000;
-  // `e`: a 3 s toast with Undo, then the same immediate send as the button.
+  // `e`: a 3 s toast with Undo, then the same immediate send as the button. One explore waits at a
+  // time: a second `e` replaces the first (its timer and toast). The gate is checked again when the
+  // timer fires, since the agent may have started working (or another send gone out) meanwhile.
+  let exploreTimer = null;
   function exploreSoon(id) {
-    const q = byId(id);
-    if (!q || !(q.options || []).length || locked() || isExploring(id) || sendState(false).disabled) return false;
-    let undone = false;
-    const timer = setTimeout(() => { if (!undone) { kb.hideToast(); explore(id); } }, EXPLORE_UNDO_MS);
-    kb.toast(`Exploring ${id.toUpperCase()}…`, { undo: () => { undone = true; clearTimeout(timer); }, ms: EXPLORE_UNDO_MS + 500 });
+    const can = () => { const q = byId(id); return !!q && !!(q.options || []).length && !locked() && !isExploring(id) && !sendState(false).disabled; };
+    if (!can()) return false;
+    clearTimeout(exploreTimer);
+    const timer = exploreTimer = setTimeout(() => {
+      if (exploreTimer !== timer) return;
+      exploreTimer = null; kb.hideToast();
+      if (can()) explore(id);
+      else kb.toast(`Explore ${String(id).toUpperCase()} was not sent: ${sendState(false).why || "the agent is busy"}`);
+    }, EXPLORE_UNDO_MS);
+    kb.toast(`Exploring ${String(id).toUpperCase()}…`, { undo: () => { if (exploreTimer === timer) { clearTimeout(timer); exploreTimer = null; } }, ms: EXPLORE_UNDO_MS + 500 });
     return true;
   }
   function sessionKey(k) {
@@ -569,6 +675,8 @@
     if (!d || typeof d !== "object") return;
     // a click in the visual means the pointer is there, whatever mouseleave the page missed
     if (typeof d.clicked === "string") { if (Q_ID.test(d.clicked) && byId(d.clicked)) { hoverId = null; select(d.clicked); } }
+    // keys only while the visual has focus (a key pressed there): a visual cannot send by itself
+    else if (document.activeElement !== f) return;
     else if (d.key === "send") send();
     else if (d.key === "escape") leaveVisual();
   }
@@ -588,10 +696,37 @@
     restHighlight();
   }
   function tick() { renderStatus(); renderSend(); }
+  // Focus survives a render. A layout keeps the textarea being typed in as the same element when
+  // its question did not change (IME composition and undo live on the element); anything else
+  // focused in the page (an option, a button, a link) that the render replaced gets focus back on
+  // its equivalent: same id, or same data-opt/-go/-rm/-rmf/-layout in the same region.
+  const FOCUS_ATTRS = ["data-opt", "data-go", "data-rm", "data-rmf", "data-layout"];
+  function focusSpot() {
+    const a = document.activeElement;
+    if (!a || a === document.body || !a.closest) return null;
+    const region = a.closest("main, aside, header, #banner, footer, #map-screen");
+    if (!region) return null;
+    const spot = { el: a, region: region.id ? "#" + region.id : region.tagName.toLowerCase() };
+    if (a.id) spot.id = a.id;
+    else { const at = FOCUS_ATTRS.find((x) => a.hasAttribute(x)); if (at) spot.sel = `[${at}="${CSS.escape(a.getAttribute(at))}"]`; }
+    if (a.tagName === "TEXTAREA") { spot.s = a.selectionStart; spot.e = a.selectionEnd; }
+    return spot;
+  }
+  function restoreFocus(spot) {
+    if (!spot || spot.el.isConnected) return; // still there: focus is where it was, or was moved on purpose
+    const now = document.activeElement; if (now && now !== document.body) return;
+    const ok = (el) => (el && el.isConnected && !el.matches(":disabled") && el.getClientRects().length ? el : null);
+    const t = ok(spot.id ? $(spot.id) : spot.sel ? document.querySelector(`${spot.region} ${spot.sel}`) : null)
+      || (spot.id === "finish" ? ok($("finish-yes")) : spot.id === "finish-yes" || spot.id === "finish-no" ? ok($("finish")) : null)
+      || (spot.region === "#main" ? ok($("card-title")) : null);
+    if (!t) return;
+    t.focus({ preventScroll: true });
+    if (spot.s != null && t.setSelectionRange) { try { t.setSelectionRange(spot.s, spot.e); } catch {} }
+  }
   function withInputs(fn) {
-    const act = document.activeElement; const keep = act && act.tagName === "TEXTAREA" && act.id ? { id: act.id, s: act.selectionStart, e: act.selectionEnd } : null;
+    const spot = focusSpot();
     fn();
-    if (keep) { const el = $(keep.id); if (el && el !== document.activeElement) { el.focus(); try { el.setSelectionRange(keep.s, keep.e); } catch {} } }
+    restoreFocus(spot);
   }
   // Every render replaces the discussion panel with a fresh element, and a fresh element starts
   // at scrollTop 0: a send, or the agent's reply landing, used to throw you back to the top of a
@@ -726,13 +861,13 @@
     const parts = Object.entries(local.staged).map(([id, s]) => {
       const bits = [];
       if (s.reopen) bits.push("reopen"); if (s.defer) bits.push("defer");
-      if (s.answer) bits.push(s.answer.option ? "→ " + s.answer.option : "→ text");
-      if (s.thread && s.thread.length) bits.push(`+${s.thread.length} msg`);
-      return `${esc(id).toUpperCase()} ${bits.join(" ")}`;
+      if (s.answer) bits.push(s.answer.option ? "→ " + esc(s.answer.option) : "→ text");
+      if (s.thread && s.thread.length) bits.push(`+${esc(s.thread.length)} msg`);
+      return `${esc(String(id).toUpperCase())} ${bits.join(" ")}`;
     });
     if (local.vfeedback.length) parts.push(`visual +${local.vfeedback.length} msg`);
     const lp = lastPending();
-    const sent = lp ? `<span class="sent"><span class="spin"></span>Sent #${lp.seq} · waiting for the agent</span>` : "";
+    const sent = lp ? `<span class="sent"><span class="spin"></span>Sent #${esc(lp.seq)} · waiting for the agent</span>` : "";
     list.innerHTML = locked() ? "This grill is finished." : n ? `<b>${n} staged</b> · ${parts.join(" · ")}${sent ? " · " + sent : ""}` : sent || "Nothing staged. Pick an option or write in the discussion.";
     const fa = $("finish-area");
     if (fa) {
@@ -754,7 +889,7 @@
     const b = $("send"); if (!b) return;
     const { disabled, why } = sendState(); const n = stagedCount();
     b.disabled = disabled; b.textContent = n ? `Send ${n} to Agent` : "Send to Agent";
-    setText("send-why", why);
+    setText("send-why", sendError || why);
   }
 
   // ---- mount ----
@@ -788,6 +923,10 @@
     kb = keys({ rows: SESSION_ROWS, handle: sessionKey, go: sessionGo, send, closeOverlays: closeTerms });
     on("keys-help", (e) => { e.preventDefault(); kb.openSheet(); });
     window.addEventListener("message", onFrameMessage);
+    // another tab on this session staged, sent or typed a draft (item: tabs never clobber staging)
+    window.addEventListener("storage", (e) => { if (e.key === storeKey || e.key === null) { adoptStored(); render(); } });
+    // back from the bfcache: staging may have moved on in another tab (the transport refetches state)
+    window.addEventListener("pageshow", (e) => { if (e.persisted) { adoptStored(); render(); } });
     { const f = frameEl(); if (f) { f.addEventListener("load", () => restHighlight(true)); f.addEventListener("mouseenter", () => hover(null)); } } // a (re)loaded visual starts unhighlighted
     setInterval(tick, 1000);
     render();

@@ -11,6 +11,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { envMs, isObj, rand, readJson, writeJson } from "./util.mjs";
 import { ClaimError, PatchError, QUEUED, applyMapPatch, claim, mapDirOf, mapEventsFile, mapFile, mapMetaFile, readMapMeta, release, validateMap } from "./maps.mjs";
+import { OPTION_KEY } from "./state.mjs";
 import { AGENT_RE, eventsFile, lastSeq, publicOwner, readMeta, sessionDirById, stateFile, takeSession, touchHeartbeat } from "./sessions.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -295,6 +296,11 @@ function addSessionRoutes(hub) {
       hub.checkSessionPost(req, dir);
       const body = await readJsonBody(req);
       if (!Array.isArray(body.actions) || body.actions.length === 0) throw httpError(400, "actions must be a non-empty array");
+      // Actions are user input the agent reads; reject malformed ones at the door.
+      for (const a of body.actions) {
+        if (!isObj(a) || typeof a.type !== "string") throw httpError(400, "each action must be an object with a string type");
+        if ("option" in a && !(typeof a.option === "string" && OPTION_KEY.test(a.option))) throw httpError(400, `bad option key ${JSON.stringify(a.option)}`);
+      }
       const seq = hub.appendSend(id, dir, body.actions);
       json(res, 200, { ok: true, seq });
     }],

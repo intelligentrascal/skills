@@ -107,6 +107,34 @@ try {
   check("SSE tabs' status carries no polling tooltip", !((await tabs[0].p.locator("header .status").getAttribute("title")) || ""));
   await ctx2.close();
 
+  // presence after a handoff reaches follower tabs too: a follower opened after the leader's
+  // hello never saw one, and must still tell the new hub it exists at once (not 20 s later)
+  const d = JSON.parse(run(env, ["new", "--topic", "Delta topic", "--doc", "docs/Delta.md", "--agent", "claude"], { cwd: proj }));
+  const ctx3 = await browser.newContext({ viewport: { width: 1200, height: 800 } });
+  const d1 = await ctx3.newPage(); watch(d1); await d1.goto(d.url); await d1.locator("#topic").waitFor();
+  await sleep(500); // d1 leads and has had its hello
+  const d2 = await ctx3.newPage(); watch(d2); await d2.goto(d.url); await d2.locator("#topic").waitFor();
+  const clients = async () => { try { return (await (await fetch(`http://127.0.0.1:${hubInfo(home).port}/s/${d.id}/clients`)).json()).count; } catch { return -1; } };
+  ok = false; try { await waitUntil(async () => (await clients()) === 2, 5000); ok = true; } catch {}
+  check("two tabs of a new session are both present", ok, String(await clients()));
+  const b3 = hubInfo(home);
+  const e3 = JSON.parse(run({ ...env, GRILL_VERSION_OVERRIDE: "sse-v3", GRILL_CODETIME_OVERRIDE: "3000" }, ["ensure"]));
+  check("second handoff: a new hub on the same port", e3.port === b3.port && e3.pid !== b3.pid, JSON.stringify(e3));
+  ok = false; try { await waitUntil(async () => (await clients()) === 2, 5000); ok = true; } catch {}
+  check("after a handoff the new hub counts the leader and the follower at once (presence on every hello)", ok, String(await clients()));
+  // deterministic: a hello relayed by the leader (as after a handoff) makes a follower ping presence
+  // at once, even though it never saw the previous hub's hello
+  const d3 = await ctx3.newPage(); watch(d3); await d3.goto(d.url); await d3.locator("#topic").waitFor();
+  const pings = []; d3.on("request", (r) => { if (r.url().includes("/presence?tab=")) pings.push(Date.now()); });
+  await sleep(300); pings.length = 0;
+  // the current hub's own identity: a follower that has seen no hello yet (or saw this one) must
+  // still ping, which is the handoff case for a tab that joined after the leader's hello
+  const health = await (await fetch(`http://127.0.0.1:${hubInfo(home).port}/health`)).json();
+  await d1.evaluate((h) => { const bc = new BroadcastChannel("grill-sse"); bc.postMessage({ ev: "hello", d: { pid: h.pid, started: h.started } }); bc.close(); }, health);
+  ok = false; try { await waitUntil(() => pings.length > 0, 1000); ok = true; } catch {}
+  check("a follower pings presence on every relayed hello", ok);
+  await ctx3.close();
+
   const real = errors.filter((e) => !/ERR_CONNECTION_REFUSED|ERR_FAILED|EventSource/.test(e));
   check("no page errors", real.length === 0, real.join(" | "));
 } catch (e) {

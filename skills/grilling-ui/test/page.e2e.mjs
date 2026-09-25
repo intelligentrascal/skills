@@ -423,6 +423,128 @@ try {
   await page.locator("#layouts a", { hasText: "Studio" }).click();
   await page.waitForURL(/\/studio$/, { timeout: 5000 }).catch(() => {});
   check("the switch navigates and records the choice", page.url() === url + "studio" && (await page.evaluate(() => localStorage.getItem("grill:layout"))) === "studio");
+
+  // ---- review fixes: escaping, two tabs on one session, sends, typing across renders, bfcache ----
+  // A fresh session in its own browser profile. state.json is written directly (the hub serves it
+  // as is), so an option key the patch validation would reject still reaches the page.
+  const r2 = JSON.parse(run(env, ["new", "--topic", "Robust topic", "--doc", "docs/robust.md", "--agent", "claude"], { cwd: proj }));
+  const rFile = join(r2.session, "state.json");
+  const rBase = JSON.parse(readFileSync(rFile, "utf8"));
+  const EVIL = "<img src=x onerror=window.__xss=1>";
+  const rState = (handled, extra = {}) => ({
+    ...rBase, agent: { status: "waiting", since: new Date().toISOString(), handled },
+    questions: [
+      { id: "q1", round: 1, deps: [], title: "Evil keys", body: "b", options: [{ k: EVIL, text: "evil" }, { k: "B", text: "b" }], rec: { option: "B", why: "w" }, status: "open", thread: [] },
+      { id: "q2", round: 1, deps: [], title: "Second", body: "b", options: [{ k: "A", text: "a" }, { k: "B", text: "b" }], rec: { option: "A", why: "w" }, status: "open", thread: [] },
+      { id: "q3", round: 1, deps: [], title: "Third", body: "b", options: [{ k: "A", text: "a" }, { k: "B", text: "b" }], rec: { option: "A", why: "w" }, status: "open", thread: [] },
+    ],
+    ...extra,
+  });
+  const writeR = (handled, extra) => atomic(rFile, JSON.stringify(rState(handled, extra), null, 2));
+  writeR(0);
+  const rEvents = () => { try { return readFileSync(join(r2.session, "events.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; } };
+  const rSend = async (seq) => { try { await waitUntil(() => rEvents().some((e) => e.seq === seq), 6000); } catch { return { actions: [] }; } return rEvents().find((e) => e.seq === seq); };
+  const rUrl = r2.url + "inbox";
+  const ctx3 = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const ta = await ctx3.newPage(), tb = await ctx3.newPage();
+  let posts = 0;
+  for (const p of [ta, tb]) p.on("request", (r) => { if (r.method() === "POST" && r.url().endsWith("/send")) posts++; });
+  const stagedIds = (p) => p.evaluate(() => Object.keys(window.Grill.local.staged).sort().join(","));
+  const handleR = async (n) => { writeR(n); await ta.waitForFunction((k) => document.getElementById("agent-status").textContent.includes(`handled #${k}`), n, { timeout: 5000 }); };
+  await ta.goto(rUrl); await ta.locator(".opt").first().waitFor();
+
+  // 1. an option key is escaped everywhere, the footer's staged list included
+  await ta.locator(".opt").first().click();
+  await sleep(200);
+  check("an option key with markup is shown as text in the footer, never run", !(await ta.evaluate(() => window.__xss === 1)) && await ta.locator("#staged-list img").count() === 0 && (await ta.locator("#staged-list").textContent()).includes("<img"));
+  await ta.evaluate(() => window.Grill.clearStaged("q1"));
+
+  // 2. two tabs on one session: each tab's staging survives the other's saves; a send in one tab
+  //    drops the sent items in the other
+  await tb.goto(rUrl); await tb.locator(".opt").first().waitFor();
+  await ta.evaluate(() => window.Grill.select("q2")); await ta.locator(".opt[data-opt='A']").click();
+  await tb.evaluate(() => window.Grill.select("q3")); await tb.locator(".opt[data-opt='B']").click();
+  await tb.locator("#thread-in").fill("draft in tab B"); // a draft save must not drop tab A's q2
+  await sleep(200);
+  check("two tabs: tab B's staging and draft saves keep tab A's staging", (await stagedIds(ta)) === "q2,q3" && (await stagedIds(tb)) === "q2,q3", `${await stagedIds(ta)} | ${await stagedIds(tb)}`);
+  await ta.reload(); await ta.locator(".opt").first().waitFor();
+  check("two tabs: after a reload both tabs' staging is there", (await stagedIds(ta)) === "q2,q3" && (await ta.locator("#send").textContent()) === "Send 2 to Agent");
+  await ta.locator("#send").click();
+  const two = await rSend(1);
+  check("two tabs: one Send ships both tabs' staging", two.actions.length === 2, JSON.stringify(two.actions));
+  let dropped = false; try { await waitUntil(async () => (await stagedIds(tb)) === "" && (await tb.locator("#staged-list").textContent()).includes("Sent #1"), 3000); dropped = true; } catch {}
+  check("two tabs: the other tab drops the sent items and shows the send as pending", dropped, `${await stagedIds(tb)} | ${await tb.locator("#staged-list").textContent()}`);
+  await tb.reload(); await tb.locator(".opt").first().waitFor(); await tb.evaluate(() => window.Grill.select("q3"));
+  check("two tabs: sent items are not resurrected by the other tab's later saves", (await stagedIds(tb)) === "" && (await tb.locator("#thread-in").inputValue()) === "draft in tab B");
+  await handleR(1);
+
+  // 4. a double submit sends once, and Send shows disabled at once
+  await ta.evaluate(() => window.Grill.select("q2")); await ta.locator(".opt[data-opt='B']").click();
+  posts = 0;
+  const disabledAtOnce = await ta.evaluate(() => { window.Grill.send(); const d = document.getElementById("send").disabled; window.Grill.send(); return d; });
+  await rSend(2); await sleep(500);
+  check("two rapid sends make one POST", posts === 1 && rEvents().length === 2, `${posts} POSTs`);
+  check("Send is disabled as soon as the POST starts", disabledAtOnce);
+  await handleR(2);
+
+  // 5. staging made while a send is in flight is kept; only what was sent is dropped
+  await ta.route("**/send", async (r) => { await sleep(800); await r.continue(); });
+  await ta.evaluate(() => window.Grill.select("q2")); await ta.locator(".opt[data-opt='A']").click();
+  await ta.evaluate(() => { window.__sendP = window.Grill.send(); });
+  await sleep(200);
+  await ta.evaluate(() => { window.Grill.stageAnswer("q3", { kind: "option", option: "B" }); window.Grill.stageThread("q2", "said while sending"); });
+  await ta.evaluate(() => window.__sendP);
+  const mid = await rSend(3);
+  const kept = await ta.evaluate(() => window.Grill.local.staged);
+  check("a send in flight ships only what was staged when it started", mid.actions.length === 1 && mid.actions[0].q === "q2" && mid.actions[0].option === "A", JSON.stringify(mid.actions));
+  check("staging made during the send is kept after it lands", kept.q3?.answer?.option === "B" && !kept.q2?.answer && kept.q2?.thread?.[0] === "said while sending", JSON.stringify(kept));
+  await ta.unroute("**/send");
+  await ta.evaluate(() => { window.Grill.clearStaged("q3"); window.Grill.removeThread("q2", 0); });
+  await handleR(3);
+
+  // 3. a failed send says so until the next successful send or staging change
+  await ta.route("**/send", (r) => r.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ error: "session token required" }) }));
+  await ta.evaluate(() => window.Grill.select("q2")); await ta.locator(".opt[data-opt='A']").click();
+  await ta.locator("#send").click();
+  await sleep(1600); // the 1 s tick re-renders the send area
+  check("a 401 send failure stays on screen across ticks", (await ta.locator("#send-why").textContent()) === "Send failed: session token required", await ta.locator("#send-why").textContent());
+  await ta.unroute("**/send");
+  await ta.route("**/send", (r) => r.fulfill({ status: 500, body: "boom" }));
+  await ta.locator("#send").click();
+  await sleep(1300);
+  check("a 500 send failure stays on screen too", (await ta.locator("#send-why").textContent()) === "Send failed: 500", await ta.locator("#send-why").textContent());
+  await ta.locator(".opt[data-opt='B']").click();
+  check("a staging change clears the failure", (await ta.locator("#send-why").textContent()) === "");
+  await ta.unroute("**/send");
+  await ta.locator("#send").click();
+  await rSend(4);
+  await ta.waitForFunction(() => document.getElementById("staged-list").textContent.includes("Sent #4"), null, { timeout: 5000 }).catch(() => {});
+  check("the send goes through once the hub accepts it", (await ta.locator("#send-why").textContent()) === "" && (await ta.locator("#staged-list").textContent()).includes("Sent #4"), `${await ta.locator("#send-why").textContent()} | ${await ta.locator("#staged-list").textContent()} | ${JSON.stringify(rEvents().map((e) => e.seq))}`);
+  await handleR(4);
+
+  // 10. a render does not rebuild the textarea being typed in (IME composition, undo, caret)
+  await ta.evaluate(() => window.Grill.select("q3"));
+  await ta.locator("#thread-in").fill(""); await ta.keyboard.type("half a thought");
+  await ta.evaluate(() => { window.__ta = document.getElementById("thread-in"); });
+  writeR(4, { topic: "Robust topic 2" });
+  await ta.waitForFunction(() => document.getElementById("topic").textContent === "Robust topic 2", null, { timeout: 5000 });
+  check("a state patch keeps the discussion textarea being typed in (same element, focus, value)", await ta.evaluate(() => document.getElementById("thread-in") === window.__ta && document.activeElement === window.__ta && window.__ta.value === "half a thought"), await ta.evaluate(() => JSON.stringify([document.getElementById("thread-in") === window.__ta, document.activeElement && (document.activeElement.id || document.activeElement.tagName), window.__ta.value, window.__ta.isConnected])));
+  await ta.locator("#free").fill(""); await ta.keyboard.type("free words");
+  await ta.evaluate(() => { window.__fr = document.getElementById("free"); });
+  writeR(4, { topic: "Robust topic 3" });
+  await ta.waitForFunction(() => document.getElementById("topic").textContent === "Robust topic 3", null, { timeout: 5000 });
+  check("…and the free-text answer the same way", await ta.evaluate(() => document.getElementById("free") === window.__fr && document.activeElement === window.__fr && window.__fr.value === "free words"));
+  await ta.locator("#stage-thread").click();
+  check("staging the kept textarea's text still empties it", (await ta.locator("#thread-in").inputValue()) === "" && await ta.locator("aside .msg.staged").count() === 1);
+  await ta.evaluate(() => window.Grill.select("q2"));
+  check("another question gets its own (empty) composer", (await ta.locator("#thread-in").inputValue()) === "");
+
+  // 9. back from the bfcache: the page refetches state
+  let fetched = 0; ta.on("request", (r) => { if (r.url().endsWith("/state")) fetched++; });
+  await ta.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })));
+  try { await waitUntil(() => fetched > 0, 3000); } catch {}
+  check("pageshow from the bfcache refetches the state", fetched > 0);
+  await ctx3.close();
 } catch (e) {
   check("run finished without an exception", false, String(e && e.stack || e));
 } finally {

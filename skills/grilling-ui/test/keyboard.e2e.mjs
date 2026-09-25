@@ -68,6 +68,7 @@ try {
   await page.goto(url);
   await page.locator(".item").first().waitFor();
   await page.locator("h1").click(); // focus on the page, not in a field
+  check("the toast's live region exists (empty, role=status) before the first toast", await page.evaluate(() => { const t = document.getElementById("grill-toast"); return !!t && t.getAttribute("role") === "status" && t.getAttribute("aria-live") === "polite" && t.textContent === "" && !t.classList.contains("show"); }));
 
   // j / k
   check("starts on the first open question", (await sel()) === "Q3");
@@ -287,6 +288,74 @@ ${listener}
   await page.locator(".item", { hasText: "Q2" }).hover();
   await page.locator(".card").hover();
   check("hovering the card outlines the card's question (Q3)", await hlSoon("#r3", true) && !(await hl("#r2")));
+
+  // ---- review fixes ----
+  await page.locator("h1").click();
+  if (await page.locator("body.visualize").count()) await press("v");
+  await page.evaluate(() => window.Grill.select("q3")); await page.locator("h1").click();
+  if ((await staged()).q3) await press("u");
+  // g then a key that is not a destination: the key acts as it would have
+  await press("g"); await press("j");
+  check("g then j: the j is not swallowed", (await sel()) === "Q4");
+  await press("k");
+  // ⌘↵ auto-repeat does not send again
+  await press("1");
+  let n0 = events().length;
+  await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, repeat: true, bubbles: true, cancelable: true })));
+  await sleep(600);
+  check("an auto-repeated Ctrl↵ does not send", events().length === n0);
+  await press("u");
+
+  // e twice: one explore waits at a time
+  n0 = events().length;
+  await press("e"); await sleep(300); await press("e");
+  check("a second e keeps one toast", await page.locator("#grill-toast.show").count() === 1 && (await page.locator("#grill-toast").textContent()).includes("Exploring Q3…"));
+  await sleep(3800);
+  const exs = events().slice(n0);
+  check("pressing e twice sends one explore", exs.length === 1 && exs[0].actions[0].type === "explore", JSON.stringify(exs.map((e) => e.actions)));
+  await handleAll();
+  // the gate is checked again when the timer fires
+  n0 = events().length;
+  await press("e");
+  st.agent = { status: "working", since: new Date().toISOString(), handled: n0 }; writeState();
+  await page.waitForFunction(() => document.getElementById("agent-status").textContent.includes("Agent working"), null, { timeout: 5000 });
+  await sleep(3300);
+  check("an explore whose gate closed during the undo window is not sent, and says so", events().length === n0 && (await page.locator("#grill-toast").textContent()).includes("was not sent"), await page.locator("#grill-toast").textContent());
+  await handleAll();
+
+  // a visual that posts {key:"send"} / {key:"escape"} by itself (not while focused) does nothing
+  await press("1");
+  n0 = events().length;
+  writeFileSync(join(session, "visual.html"), `<!doctype html><title>pushy</title><h1 id="vh">Pushy visual</h1><script>
+const go = () => { parent.postMessage({ key: "send" }, "*"); parent.postMessage({ key: "escape" }, "*"); };
+go(); setTimeout(go, 300); setTimeout(go, 700);
+</script>`);
+  st.visual = { kind: "prototype", version: 3, at: new Date().toISOString(), note: "v3 pushy", thread: [], stale: false }; writeState();
+  await page.waitForFunction(() => (document.getElementById("visual-frame").getAttribute("src") || "").includes("v=3"), null, { timeout: 5000 });
+  if (!(await page.locator("body.visualize").count())) { await page.locator("h1").click(); await press("v"); }
+  await page.frameLocator("#visual-frame").locator("#vh").waitFor();
+  await sleep(1200);
+  check("a visual cannot send by posting {key:'send'} while it does not have focus", events().length === n0, JSON.stringify(events().slice(n0).map((e) => e.actions)));
+  await page.locator("h1").click(); await press("v");
+  await press("u");
+
+  // options are keyboard radios: Tab-reachable, Enter/Space stage, focus survives the render
+  const opt = (k) => page.locator(`.opt[data-opt='${k}']`);
+  check("options are radios in a radiogroup, reachable with Tab", (await opt("A").getAttribute("role")) === "radio" && (await opt("A").getAttribute("tabindex")) === "0" && (await page.locator(".opts").getAttribute("role")) === "radiogroup");
+  await opt("A").focus();
+  await press("Enter");
+  const focusedOpt = () => page.evaluate(() => { const a = document.activeElement; return a && a.classList.contains("opt") ? a.dataset.opt : a ? a.id || a.tagName : ""; });
+  check("Enter on a focused option stages it, and focus stays on it after the render", (await staged()).q3?.answer?.option === "A" && (await focusedOpt()) === "A" && (await opt("A").getAttribute("aria-checked")) === "true");
+  await page.keyboard.press("Tab"); await sleep(30);
+  await press(" ");
+  check("Tab then Space stages the next option", (await staged()).q3?.answer?.option === "B" && (await focusedOpt()) === "B");
+  check("keyboard focus shows a ring", await page.evaluate(() => { const a = document.activeElement; return a.matches(":focus-visible") && getComputedStyle(a).outlineStyle === "solid"; }));
+  st.note = "A note that re-renders the page."; writeState();
+  await page.waitForFunction(() => !!document.querySelector("nav .note"), null, { timeout: 5000 });
+  check("focus on an option survives a state patch's render", (await focusedOpt()) === "B");
+  await opt("A").click();
+  check("a mouse click shows no focus ring (Jason's look)", await page.evaluate(() => { const a = document.activeElement; return !!a && a.dataset.opt === "A" && !a.matches(":focus-visible") && getComputedStyle(a).outlineStyle === "none"; }));
+  await page.locator("h1").click(); await press("u");
 
   const real = errors.filter((e) => !e.includes("404"));
   check("no console errors", real.length === 0, real.join(" | "));

@@ -240,6 +240,12 @@ test("patch: every field the page renders must have the shape the render reads, 
   rejected(T, { questions: [{ id: "q1", rec: { text: 5, why: "w" } }] }, /q1\.rec\.text/);
   rejected(T, { questions: [{ id: "q1", status: "answered", answer: { kind: "option", option: 2 } }] }, /q1\.answer\.option/);
   rejected(T, { questions: [{ id: "q1", status: "answered", answer: { kind: "text", text: boom } }] }, /q1\.answer\.text/);
+  // option keys are short labels: anything else (markup, long text, spaces) is rejected with a clear error
+  for (const k of ["<img src=x onerror=alert(1)>", "", "ABCDE", "A B", "é", "A\"", "a-1"]) {
+    rejected(T, { questions: [{ id: "q1", options: [{ k, text: "t" }] }] }, /q1\.options\[0\]\.k must be 1-4 letters or digits/);
+    rejected(T, { questions: [{ id: "q1", status: "answered", answer: { kind: "option", option: k } }] }, /q1\.answer\.option must be 1-4 letters or digits/);
+  }
+  assert.doesNotThrow(() => applied(T, { questions: [{ id: "q1", options: [{ k: "A", text: "a" }, { k: "b2", text: "b" }, { k: "1234", text: "c" }], status: "answered", answer: { kind: "option", option: "1234" } }] }));
   rejected(T, { visual: { note: boom } }, /visual\.note/);
   rejected(T, { visual: { version: 2, at: 5 } }, /visual\.at/);
   rejected(T, { visual: { drawing: { since: boom, seq: 2 } } }, /visual\.drawing/);

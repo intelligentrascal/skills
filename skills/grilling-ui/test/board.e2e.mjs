@@ -104,8 +104,9 @@ try {
 
   // ---- Refresh ----
   const before = events().length;
-  await page.locator("#refresh").click();
+  await page.evaluate(() => { const r = document.getElementById("refresh"); r.click(); r.click(); }); // a double click
   check("Refresh appends a refresh event", await until(() => document.getElementById("refresh").textContent === "Refresh requested") && events().slice(before).some((e) => e.type === "refresh"), JSON.stringify(events()));
+  check("a double click on Refresh sends one request", events().slice(before).filter((e) => e.type === "refresh").length === 1, JSON.stringify(events().slice(before)));
   const refreshSeq = events().filter((e) => e.type === "refresh").pop().seq;
   check("\"refresh requested\" shows until the next map update", (await page.locator("#queue").textContent()).includes("Refresh requested") && await page.locator("#refresh").isDisabled());
   await mapPatch({ handled: refreshSeq, notes: "Re-read the tracker." });
@@ -151,9 +152,16 @@ try {
   // ---- a claim while no agent listens stays queued ----
   writeMapFile({ ...readMap(), listener: { agentId: "watcher-1", heartbeat: new Date(Date.now() - 600 * 1000).toISOString() } });
   check("stale listener → no agent listening", await until(() => document.getElementById("listener").textContent === "no agent listening: requests queue"));
-  await cardOf(T.b).locator("button.work").click();
+  await cardOf(T.b).locator(".chip").click(); // select it, then `w` twice quickly
+  await page.keyboard.press("w"); await page.keyboard.press("w");
   check("Work with nobody listening → queued, and the footer says it waits", await until((t) => { const c = [...document.querySelectorAll('#board .col[data-col="progress"] .tk')].find((e) => e.querySelector(".t").textContent.trim() === t); return !!c && /queued · waits for an agent/.test(c.textContent); }, T.b) && /no agent is listening/.test(await page.locator("#queue").textContent()));
   check("its hub claim is \"queued\"", readMap().tickets.find((t) => t.title === T.b).hubClaim.agentId === "queued");
+  await sleep(300);
+  check("w twice while the claim is in flight sends one work request", events().filter((e) => e.type === "work" && e.ticket === T.b).length === 1, JSON.stringify(events().filter((e) => e.type === "work")));
+  const mapFetches = requests.length;
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })));
+  await sleep(500);
+  check("pageshow from the bfcache refetches the map", requests.slice(mapFetches).some((u) => u.endsWith(`/m/${KEY}/map`)), JSON.stringify(requests.slice(mapFetches)));
   if (shots) await page.screenshot({ path: join(shots, "board-1440-claims.png"), fullPage: true });
 
   // ---- ? cheatsheet, ?from= and g i ----
