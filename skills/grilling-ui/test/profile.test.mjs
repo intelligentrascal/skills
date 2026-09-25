@@ -206,3 +206,70 @@ test("printed commands quote paths for POSIX shells ($, backtick, double and sin
     assert.equal(words[words.indexOf("--agent-id") + 1], "a b'c", a);
   }
 });
+
+// ---- board watcher: agent-profile --map (plan T35; spec §4a Board watcher, §5b Listening) ----
+const MAPCTX = { skill: SKILL, map: "skills-1a2b3c4d/42", mapTitle: "Board redesign", project: "skills", agentId: "b0a4d1e2f3a4", handled: 3 };
+
+test("map: claude Monitor on watch --map, description board: <project> · <map title> (snapshot)", () => {
+  const p = profile("claude", { ...MAPCTX, env: {} });
+  assert.equal(p.mode, "monitor");
+  assert.deepEqual(p.listen, {
+    tool: "Monitor",
+    params: {
+      command: "node '/opt/skills/grilling-ui/hub.mjs' watch --map skills-1a2b3c4d/42 --after 3 --agent-id b0a4d1e2f3a4",
+      description: "board: skills · Board redesign",
+      timeout_ms: 1800000,
+    },
+  });
+  assert.match(p.repeat, /map event rule/); assert.match(p.repeat, /agent-profile --map/);
+  assert.doesNotMatch(p.repeat, /taken/, "a map listener is never taken: the latest watcher wins");
+  assert.equal(profile("claude", { ...MAPCTX, env: { GRILL_MONITOR_MS: "60000" } }).listen.params.timeout_ms, 60000);
+});
+
+test("map: wait agents get wait --map with the same tools and timeouts as sessions", () => {
+  const cmd = (a, secs) => `node '/opt/skills/grilling-ui/hub.mjs' wait --map skills-1a2b3c4d/42 --after 3 --timeout ${secs} --agent-id b0a4d1e2f3a4`;
+  const codex = profile("codex", MAPCTX);
+  assert.deepEqual(codex.listen.params, { cmd: cmd("codex", 280), yield_time_ms: 30000 });
+  assert.equal(codex.listen.poll.tool, "write_stdin");
+  assert.deepEqual(profile("opencode", { ...MAPCTX, env: {} }).listen, { tool: "bash", params: { command: cmd("opencode", 540), timeout: 600000 } });
+  assert.deepEqual(profile("pi", MAPCTX).listen, { tool: "bash", params: { command: cmd("pi", 900) } });
+  assert.deepEqual(profile("unknown", MAPCTX).listen, { tool: "shell", params: { command: cmd("unknown", 480) } });
+  for (const a of ["codex", "opencode", "pi", "unknown"]) {
+    const r = profile(a, { ...MAPCTX, env: {} }).repeat;
+    assert.match(r, /map event rule/, a); assert.match(r, /Exit 3/, a); assert.match(r, /Exit 1 or 2: report the error line to the user; do not loop/, a);
+    assert.doesNotMatch(r, /patch agent\.handled/, a);
+  }
+});
+
+test("map: full shape, placeholders when title or project are unknown", () => {
+  for (const a of AGENTS) {
+    const p = profile(a, MAPCTX);
+    assert.deepEqual(Object.keys(p).sort(), ["agent", "draw", "listen", "loadSkill", "mode", "notes", "repeat", "research"]);
+  }
+  const p = profile("claude", { skill: SKILL, map: "skills-1a2b3c4d/42", env: {} });
+  assert.equal(p.listen.params.command, "node '/opt/skills/grilling-ui/hub.mjs' watch --map skills-1a2b3c4d/42 --after <handled> --agent-id <agentId>");
+  assert.equal(p.listen.params.description, "board: <project> · <map title>");
+});
+
+test("CLI: agent-profile --map reads handled and title from map.json; --agent-id or a fresh agentId", () => {
+  const home = tmp("grill-prof-home-");
+  const dir = join(home, "maps", "my-app-0a1b2c3d", "42"); mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "meta.json"), JSON.stringify({ token: "t" }));
+  writeFileSync(join(dir, "map.json"), JSON.stringify({ title: "Checkout rewrite", handled: 5, tickets: [] }));
+  const env = (extra) => clean({ GRILL_HOME: home, ...extra });
+  const p = JSON.parse(run(env(ENV.claude), ["agent-profile", "--map", "my-app-0a1b2c3d/42", "--agent-id", "b0a4d1e2f3a4"]));
+  assert.equal(p.listen.params.command, `node '${dirname(HUB)}/hub.mjs' watch --map my-app-0a1b2c3d/42 --after 5 --agent-id b0a4d1e2f3a4`);
+  assert.equal(p.listen.params.description, "board: my-app · Checkout rewrite");
+  assert.equal(p.agentId, "b0a4d1e2f3a4");
+  // no --agent-id: a fresh board agentId is minted, printed, and used in the command
+  const q = JSON.parse(run(env(ENV.pi), ["agent-profile", "--map", "my-app-0a1b2c3d/42"]));
+  assert.match(q.agentId, /^[0-9a-f]{12}$/);
+  assert.match(q.listen.params.command, new RegExp(`wait --map my-app-0a1b2c3d/42 --after 5 --timeout 900 --agent-id ${q.agentId}$`));
+  // handled defaults to 0
+  writeFileSync(join(dir, "map.json"), JSON.stringify({ title: "Checkout rewrite" }));
+  assert.match(JSON.parse(run(env(ENV.pi), ["agent-profile", "--map", "my-app-0a1b2c3d/42", "--agent-id", "x1"])).listen.params.command, /--after 0 --timeout 900/);
+  // errors: no such map, both --map and --session, a bad key
+  assert.throws(() => run(env({}), ["agent-profile", "--map", "my-app-0a1b2c3d/nope"], { stdio: "pipe" }), /no such map/);
+  assert.throws(() => run(env({}), ["agent-profile", "--map", "my-app-0a1b2c3d/42", "--session", dir], { stdio: "pipe" }), /either --session or --map/);
+  assert.throws(() => run(env({}), ["agent-profile", "--map", "a/b/c"], { stdio: "pipe" }), /bad map key/);
+});

@@ -16,9 +16,10 @@ const USAGE = `usage: hub.mjs <command> [options]
   open (--session DIR [--ui L] | --map KEY)
   watch (--session DIR | --map KEY) --after N --agent-id ID
   wait  (--session DIR | --map KEY) --after N --timeout S --agent-id ID
+  map --map KEY                                      print map.json (tickets with hubClaim, listener, handled)
   map-patch --map KEY [--agent-id ID] [--file P]
   claim --map KEY --ticket TITLE --agent-id ID [--release]
-  agent-profile [--agent A] [--session DIR] [--agent-id ID]`;
+  agent-profile [--agent A] [--session DIR | --map KEY] [--agent-id ID]`;
 
 // Each command is loaded lazily so a short CLI call imports only what it needs.
 const cmds = {
@@ -31,6 +32,7 @@ const cmds = {
   pending: async (o) => (await import("./lib/sessions.mjs")).cmdPending(o),
   watch: async (o) => (await import("./lib/events.mjs")).cmdWatch(o),
   wait: async (o) => (await import("./lib/events.mjs")).cmdWait(o),
+  map: async (o) => (await import("./lib/maps.mjs")).cmdMapShow(o),
   "map-patch": async (o) => (await import("./lib/maps.mjs")).cmdMapPatch(o),
   claim: async (o) => (await import("./lib/maps.mjs")).cmdClaim(o),
   url: async (o) => (await import("./lib/open.mjs")).cmdUrl(o),

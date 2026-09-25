@@ -322,7 +322,9 @@ The end-of-grill Map screen uses the same data and always shows
 
 ### Resource budget
 
-One hub at about 40 MB RSS total, whatever the number of grills. One small `watch` process
+One hub, whatever the number of grills: about 79 MB RSS with 5 sessions, a board and 8 SSE
+readers on Node 26 arm64 (spawned with `--max-semi-space-size=1`; `node:http` alone is about
+19 MB). The concurrency test's budget is 96 MB. One small `watch` process
 per active Claude Code grill. Idle tabs cost nothing.
 
 ## 5b. Multi-agent support: Claude Code, Codex, OpenCode, Pi
@@ -609,7 +611,7 @@ If the subagent forgets the tags, linking silently does nothing.
   - the Map screen, and the board (render, Refresh, Work → claimed);
   - one flow per built layout.
 - **Concurrency:** 5 sessions and 1 board across 2 fake projects on one hub. Check sends
-  land in the right `events.jsonl` and RSS stays under 80 MB.
+  land in the right `events.jsonl` and RSS stays under 96 MB.
 - **Manual:**
   - a `watch` Monitor event wakes an idle Claude Code turn, and a Monitor expiry notice
     does too;

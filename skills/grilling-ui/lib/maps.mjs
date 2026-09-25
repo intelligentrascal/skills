@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { die, isObj, oneLine, print, rand, readJson } from "./util.mjs";
-import { projectKey } from "./home.mjs";
+import { grillHome, projectKey } from "./home.mjs";
 import { PatchError, bad, clean, fieldsOf, mergeOne } from "./state.mjs";
 
 const TYPES = ["research", "prototype", "grilling", "task"];
@@ -220,6 +220,18 @@ export function ensureMapDir(home, key) {
   }
   fs.closeSync(fs.openSync(mapEventsFile(dir), "a"));
   return dir;
+}
+
+// ---- CLI: map --map KEY|SLUG ----
+// Prints the hub's map.json (with hubClaim, listener, handled) as one JSON line, read from disk,
+// so skills need no curl. Exit codes: 0 ok; 2 bad key; 4 no such map.
+export async function cmdMapShow(o) {
+  if (!o.map || o.map === true) die("--map <slug|projectKey/slug> is required");
+  let key;
+  try { key = mapKeyOf(o.map); } catch (e) { die(e.message); }
+  const m = readJson(mapFile(mapDirOf(grillHome(), key)));
+  if (!isObj(m)) die(`no map ${key}; run map-patch first`, 4);
+  print(m);
 }
 
 // ---- CLI: map-patch --map KEY|SLUG [--agent-id ID] [--file P] ----

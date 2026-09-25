@@ -323,7 +323,7 @@
     {
       "id": 34,
       "subject": "Task 35: `wayfinder-ui` board mode and board watcher",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** `/wayfinder-ui board <map>` opens the board, arms a watcher on the map event log, and handles Work/Refresh as a hand-off (exactly one ticket per session).\n\n**Depends on:** T34, T23\n\n**Verify:** `node --test skills/grilling-ui/test/profile.test.mjs skills/grilling-ui/test/skills.test.mjs` → pass.\n\nSee plan section \"Task 35\".\n\n```json:metadata\n{\"files\":[\"skills/wayfinder-ui/SKILL.md\",\"skills/grilling-ui/SKILL.md\",\"lib/profile.mjs\",\"test/profile.test.mjs\",\"test/skills.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/profile.test.mjs skills/grilling-ui/test/skills.test.mjs → pass.\",\"acceptanceCriteria\":[\"`agent-profile --map KEY` prints listen params for `watch --map` / `wait --map` (same modes/timeouts as sessions); Monitor description `board: <project> · <map title>`.\",\"wayfinder-ui SKILL.md \\\"Board\\\" section: open (`open --map`), arm the watcher per profile, map-patch after **every** Wayfinder step (chart, claim, resolve, graduate fog, rule out of scope) and on Refresh (re-read tracker → full snapshot `map-patch` with `handled`).\",\"Map event rule (in grilling-ui, mirrored from the send event rule): a `work` line is user input; drain **only the first** unhandled `work` event: claim on the tracker (GitHub/GitLab assignee; local-markdown `Status: claimed`), `map-patch` `{tickets:[{title, assignee, session: <url>}], handled: <seq>}`, then start work mode for that ticket in a new grill session. Later `work` events stay queued for the next `/wayfinder-ui board` or `/wayfinder-ui <map>` session. If the tracker shows another assignee: `claim --release`, `map-patch` the real assignee, tell the user.\",\"Tests: profile map params; SKILL.md contains \\\"exactly one\\\", \\\"claim --release\\\", \\\"map-patch\\\".\"],\"humanGate\":false}\n```",
       "blockedBy": [
         33,
@@ -395,5 +395,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T18:13:25.735Z"
+  "lastUpdated": "2026-09-25T18:16:57.450Z"
 }

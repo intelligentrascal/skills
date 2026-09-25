@@ -192,6 +192,50 @@ test("wayfinder-ui: chart mode, finish, work mode and hub commands", () => {
   assert.match(text, /No design doc in either mode/);
 });
 
+// ---- board mode and the map event rule (T35; spec §4a Board watcher, Work hand-off, Concurrency) ----
+// The text of one `## ` (or `### `) section, heading included, up to the next heading of that level or higher.
+function section(text, heading) {
+  const i = text.indexOf(heading);
+  assert.ok(i >= 0, `has the section ${heading}`);
+  const level = /^#+/.exec(heading)[0].length;
+  const next = new RegExp(`^#{1,${level}} `, "m").exec(text.slice(i + heading.length));
+  return text.slice(i, next ? i + heading.length + next.index : undefined);
+}
+
+test("grilling-ui: Board events rule sits inside The event rule and covers work, refresh, queueing and conflicts", () => {
+  const text = read("grilling-ui");
+  const rule = section(text, "## The event rule");
+  const s = section(rule, "### Board events");
+  for (const w of ["user input", "**exactly one**", "stay queued", "/wayfinder-ui board", "/wayfinder-ui <map>",
+    '{"type":"work"', '{"type":"refresh"', '"handled": <seq>', '"session": "<url>"', "canonical", "<boardAgentId>", "TaskStop", "wayfinder-ui **Work mode**"]) assert.ok(s.includes(w), `mentions ${w}`);
+  assert.match(s, /node "\$SKILL\/hub\.mjs" claim --map <mapKey> --ticket "<ticket>" --agent-id <boardAgentId>/);
+  assert.match(s, /node "\$SKILL\/hub\.mjs" claim --release --map <mapKey> --ticket "<ticket>" --agent-id <boardAgentId>/);
+  assert.match(s, /node "\$SKILL\/hub\.mjs" map-patch --map <mapKey> --agent-id <boardAgentId> <<'MAP_PATCH'/);
+  // the hand-off order: hub claim → tracker claim → stop the watcher → new session → map-patch with the session link
+  const at = (w) => { const i = s.indexOf(w); assert.ok(i >= 0, w); return i; };
+  const order = [at("claim --map <mapKey>"), at("on the tracker"), at("Stop the board watcher"), at("**Start** step 1"), at('"session": "<url>"')];
+  for (let i = 1; i < order.length; i++) assert.ok(order[i - 1] < order[i], `hand-off step ${i + 1} follows step ${i}`);
+});
+
+test("wayfinder-ui: Board mode replaces the hook: profile --map, watcher, open, one ticket", () => {
+  const text = read("wayfinder-ui");
+  assert.doesNotMatch(text, /HOOK|Not built yet|board mode is coming/);
+  const s = section(text, "## Board mode (`/wayfinder-ui board <map>`)");
+  for (const w of ['node "$ENGINE/hub.mjs" agent-profile --map <mapKey>', 'node "$ENGINE/hub.mjs" open --map <mapKey>',
+    "**exactly one**", "<boardAgentId>", "`listen.tool`", "`repeat`", "grilling-ui **Board events**"]) assert.ok(s.includes(w), `mentions ${w}`);
+});
+
+test("wayfinder-ui: snapshots after every step and on Refresh; stale hub claims released; queued clicks go first in work mode", () => {
+  const text = read("wayfinder-ui");
+  const snap = section(text, "## The map key and snapshot");
+  assert.match(snap, /after \*\*every\*\* Wayfinder step \(chart, claim, resolve, graduate fog, rule out of scope\) and on a board \*\*Refresh\*\*/);
+  assert.ok(snap.includes('"state": "frontier"') && snap.includes("hubClaim") && snap.includes("claim --release"), "frontier + hubClaim → claim --release");
+  assert.match(snap, /queued board click/);
+  const work = section(text, "## Work mode (`/wayfinder-ui <map>`)");
+  assert.match(work, /node "\$ENGINE\/hub\.mjs" wait --map <mapKey> --timeout 1 --agent-id <boardAgentId>/);
+  assert.ok(work.includes("grilling-ui **Board events**"));
+});
+
 // ---- Codex agents/openai.yaml sidecars (T27; spec §2, §5b) ----
 // Field names verified against openai/codex (research clone at b35a7af):
 //   codex-rs/ext/skills/src/loader/mod.rs:20-21   SKILLS_METADATA_DIR = "agents", SKILLS_METADATA_FILENAME = "openai.yaml"

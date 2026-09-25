@@ -135,7 +135,10 @@ export async function ensure({ home, version, codeTime = hubCodeTime(), hubPath 
         }
         let offset = 0; try { offset = fs.statSync(logFile(home)).size; } catch { /* no log yet */ }
         // cwd: home, so the detached hub never pins (or dies with) the calling agent's directory.
-        const child = spawn(process.execPath, [hubPath, "serve", "--port", String(remembered)],
+        // --max-semi-space-size=1 (MB): V8's default young generation lets RSS drift past the §5
+        // 80 MB budget under a burst of sends on Node 26 (idle ≈ 73 MB, of which node:http ≈ 19);
+        // a 1 MB semi-space keeps it under (test/concurrency.test.mjs, plan T36).
+        const child = spawn(process.execPath, ["--max-semi-space-size=1", hubPath, "serve", "--port", String(remembered)],
           { detached: true, stdio: "ignore", cwd: home, env: { ...env, GRILL_HOME: home } });
         let exited = null;
         child.on("exit", (code, sig) => { exited = code ?? sig; });

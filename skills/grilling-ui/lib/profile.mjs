@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { print, die, readJson, envMs } from "./util.mjs";
+import { print, die, readJson, envMs, rand } from "./util.mjs";
 
 export const AGENTS = ["claude", "codex", "opencode", "pi", "unknown"];
 
@@ -33,11 +33,23 @@ export const STOP_RULES = 'Exit 4 or a {"type":"taken"} line: another agent took
 // Effect's Config.boolean truthy spellings (OpenCode runtime flags).
 const effectBool = (v) => v === undefined ? undefined : ["true", "yes", "on", "1", "y"].includes(String(v).toLowerCase());
 
-export function profile(agent, { skill = "<skill>", session, agentId, handled, project, topic, env = process.env } = {}) {
-  const S = shq(session ?? "<session>"), H = handled ?? "<handled>", A = agentId === undefined ? "<agentId>" : shArg(agentId);
+// A map listener (the board watcher, spec §4a) is never taken: the latest watcher wins.
+const MAP_STOP_RULES = "Exit 1 or 2: report the error line to the user; do not loop.";
+// A map key is [a-z0-9-]+/[a-z0-9-]+: safe bare in a shell word.
+const MAP_KEY_RE = /^[a-z0-9-]+\/[a-z0-9-]+$/;
+
+// With `map` (a map key) the listener is the board watcher: watch/wait --map, same tools and
+// timeouts as a session listener, `handled` = map.json handled, description "board: …".
+export function profile(agent, { skill = "<skill>", session, map, mapTitle, agentId, handled, project, topic, env = process.env } = {}) {
+  const H = handled ?? "<handled>", A = agentId === undefined ? "<agentId>" : shArg(agentId);
+  const onMap = map !== undefined;
+  const T = onMap ? `--map ${MAP_KEY_RE.test(map) ? map : shq(map)}` : `--session ${shq(session ?? "<session>")}`;
   const hub = `node ${shq(`${skill}/hub.mjs`)}`;
-  const wait = (secs) => `${hub} wait --session ${S} --after ${H} --timeout ${secs} --agent-id ${A}`;
-  const waitRepeat = `Exit 0: handle every printed send as one batch, patch agent.handled, then start a new wait with the new handled. Exit 3 (idle timeout): start a new wait with the same handled. ${STOP_RULES} Never end the turn while listening; if you must stop, say the listener is inactive (Sends queue and replay on resume).`;
+  const wait = (secs) => `${hub} wait ${T} --after ${H} --timeout ${secs} --agent-id ${A}`;
+  const proj = project ? path.basename(project) : "<project>";
+  const waitRepeat = onMap
+    ? `Exit 0: handle the printed board events per the map event rule (its map-patch sets handled), then start a new wait with the new handled. Exit 3 (idle timeout): start a new wait with the same handled. ${MAP_STOP_RULES} Never end the turn while watching the board; if you must stop, say the board watcher is inactive (board requests queue).`
+    : `Exit 0: handle every printed send as one batch, patch agent.handled, then start a new wait with the new handled. Exit 3 (idle timeout): start a new wait with the same handled. ${STOP_RULES} Never end the turn while listening; if you must stop, say the listener is inactive (Sends queue and replay on resume).`;
   const base = { agent, mode: "wait" };
 
   if (agent === "claude") {
@@ -45,11 +57,13 @@ export function profile(agent, { skill = "<skill>", session, agentId, handled, p
     return {
       ...base, mode: "monitor",
       listen: { tool: "Monitor", params: {
-        command: `${hub} watch --session ${S} --after ${H} --agent-id ${A}`,
-        description: `grill: ${project ? path.basename(project) : "<project>"} · ${topic ?? "<topic>"}`,
+        command: `${hub} watch ${T} --after ${H} --agent-id ${A}`,
+        description: onMap ? `board: ${proj} · ${mapTitle || "<map title>"}` : `grill: ${proj} · ${topic ?? "<topic>"}`,
         timeout_ms: ms,
       } },
-      repeat: `Each Monitor event is a send: handle it and patch agent.handled. On the expiry notice, re-arm the same Monitor with the current \`handled\`. ${STOP_RULES} Stop it with TaskStop only at Finish.`,
+      repeat: onMap
+        ? `Each Monitor event is a board event (work or refresh): handle it per the map event rule; its map-patch sets handled. On the expiry notice, re-run agent-profile --map with your --agent-id and re-arm the Monitor exactly as printed. ${MAP_STOP_RULES} Stop it with TaskStop when you hand off to work mode or the user ends board mode.`
+        : `Each Monitor event is a send: handle it and patch agent.handled. On the expiry notice, re-arm the same Monitor with the current \`handled\`. ${STOP_RULES} Stop it with TaskStop only at Finish.`,
       draw: { tool: "Agent", background: true },
       research: "subagent",
       loadSkill: "Call the Skill tool with the plugin-qualified name, e.g. mattpocock-skills:grilling.",
@@ -110,7 +124,7 @@ export function profile(agent, { skill = "<skill>", session, agentId, handled, p
 // The skill folder is the absolute folder of hub.mjs (this file lives in <skill>/lib/).
 export const skillDir = () => path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
-export function cmdAgentProfile(o) {
+export async function cmdAgentProfile(o) {
   let agent;
   try { agent = detectAgent(process.env, o.agent); } catch (e) { die(e.message); }
   const ctx = { skill: skillDir(), env: process.env };
@@ -119,6 +133,26 @@ export function cmdAgentProfile(o) {
   if (o["agent-id"] !== undefined) {
     if (typeof o["agent-id"] !== "string" || !o["agent-id"]) die("--agent-id needs a value");
     ctx.agentId = o["agent-id"];
+  }
+  if (o.session !== undefined && o.map !== undefined) die("give either --session or --map, not both");
+  if (o.map !== undefined) {
+    // The board watcher (plan T35): handled and title from map.json; a board has no `new` to mint
+    // an agentId, so one is minted here when --agent-id is absent and printed as `agentId`.
+    if (typeof o.map !== "string") die("--map needs a key");
+    const { mapKeyOf, mapDirOf, mapFile, MapKeyError } = await import("./maps.mjs");
+    const { grillHome } = await import("./home.mjs");
+    let key;
+    try { key = mapKeyOf(o.map); } catch (e) { die(e instanceof MapKeyError ? e.message : `cannot read the project: ${e.code || e.message}`); }
+    const map = readJson(mapFile(mapDirOf(grillHome(process.env), key)));
+    if (!map || typeof map !== "object") die(`no such map ${key} (map-patch it first)`);
+    ctx.agentId ??= rand(12);
+    Object.assign(ctx, {
+      map: key,
+      mapTitle: typeof map.title === "string" ? map.title : "",
+      handled: Number.isInteger(map.handled) && map.handled > 0 ? map.handled : 0,
+      project: key.split("/")[0].replace(/-[0-9a-f]{8}$/, ""),
+    });
+    return print({ ...profile(agent, ctx), agentId: ctx.agentId });
   }
   if (o.session !== undefined) {
     if (typeof o.session !== "string") die("--session needs a folder");

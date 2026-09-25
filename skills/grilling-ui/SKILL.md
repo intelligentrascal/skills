@@ -133,6 +133,29 @@ Two background completions are not user input, but act on them in that turn, the
 
 Launch fact-finding subagents with `draw.tool` from your profile, in the background when `draw.background` is true. While one runs, publish the rest of the frontier and set `note` to one sentence naming the fact being looked up. When `draw.tool` is `inline`, look the fact up yourself before patching the round.
 
+### Board events
+
+A board watcher (wayfinder-ui **Board mode**) prints the map's event lines. A `work` or `refresh` line is **user input** under the same rule: the user clicked **Work this ticket** or **Refresh** on the board. Act on it immediately, in that turn. `<boardAgentId>` is the `agentId` printed by `agent-profile --map`; `<seq>` is the line's `seq`. Every map patch below is sent as:
+
+```sh
+node "$SKILL/hub.mjs" map-patch --map <mapKey> --agent-id <boardAgentId> <<'MAP_PATCH'
+{ … }
+MAP_PATCH
+```
+
+Handle the lines in order until a `work` line hands this session its ticket:
+
+- `{"type":"refresh","seq"}`: re-read the tracker and publish the full snapshot (wayfinder-ui **The map key and snapshot**) with `"handled": <seq>`.
+- `{"type":"work","seq","ticket"}`: a session works **exactly one** ticket, so it takes only the first `work` line that succeeds. Every line after it stays queued for the next `/wayfinder-ui board` or `/wayfinder-ui <map>` session: leave `handled` at this line's seq.
+  1. `node "$SKILL/hub.mjs" claim --map <mapKey> --ticket "<ticket>" --agent-id <boardAgentId>`. The click already holds the hub claim for you (or as `queued`, which this adopts). Exit 5 (another session holds it) or 4 (the ticket is gone): patch `{ "handled": <seq> }`, tell the user in one line, go to the next line.
+  2. Claim it on the tracker: wayfinder's claim, as the tracker doc expresses it (the assignee on GitHub or GitLab; `Status: claimed` on local-markdown). The tracker assignee is canonical. If the tracker already shows another assignee: `node "$SKILL/hub.mjs" claim --release --map <mapKey> --ticket "<ticket>" --agent-id <boardAgentId>`, patch `{ "tickets": [{ "title": "<ticket>", "state": "claimed", "assignee": "<their assignee>" }], "handled": <seq> }`, tell the user in one line, go to the next line.
+  3. Stop the board watcher (`monitor`: TaskStop; `wait`: start no new wait). Board lines that arrive later stay queued.
+  4. Follow **Start** step 1 with topic `<ticket>`, no doc path, `--phase ticket` and `--map-key <mapKey>`. Keep the new `session`, `agentId` and `url`.
+  5. Patch `{ "tickets": [{ "title": "<ticket>", "assignee": "<your tracker assignee>", "session": "<url>" }], "handled": <seq> }`. The card now shows "claimed by …" and "grilling now →".
+  6. Continue wayfinder-ui **Work mode** from step 4 in this session.
+
+After the last line with no hand-off, return to watching the board.
+
 ## Handling a send
 
 1. Patch `{ "agent": { "status": "working" } }`. The page disables Send while you work.

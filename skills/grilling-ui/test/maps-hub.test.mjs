@@ -179,3 +179,13 @@ test("map-patch --agent-id matching the listener refreshes its heartbeat", async
   assert.equal((await mapPatch(env, "42", { notes: "z2" }, { cwd, args: ["--agent-id", "L"] })).code, 0);
   assert.ok((await (await fetch(`${b}/m/${key}/map`)).json()).listener.heartbeat > hb1);
 });
+
+test("map --map prints map.json from disk; unknown map exits 4", async (t) => {
+  const { home, env } = mkHome(); t.after(() => cleanupHub(home));
+  const cwd = tmp("p-");
+  run(env, ["map-patch", "--map", "show-me"], { cwd, input: JSON.stringify({ title: "M", tickets: [{ title: "A", type: "task", state: "frontier" }] }) });
+  const m = JSON.parse(run(env, ["map", "--map", "show-me"], { cwd }));
+  assert.equal(m.title, "M"); assert.equal(m.tickets[0].title, "A");
+  const r = await runAsync(env, ["map", "--map", "nope"], { cwd });
+  assert.equal(r.code, 4);
+});

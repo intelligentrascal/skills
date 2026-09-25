@@ -41,6 +41,8 @@ No design doc in either mode.
   ```
 
   `tickets`, `closed` and `decisions` merge by title, so a ticket that left `tickets` (closed, deleted, ruled out of scope) also needs `{ "title": "…", "remove": true }` in `tickets`. Every other key is replaced whole. `--agent-id` is optional. Exit 2 means the patch was rejected: fix it and run it again.
+- Publish the snapshot after **every** Wayfinder step (chart, claim, resolve, graduate fog, rule out of scope) and on a board **Refresh**. The board is only as fresh as your last snapshot.
+- A ticket the tracker shows open, unblocked and unassigned goes in as `"state": "frontier"`, but a hub claim on it keeps it claimed on the board. Before publishing, read the hub's copy with `node "$ENGINE/hub.mjs" map --map <mapKey>`. For each such ticket with a `hubClaim` whose `seq` is absent or at most the map's `handled`, run `node "$ENGINE/hub.mjs" claim --release --map <mapKey> --ticket "<title>" --agent-id <that hubClaim.agentId>`. A higher `seq` is a queued board click waiting for a session: leave it.
 
 ## Chart mode (`/wayfinder-ui` with a loose idea)
 
@@ -59,7 +61,7 @@ One page session covers wayfinder steps 1 and 2.
 **Exactly one ticket per session**; the next ticket is a new `/wayfinder-ui <map>` session. Research tickets are the one exception wayfinder allows.
 
 1. Load the map from the tracker (step 1) and `map-patch --map <slug>` its snapshot (no `--agent-id` yet). The printed `url` gives `<mapKey>`.
-2. Choose the ticket (step 2). Follow grilling-ui **Start** step 1 with topic `<ticket title>`, no doc path, `--phase ticket` and `--map-key <mapKey>`, keeping `agentId`.
+2. Choose the ticket (step 2). A board click queued earlier goes first: run `node "$ENGINE/hub.mjs" agent-profile --map <mapKey>` and keep its `agentId` as `<boardAgentId>`, then `node "$ENGINE/hub.mjs" wait --map <mapKey> --timeout 1 --agent-id <boardAgentId>`. Exit 0 prints the queued lines: handle them per grilling-ui **Board events**; a `work` line that hands you its ticket also does steps 2–3 here, so continue at step 4. Otherwise (exit 3, or no hand-off) choose per wayfinder. Follow grilling-ui **Start** step 1 with topic `<ticket title>`, no doc path, `--phase ticket` and `--map-key <mapKey>`, keeping `agentId`.
 3. **Claim it, before any work:**
    1. `node "$ENGINE/hub.mjs" claim --map <mapKey> --ticket "<ticket title>" --agent-id <agentId>`. Exit 5 prints `{"conflict":…}`: another session has it. Choose the next frontier ticket, patch the session `topic` to its title, and claim again.
    2. Assign it on the tracker (wayfinder's claim). If the tracker already shows another assignee, release the hub claim with `node "$ENGINE/hub.mjs" claim --release --map <mapKey> --ticket "<ticket title>" --agent-id <agentId>`, `map-patch` that ticket with the real `assignee`, and go back to 3.1 with the next frontier ticket.
@@ -68,5 +70,11 @@ One page session covers wayfinder steps 1 and 2.
 
 ## Board mode (`/wayfinder-ui board <map>`)
 
-<!-- HOOK (plan Task 35): board mode text lands here: open --map, arm the map watcher per agent-profile --map, handle work/refresh events (exactly one ticket per session), map-patch after every step. -->
-Not built yet. Tell the user board mode is coming and offer work mode, `/wayfinder-ui <map>`.
+The board, `/m/<mapKey>/`, shows the map and queues two requests for a watching agent: **Refresh** and **Work this ticket**. This mode watches until a Work request hands it **exactly one** ticket; the session then becomes a work-mode session for that ticket.
+
+1. Load the map from the tracker and `map-patch --map <slug>` its snapshot. The printed `url` gives `<mapKey>`.
+2. `node "$ENGINE/hub.mjs" agent-profile --map <mapKey>` prints your board profile and an `agentId`. Keep it as `<boardAgentId>` and pass `--agent-id <boardAgentId>` to every later `agent-profile --map`, `claim` and `map-patch` in this mode.
+3. Arm the watcher: call `listen.tool` with `listen.params` exactly as printed, and follow its `repeat` (grilling-ui **Listening**, with board lines in place of sends).
+4. `node "$ENGINE/hub.mjs" open --map <mapKey>`.
+5. Print ONE line: the board URL and "watching for board requests".
+6. Handle every board line per grilling-ui **Board events**. The `work` line that hands you a ticket ends board mode.
