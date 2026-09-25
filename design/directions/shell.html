@@ -55,9 +55,6 @@
   @media (hover: hover) { .tab:hover:not([aria-selected="true"]) { color: var(--ink); background: rgb(0 0 0 / 0.04); } }
   .tab:active { transform: scale(0.98); }
   .spacer { flex: 1; }
-  .seg { display: inline-flex; border: 1px solid var(--rule-2); border-radius: 999px; overflow: hidden; }
-  .seg button { border: 0; background: var(--panel); padding: 4px 12px; font-size: 12.5px; color: var(--ink-2); cursor: pointer; }
-  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
   .btn {
     border: 1px solid var(--rule-2); background: var(--panel); border-radius: 999px;
     padding: 4px 12px; font-size: 12.5px; color: var(--ink); cursor: pointer;
@@ -65,7 +62,7 @@
   }
   .btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-wash); }
   @media (hover: hover) { .btn:hover { border-color: var(--ink-3); } }
-  .btn:active, .seg button:active { transform: scale(0.98); }
+  .btn:active { transform: scale(0.98); }
   .dir-only[hidden] { display: none; }
 
   /* ---- views ---- */
@@ -75,17 +72,11 @@
 
   /* direction view: stage + notes */
   .dir { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); overflow: hidden; }
-  .dir.with-notes { grid-template-columns: minmax(0, 1fr) 380px; }
   .stage { position: relative; min-width: 0; min-height: 0; display: grid; place-items: stretch; }
   .stage iframe { width: 100%; height: 100%; border: 0; display: block; background: var(--panel); }
-  .stage.phone { display: flex; align-items: center; justify-content: center; padding: 24px; overflow: auto; background: var(--wash); }
-  .stage.phone .device {
-    width: 390px; height: 844px; max-height: 100%; border-radius: 36px; overflow: hidden;
-    box-shadow: 0 0 0 10px #1c1b19, 0 24px 60px -20px rgb(28 27 25 / 0.45);
-    background: var(--panel); flex: none;
-  }
-  .stage:not(.phone) .device { width: 100%; height: 100%; }
-  .notes { border-left: 1px solid var(--rule); background: var(--panel); overflow: auto; padding: 20px 22px 40px; }
+  .device { width: 100%; height: 100%; }
+  /* Notes float over the mockup so each direction renders at its full designed width. */
+  .notes { position: absolute; top: 0; right: 0; bottom: 0; width: min(400px, 100%); z-index: 2; border-left: 1px solid var(--rule); background: var(--panel); overflow: auto; padding: 20px 22px 40px; box-shadow: -18px 0 40px -24px rgb(28 27 25 / 0.35); }
   .dir:not(.with-notes) .notes { display: none; }
 
   .notes h2 { font: 400 26px/1.1 var(--serif); letter-spacing: -0.02em; margin: 2px 0 6px; text-wrap: balance; }
@@ -137,8 +128,6 @@
   .pal i { width: 22px; height: 22px; border-radius: 5px; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08); }
 
   @media (max-width: 1000px) {
-    .dir.with-notes { grid-template-columns: 1fr; grid-template-rows: 1fr; }
-    .dir.with-notes .notes { position: absolute; inset: auto 0 0 0; max-height: 70%; border-left: 0; border-top: 1px solid var(--rule); border-radius: 16px 16px 0 0; box-shadow: 0 -16px 40px -16px rgb(28 27 25 / 0.3); z-index: 2; }
     .cards { grid-template-columns: 1fr; }
   }
   @media (max-width: 760px) {
@@ -147,10 +136,7 @@
     .tabs { order: 3; flex-basis: 100%; }
     .doc { padding: 24px 16px 60px; }
     .doc h2 { font-size: 30px; }
-    .stage.phone { padding: 0; }
-    .stage.phone .device { width: 100%; height: 100%; max-height: none; border-radius: 0; box-shadow: none; }
-  }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } .tab:active, .btn:active, .card:active, .seg button:active { transform: none; } }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } .tab:active, .btn:active, .card:active { transform: none; } }
 </style>
 </head>
 <body>
@@ -158,11 +144,7 @@
   <h1>Grill page <span>three new directions · 2026-09-25</span></h1>
   <div class="tabs" role="tablist" aria-label="Views" id="tabs"></div>
   <div class="spacer"></div>
-  <div class="seg dir-only" role="group" aria-label="Viewport" id="vp" hidden>
-    <button type="button" data-vp="desktop" aria-pressed="true">Desktop</button>
-    <button type="button" data-vp="phone" aria-pressed="false">Phone</button>
-  </div>
-  <button type="button" class="btn dir-only" id="notesBtn" aria-pressed="true" hidden>Notes</button>
+  <button type="button" class="btn dir-only" id="notesBtn" aria-pressed="false" hidden>About this direction</button>
 </header>
 <main id="main"></main>
 
@@ -173,8 +155,8 @@
 (() => {
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const main = document.getElementById("main"), tabsEl = document.getElementById("tabs");
-  const vpEl = document.getElementById("vp"), notesBtn = document.getElementById("notesBtn");
-  const pref = { vp: "desktop", notes: innerWidth > 1000 };
+  const notesBtn = document.getElementById("notesBtn");
+  const pref = { notes: false };
   const SKILL = {
     "hallmark": "Hallmark", "web-design-engineer": "Web Design Engineer", "ui-ux-pro-max": "UI/UX Pro Max",
     "taste-skill": "Taste", "gpt-taste": "GPT Taste", "gpt-tasteskill": "GPT Taste",
@@ -201,7 +183,7 @@
       <li>Same semantics: nothing is sent until Send; one Send is one turn; Explore deeper and Visualize send at once, with undo; Finish asks for confirmation and shows the doc path.</li>
       <li>Same visual contract: a sandboxed iframe with <code>data-q</code> regions and two-way hover and click linkage over postMessage.</li>
       <li>Same keys: <kbd>j</kbd>/<kbd>k</kbd>, <kbd>1</kbd>–<kbd>4</kbd>, <kbd>a</kbd>, <kbd>r</kbd>, <kbd>f</kbd>, <kbd>d</kbd>/<kbd>o</kbd>, <kbd>e</kbd>, <kbd>v</kbd>, <kbd>u</kbd>, <kbd>⌘↵</kbd>, <kbd>Esc</kbd>, <kbd>?</kbd>.</li>
-      <li>Product rules win over the skills: no network, system fonts only, light theme, WCAG AA, no horizontal scroll at 390 px.</li>
+      <li>Product rules win over the skills: no network, system fonts only, light theme, WCAG AA. Desktop only (1440×900 first).</li>
     </ul>
     <h3>Usability findings every direction had to fix</h3>
     <ul>
@@ -211,7 +193,6 @@
       <li>Reopened questions that don't look settled.</li>
       <li>A visual that is first-class and discoverable, with linkage you can see.</li>
       <li>The current round first, with earlier rounds one step away.</li>
-      <li>No nested scroll strips on phone, and content before chrome.</li>
       <li>Shortcuts that never fire while focus is moving to a text field.</li>
     </ul>
   </div>`;
@@ -266,8 +247,6 @@
 
   const apply = () => {
     document.querySelectorAll(".dir").forEach((el) => el.classList.toggle("with-notes", pref.notes));
-    document.querySelectorAll(".stage").forEach((el) => el.classList.toggle("phone", pref.vp === "phone"));
-    vpEl.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vp === pref.vp)));
     notesBtn.setAttribute("aria-pressed", String(pref.notes));
   };
 
@@ -279,7 +258,7 @@
       document.getElementById("view-" + v.id).hidden = !on;
     });
     const isDir = /^d\d$/.test(id);
-    vpEl.hidden = notesBtn.hidden = !isDir;
+    notesBtn.hidden = !isDir;
     if (isDir) mount(+id.slice(1) - 1);
     const t = document.getElementById("tab-" + id);
     t.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -295,7 +274,6 @@
     e.preventDefault(); show(ids[(next + ids.length) % ids.length], true);
   });
   main.addEventListener("click", (e) => { const c = e.target.closest("[data-go]"); if (c) show(c.dataset.go, true); });
-  vpEl.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { pref.vp = b.dataset.vp; apply(); } });
   notesBtn.addEventListener("click", () => { pref.notes = !pref.notes; apply(); });
   addEventListener("hashchange", () => show(location.hash.slice(1)));
 
