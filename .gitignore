@@ -1,3 +1,4 @@
 node_modules/
 design/mockups/shots/
 *.tmp
+upstream.local.json

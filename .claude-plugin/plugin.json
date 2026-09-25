@@ -2,8 +2,22 @@
   "name": "intelligentrascal",
   "version": "0.1.0",
   "description": "Browser-UI versions of Matt Pocock's grill-me, grill-with-docs and wayfinder skills, on one shared local hub.",
-  "author": { "name": "Rahil" },
+  "author": {
+    "name": "intelligentrascal",
+    "url": "https://github.com/intelligentrascal"
+  },
   "license": "MIT",
-  "keywords": ["grilling", "wayfinder", "ui"],
-  "dependencies": [{ "name": "mattpocock-skills", "marketplace": "mattpocock" }]
+  "keywords": [
+    "grilling",
+    "wayfinder",
+    "ui"
+  ],
+  "dependencies": [
+    {
+      "name": "mattpocock-skills",
+      "marketplace": "mattpocock"
+    }
+  ],
+  "homepage": "https://github.com/intelligentrascal/skills",
+  "repository": "https://github.com/intelligentrascal/skills"
 }

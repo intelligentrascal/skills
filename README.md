@@ -20,30 +20,35 @@ have open, across projects and agents, at `http://127.0.0.1:<port>/`.
 
 ## Install
 
-Requires Node 20+ and Pocock's skills.
+Requires [Node.js](https://nodejs.org) 20 or newer and Matt Pocock's skills (installed below).
 
 ### Claude Code
 
 ```bash
-claude plugin marketplace add ~/code/skills
+claude plugin marketplace add mattpocock/skills
+claude plugin marketplace add intelligentrascal/skills
 claude plugin install intelligentrascal@intelligentrascal
 ```
 
-The plugin depends on `mattpocock-skills@mattpocock`; install it too if you don't have it
-(`claude plugin install mattpocock-skills@mattpocock`). If Pocock's plugin is disabled, Claude
-Code disables this one too. After editing the skills locally, run `/reload-plugins`.
+This installs Pocock's `mattpocock-skills` plugin too, as a dependency. Then, in Claude Code:
+`/intelligentrascal:grill-me-ui <topic>`. If Pocock's plugin is disabled, Claude Code disables
+this one too. Update later with `claude plugin marketplace update intelligentrascal` and
+`claude plugin update intelligentrascal`.
 
 ### Codex, OpenCode, Pi
 
 ```bash
-npx skills add -g mattpocock/skills
-~/code/skills/scripts/install-agents.sh
+git clone https://github.com/intelligentrascal/skills ~/intelligentrascal-skills
+npx skills add mattpocock/skills -g --skill grilling domain-modeling research prototype
+~/intelligentrascal-skills/scripts/install-agents.sh
 ```
 
-`install-agents.sh` symlinks all four skills into `~/.agents/skills` (override with
-`AGENTS_SKILLS_DIR`), checks that Pocock's `grilling` and `domain-modeling` are installed (exit 2
-with the `npx` hint if not), records their version in `upstream.json`, and checks the Codex
-sandbox. It is safe to re-run.
+`install-agents.sh` symlinks the four skills into `~/.agents/skills` (override with
+`AGENTS_SKILLS_DIR`), where Codex, OpenCode and Pi all find them; checks that Pocock's `grilling`
+and `domain-modeling` are installed (exit 2 with the `npx` hint if not); records their version
+in a local, gitignored `upstream.local.json` (so your clone stays clean); and checks the Codex
+sandbox. It is safe to re-run; `git pull` in the clone
+updates the skills in place. Then ask your agent to "grill me with ui about <topic>".
 
 **Codex** needs loopback networking and write access to the hub's folder. Add to
 `~/.codex/config.toml` (the script prints this block with your path) and restart Codex:
@@ -120,17 +125,18 @@ need it by hand.
 
 ## Upstream sync
 
-Only Pocock's skills are tracked (`upstream.json` pins the Claude plugin version/commit and, after
-`install-agents.sh`, the `~/.agents` copy).
+For maintainers. Only Pocock's skills are tracked: `upstream.json` pins the Claude plugin
+version/commit and the vendored wayfinder, and the gitignored `upstream.local.json` holds this
+machine's pin of the `~/.agents` copy (written by `install-agents.sh`).
 
 ```bash
-~/code/skills/scripts/sync-pocock.sh
+scripts/sync-pocock.sh   # from a clone of this repo
 ```
 
 It prints what changed upstream since the pin for each skill we delegate to, warns when upstream
 `main` is ahead of the installed release, fails loudly if a skill was renamed or stopped being
 model-invocable, three-way merges the vendored `skills/wayfinder-ui/upstream/wayfinder.md`, runs
-the tests, and bumps the pins. It never commits. After resolving wayfinder conflicts by hand, run
+the tests, and bumps the pins (the agents pin only ever in `upstream.local.json`). It never commits. After resolving wayfinder conflicts by hand, run
 it again with `SYNC_WAYFINDER_DONE=1`.
 
 ## Development

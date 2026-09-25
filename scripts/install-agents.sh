@@ -4,7 +4,8 @@
 #   1. Symlinks all four skills (never a subset) into $AGENTS_SKILLS_DIR (default ~/.agents/skills).
 #   2. Checks that Pocock's grilling and domain-modeling are discoverable
 #      (in $AGENTS_SKILLS_DIR or ~/.pi/agent/skills); if not, prints the npx command and exits 2.
-#   3. Records the copy it found in upstream.json .pocock.agents (spec §8).
+#   3. Records the copy it found in upstream.local.json .pocock.agents (spec §8). That file is
+#      per-machine and gitignored, so running this never dirties the tracked upstream.json.
 #   4. Prints the Codex sandbox config and checks ~/.codex/config.toml for it.
 #
 # Environment (all optional): HOME, AGENTS_SKILLS_DIR, REPO_ROOT (default: this repo),
@@ -43,8 +44,10 @@ done
 # ---- 3. record the agents pin ----------------------------------------------------------------
 if [ -n "$found" ]; then
   pin="$(node "$HELPER" agents-pin "$found")"
-  node "$HELPER" set "$REPO/upstream.json" pocock.agents "$pin"
-  echo "Pocock's skills: found in $found; recorded in upstream.json (pocock.agents)"
+  LOCAL="$REPO/upstream.local.json"
+  [ -f "$LOCAL" ] || printf '{}\n' > "$LOCAL"
+  node "$HELPER" set "$LOCAL" pocock.agents "$pin"
+  echo "Pocock's skills: found in $found; recorded in upstream.local.json (pocock.agents)"
 else
   echo "Pocock's skills (grilling, domain-modeling) not found in $DEST or $HOME/.pi/agent/skills. Install them with:"
   echo "  npx skills add -g mattpocock/skills"

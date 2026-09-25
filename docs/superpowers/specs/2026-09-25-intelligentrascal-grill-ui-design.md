@@ -45,7 +45,7 @@ folded in below.
 skills/
   grilling-ui/              shared engine; user-invocable: false
     SKILL.md                transport protocol + override table (no interview method)
-    agents/openai.yaml      Codex: allow_implicit_invocation false
+    agents/openai.yaml      Codex: display name (no policy block; see §5b)
     hub.mjs                 the shared server (HTTP + SSE) and CLI
     lib/                    state.mjs (patch/validate), sessions.mjs, open.mjs
     page/
@@ -355,11 +355,13 @@ Verified against each agent's source (September 2026):
   2. Checks that Pocock's `grilling` and `domain-modeling` are discoverable (in
      `~/.agents/skills` or `~/.pi/agent/skills`). If not, it prints
      `npx skills add -g mattpocock/skills`.
-  3. Records the version it found in `upstream.json.agents` (§8).
+  3. Records the version it found in `upstream.local.json` (`pocock.agents`; per-machine,
+     gitignored, so a user's clone stays clean) (§8).
   4. For Codex, prints the sandbox config below and checks whether it's present.
-- Codex sidecars (`agents/openai.yaml`) set `policy.allow_implicit_invocation: false` on
-  `grilling-ui` and give display names, following Pocock's convention. Codex parses and
-  enforces these.
+- Codex sidecars (`agents/openai.yaml`) give display names. `grilling-ui` has **no**
+  `policy.allow_implicit_invocation: false`: Codex then leaves the skill out of the model's
+  context and only a user's `$grilling-ui` reaches it, so the wrappers could not load it
+  (found in the T29 smoke run). Its trigger-free description keeps it from firing alone.
 
 ### Portable SKILL.md conventions
 
@@ -377,7 +379,7 @@ Verified against each agent's source (September 2026):
      folder. There are no `../` paths.
 3. **Frontmatter:** only `name` and `description` are portable.
    - Hiding `grilling-ui` from auto-invocation uses `user-invocable: false` (Claude Code),
-     the `openai.yaml` policy (Codex), and a trigger-free description (OpenCode, Pi).
+     and a trigger-free description (Codex, OpenCode, Pi).
    - It stays loadable by name everywhere.
 
 ### Listening
@@ -542,8 +544,11 @@ If the subagent forgets the tags, linking silently does nothing.
   - `claude`: the installed `mattpocock-skills` plugin version (from
     `~/.claude/plugins/installed_plugins.json`) and its commit. This is authoritative for
     Claude Code.
-  - `agents`: the version/commit of the `npx skills` copy that `install-agents.sh` found,
-    used by Codex, OpenCode and Pi.
+  - `agents`: always `null` in the tracked file. The version/commit of the `npx skills` copy
+    that `install-agents.sh` found (used by Codex, OpenCode and Pi) is per-machine, so it is
+    recorded in the gitignored `upstream.local.json` (same shape: `{ pocock: { agents } }`).
+    `sync-pocock.sh` reads it from there (falling back to a legacy `upstream.json` value) and
+    bumps it there, never in `upstream.json`.
   - The two can diverge. The script reports both, and editing the `npx skills` copy is
     unsupported.
 - **`scripts/sync-pocock.sh`:**

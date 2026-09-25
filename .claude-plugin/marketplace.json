@@ -1,9 +1,10 @@
 {
   "name": "intelligentrascal",
   "owner": {
-    "name": "Rahil"
+    "name": "intelligentrascal",
+    "url": "https://github.com/intelligentrascal"
   },
-  "description": "Rahil's local marketplace: the intelligentrascal grill skills.",
+  "description": "The intelligentrascal grill skills: browser-UI versions of Matt Pocock's grill-me, grill-with-docs and wayfinder.",
   "allowCrossMarketplaceDependenciesOn": [
     "mattpocock"
   ],

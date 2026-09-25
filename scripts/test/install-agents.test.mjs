@@ -1,4 +1,4 @@
-// scripts/install-agents.sh (plan T28; spec §5b Installation, Codex sandbox; §8 upstream.json.agents).
+// scripts/install-agents.sh (plan T28; spec §5b Installation, Codex sandbox; §8 upstream.local.json agents pin).
 // Every run uses a temp HOME, AGENTS_SKILLS_DIR and REPO_ROOT: never the real ~/.agents or ~/.codex.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -36,7 +36,10 @@ function setup({ pocock = "agents", lock = true, codex = null } = {}) {
   return { home, repo, dest, pocockDir, env };
 }
 const run = (env) => spawnSync("bash", [SCRIPT], { env, encoding: "utf8" });
-const upstream = (repo) => JSON.parse(readFileSync(join(repo, "upstream.json"), "utf8"));
+// The agents pin goes to the per-machine, gitignored upstream.local.json; upstream.json is never written.
+const local = (repo) => JSON.parse(readFileSync(join(repo, "upstream.local.json"), "utf8"));
+const tracked = (repo) => readFileSync(join(repo, "upstream.json"), "utf8");
+const TRACKED = readFileSync(join(ROOT, "upstream.json"), "utf8");
 const sha = (...files) => { const h = createHash("sha256"); for (const f of files) h.update(readFileSync(f)); return h.digest("hex"); };
 
 test("bash -n: the script parses", () => {
@@ -52,21 +55,21 @@ test("links all four skills, records the agents pin, idempotent", () => {
     assert.ok(lstatSync(join(dest, s)).isSymbolicLink(), `${s} is a symlink`);
     assert.equal(realpathSync(join(dest, s)), realpathSync(join(ROOT, "skills", s)));
   }
-  const u = upstream(repo);
-  assert.deepEqual(u.pocock.agents, {
+  const u = local(repo);
+  assert.deepEqual(u, { pocock: { agents: {
     dir: "~/.agents/skills",
     skillFolderHash: { grilling: "tree-grilling", "domain-modeling": "tree-dm" },
     contentSha: sha(join(dest, "grilling", "SKILL.md"), join(dest, "domain-modeling", "SKILL.md")),
-  });
-  // the rest of upstream.json is untouched
-  const orig = JSON.parse(readFileSync(join(ROOT, "upstream.json"), "utf8"));
-  assert.deepEqual({ ...u.pocock, agents: orig.pocock.agents }, orig.pocock);
+  } } });
+  // the tracked upstream.json is byte-for-byte untouched
+  assert.equal(tracked(repo), TRACKED);
   assert.ok(existsSync(home));
   // second run: same links, same pin, no errors
   const r2 = run(env);
   assert.equal(r2.status, 0, r2.stdout + r2.stderr);
   assert.deepEqual(readdirSync(dest).sort(), [...SKILLS, "domain-modeling", "grilling"].sort());
-  assert.deepEqual(upstream(repo), u);
+  assert.deepEqual(local(repo), u);
+  assert.equal(tracked(repo), TRACKED);
 });
 
 test("AGENTS_SKILLS_DIR overrides the destination", () => {
@@ -81,8 +84,8 @@ test("Pocock's skills found under ~/.pi/agent/skills; XDG_STATE_HOME lock; missi
   const a = setup({ pocock: "pi", lock: false });
   let r = run(a.env);
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.equal(upstream(a.repo).pocock.agents.dir, "~/.pi/agent/skills");
-  assert.equal(upstream(a.repo).pocock.agents.skillFolderHash, null);
+  assert.equal(local(a.repo).pocock.agents.dir, "~/.pi/agent/skills");
+  assert.equal(local(a.repo).pocock.agents.skillFolderHash, null);
 
   const b = setup({ pocock: "agents", lock: false });
   const xdg = join(b.home, "state");
@@ -90,7 +93,7 @@ test("Pocock's skills found under ~/.pi/agent/skills; XDG_STATE_HOME lock; missi
   writeFileSync(join(xdg, "skills", ".skill-lock.json"), JSON.stringify({ version: 3, skills: { grilling: { skillFolderHash: "x1" }, "domain-modeling": { skillFolderHash: "x2" } } }));
   r = run({ ...b.env, XDG_STATE_HOME: xdg });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.deepEqual(upstream(b.repo).pocock.agents.skillFolderHash, { grilling: "x1", "domain-modeling": "x2" });
+  assert.deepEqual(local(b.repo).pocock.agents.skillFolderHash, { grilling: "x1", "domain-modeling": "x2" });
 });
 
 test("without Pocock's skills: links anyway, prints the npx hint, exits 2, pin untouched", () => {
@@ -99,7 +102,8 @@ test("without Pocock's skills: links anyway, prints the npx hint, exits 2, pin u
   assert.equal(r.status, 2, r.stdout + r.stderr);
   assert.match(r.stdout + r.stderr, /npx skills add -g mattpocock\/skills/);
   for (const s of SKILLS) assert.ok(lstatSync(join(dest, s)).isSymbolicLink());
-  assert.equal(upstream(repo).pocock.agents, null);
+  assert.ok(!existsSync(join(repo, "upstream.local.json")), "no local pin written");
+  assert.equal(tracked(repo), TRACKED);
 });
 
 test("refuses (exit 1, nothing linked) when a real directory holds one of the names", () => {

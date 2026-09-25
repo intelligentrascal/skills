@@ -61,8 +61,10 @@ function world() {
     SYNC_TEST_CMD: `echo "POCOCK_PIN=$POCOCK_PIN" > '${marker}'` };
   const run = (extra = {}) => spawnSync("bash", [SCRIPT], { env: { ...env, ...extra }, encoding: "utf8" });
   const upstream = () => JSON.parse(readFileSync(join(repo, "upstream.json"), "utf8"));
+  const local = () => JSON.parse(readFileSync(join(repo, "upstream.local.json"), "utf8"));
+  const setLocal = (agents) => writeFileSync(join(repo, "upstream.local.json"), JSON.stringify({ pocock: { agents } }, null, 2) + "\n");
   const ours = () => readFileSync(join(repo, "skills/wayfinder-ui/upstream/wayfinder.md"), "utf8");
-  return { base, home, up, mkt, repo, v1, v2, put, commit, git, installed, installPath, marker, run, upstream, ours, env };
+  return { base, home, up, mkt, repo, v1, v2, put, commit, git, installed, installPath, marker, run, upstream, local, setLocal, ours, env };
 }
 
 test("bash -n: the script parses", () => {
@@ -85,6 +87,7 @@ test("v1 pin → v2 installed: diff printed, wayfinder merged, tests run, pins b
   assert.deepEqual(u.claude, { version: "2.0.0", commit: w.v2 });
   assert.equal(u.wayfinder.vendoredFrom, w.v2);
   assert.equal(u.agents, null);
+  assert.ok(!existsSync(join(w.repo, "upstream.local.json")), "no agents record → no local file");
   // second run: nothing to sync
   rmSync(w.marker);
   const r2 = w.run();
@@ -163,11 +166,12 @@ test("agents copy differs from its pin → diff against the Claude pin, unsuppor
     mkdirSync(join(dir, s), { recursive: true });
     writeFileSync(join(dir, s, "SKILL.md"), skillMd(s, "", s === "grilling" ? "body of grilling\nagents-only line\n" : `body of ${s}\n`));
   }
+  w.setLocal({ dir: "~/.agents/skills", skillFolderHash: null, contentSha: "old" });
   const u = w.upstream();
-  u.pocock.agents = { dir: "~/.agents/skills", skillFolderHash: null, contentSha: "old" };
   // Claude side already up to date: only the agents copy moved
   u.pocock.claude = { version: "2.0.0", commit: w.v2 }; u.pocock.wayfinder.vendoredFrom = w.v2;
-  writeFileSync(join(w.repo, "upstream.json"), JSON.stringify(u, null, 2) + "\n");
+  const tracked = JSON.stringify(u, null, 2) + "\n";
+  writeFileSync(join(w.repo, "upstream.json"), tracked);
   const r = w.run();
   const out = r.stdout + r.stderr;
   assert.equal(r.status, 0, out);
@@ -176,16 +180,33 @@ test("agents copy differs from its pin → diff against the Claude pin, unsuppor
   assert.match(out, /1\.0\.0|2\.0\.0/);
   const h = createHash("sha256");
   for (const s of ["grilling", "domain-modeling"]) h.update(readFileSync(join(dir, s, "SKILL.md")));
-  assert.equal(w.upstream().pocock.agents.contentSha, h.digest("hex"));
-  assert.equal(w.upstream().pocock.agents.dir, "~/.agents/skills");
+  assert.equal(w.local().pocock.agents.contentSha, h.digest("hex"));
+  assert.equal(w.local().pocock.agents.dir, "~/.agents/skills");
+  // the agents pin never lands in the tracked upstream.json
+  assert.equal(readFileSync(join(w.repo, "upstream.json"), "utf8"), tracked);
+});
+
+test("legacy upstream.json .pocock.agents is still read; the bump goes to upstream.local.json", () => {
+  const w = world();
+  const dir = join(w.home, ".agents", "skills");
+  for (const s of ["grilling", "domain-modeling"]) { mkdirSync(join(dir, s), { recursive: true }); writeFileSync(join(dir, s, "SKILL.md"), skillMd(s)); }
+  const u = w.upstream();
+  u.pocock.agents = { dir: "~/.agents/skills", skillFolderHash: null, contentSha: "old" };
+  u.pocock.claude = { version: "2.0.0", commit: w.v2 }; u.pocock.wayfinder.vendoredFrom = w.v2;
+  const tracked = JSON.stringify(u, null, 2) + "\n";
+  writeFileSync(join(w.repo, "upstream.json"), tracked);
+  const r = w.run();
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /agents copy/);
+  assert.match(w.local().pocock.agents.contentSha, /^[0-9a-f]{64}$/);
+  assert.equal(readFileSync(join(w.repo, "upstream.json"), "utf8"), tracked);
 });
 
 test("agents copy gains disable-model-invocation → exit 3", () => {
   const w = world();
   const dir = join(w.home, ".agents", "skills");
   for (const s of ["grilling", "domain-modeling"]) { mkdirSync(join(dir, s), { recursive: true }); writeFileSync(join(dir, s, "SKILL.md"), skillMd(s, s === "grilling" ? "\ndisable-model-invocation: true" : "")); }
-  const u = w.upstream(); u.pocock.agents = { dir: "~/.agents/skills", skillFolderHash: null, contentSha: "old" };
-  writeFileSync(join(w.repo, "upstream.json"), JSON.stringify(u, null, 2) + "\n");
+  w.setLocal({ dir: "~/.agents/skills", skillFolderHash: null, contentSha: "old" });
   const r = w.run();
   assert.equal(r.status, 3, r.stdout + r.stderr);
   assert.match(r.stderr, /agents copy.*grilling.*disable-model-invocation/);

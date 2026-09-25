@@ -7,11 +7,13 @@
 #   3. Fails loudly (exit 3) if a delegated skill is missing/renamed at the installed version, or
 #      grilling/domain-modeling gained disable-model-invocation: true (SKILL.md) or
 #      allow_implicit_invocation: false (agents/openai.yaml); same checks on the agents copy.
-#   4. Agents copy (upstream.json .pocock.agents, written by install-agents.sh): if its content
+#   4. Agents copy (upstream.local.json .pocock.agents, written by install-agents.sh; per-machine
+#      and gitignored; falls back to a legacy upstream.json .pocock.agents): if its content
 #      changed, prints diff -u against the Claude pinned copy.
 #   5. Three-way merges skills/wayfinder-ui/upstream/wayfinder.md (ours) with Pocock's pinned
 #      (base) and installed (theirs) wayfinder. Conflicts are left marked (exit 4).
-#   6. Runs the tests, then bumps the pins in upstream.json. Nothing is committed.
+#   6. Runs the tests, then bumps the pins in upstream.json (claude, wayfinder) and
+#      upstream.local.json (agents; never upstream.json). Nothing is committed.
 #
 # Environment (all optional): CLAUDE_PLUGINS (~/.claude/plugins), POCOCK_MARKETPLACE
 # ($CLAUDE_PLUGINS/marketplaces/mattpocock, a git checkout), REPO_ROOT (this repo), HOME,
@@ -27,6 +29,7 @@ CLAUDE_PLUGINS="${CLAUDE_PLUGINS:-$HOME/.claude/plugins}"
 MKT="${POCOCK_MARKETPLACE:-$CLAUDE_PLUGINS/marketplaces/mattpocock}"
 HELPER="$here/lib/pocock.mjs"
 U="$REPO/upstream.json"
+L="$REPO/upstream.local.json"
 OURS="$REPO/skills/wayfinder-ui/upstream/wayfinder.md"
 DELEGATED="grilling domain-modeling grill-me grill-with-docs wayfinder"
 INVOCABLE="grilling domain-modeling"
@@ -35,6 +38,7 @@ export GIT_TERMINAL_PROMPT=0
 die() { local code="$1"; shift; echo "sync-pocock: $*" >&2; exit "$code"; }
 g() { git -C "$MKT" "$@"; }
 json() { node "$HELPER" get "$U" "$1"; }
+ajson() { node "$HELPER" get "$AF" "$1"; }
 tmpd="$(mktemp -d "${TMPDIR:-/tmp}/sync-pocock.XXXXXX")"
 trap 'rm -rf "$tmpd"' EXIT
 
@@ -42,11 +46,13 @@ command -v node >/dev/null 2>&1 || die 1 "node (20+) is required"
 [ -f "$U" ] || die 1 "$U not found"
 g rev-parse --git-dir >/dev/null 2>&1 || die 1 "$MKT is not a git checkout of mattpocock/skills (set POCOCK_MARKETPLACE)"
 
+# The agents record lives in upstream.local.json; an old upstream.json .pocock.agents still counts.
+if [ -f "$L" ] && [ -n "$(node "$HELPER" get "$L" pocock.agents)" ]; then AF="$L"; else AF="$U"; fi
 pin_version="$(json pocock.claude.version)"
 pin_commit="$(json pocock.claude.commit)"
 wf_base="$(json pocock.wayfinder.vendoredFrom)"
-agents_dir="$(json pocock.agents.dir)"
-agents_sha="$(json pocock.agents.contentSha)"
+agents_dir="$(ajson pocock.agents.dir)"
+agents_sha="$(ajson pocock.agents.contentSha)"
 [ -n "$pin_commit" ] || die 1 "upstream.json has no pocock.claude.commit"
 
 inst="$(node "$HELPER" installed "$CLAUDE_PLUGINS/installed_plugins.json" mattpocock-skills@mattpocock)" \
@@ -133,7 +139,7 @@ if [ -n "$agents_dir" ]; then
       agents_changed=1
       echo "== agents copy ($adir): contentSha $agents_sha -> $cur"
       echo "   Claude plugin pin: mattpocock-skills $pin_version ($pin_commit); installed: $inst_version ($inst_commit)"
-      echo "   agents copy: skillFolderHash $(json pocock.agents.skillFolderHash) (recorded)"
+      echo "   agents copy: skillFolderHash $(ajson pocock.agents.skillFolderHash) (recorded)"
       for s in $INVOCABLE; do
         d="$(skill_dir "$pin_commit" "$s")"
         if [ -n "$d" ]; then g show "$pin_commit:$d/SKILL.md" > "$tmpd/pin-$s.md"; else : > "$tmpd/pin-$s.md"; fi
@@ -190,8 +196,9 @@ node "$HELPER" set "$U" pocock.claude "{\"version\":\"$inst_version\",\"commit\"
 node "$HELPER" set "$U" pocock.wayfinder.vendoredFrom "\"$inst_commit\""
 if [ -n "$agents_dir" ]; then
   pin="$(node "$HELPER" agents-pin "$adir")"
-  node "$HELPER" set "$U" pocock.agents "$pin"
+  [ -f "$L" ] || printf '{}\n' > "$L"
+  node "$HELPER" set "$L" pocock.agents "$pin"
   # keep the recorded dir exactly as install-agents.sh wrote it
-  node "$HELPER" set "$U" pocock.agents.dir "\"$agents_dir\""
+  node "$HELPER" set "$L" pocock.agents.dir "\"$agents_dir\""
 fi
-echo "== pins bumped in upstream.json (claude $inst_version, wayfinder $inst_commit${agents_dir:+, agents}). Nothing committed; review with git diff."
+echo "== pins bumped in upstream.json (claude $inst_version, wayfinder $inst_commit)${agents_dir:+ and upstream.local.json (agents)}. Nothing committed; review with git diff."
