@@ -90,7 +90,7 @@
     {
       "id": 10,
       "subject": "Task 11: Hub session routes, page serving, token + Origin auth",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Serve pages/assets and session endpoints; sends require token and a same-origin (or absent) Origin and append to `events.jsonl`.\n\n**Depends on:** T10\n\n**Verify:** `node --test skills/grilling-ui/test/server.test.mjs` → pass.\n\nSee plan section \"Task 11\".\n\n```json:metadata\n{\"files\":[\"lib/server.mjs\",\"test/server.test.mjs\",\"page/inbox.html\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/server.test.mjs → pass.\",\"acceptanceCriteria\":[\"Routes: `GET /s/<id>/` and `/s/<id>/inbox|brief|studio` → layout HTML with `<!--GRILL_BOOT-->` replaced by `<script>window.GRILL=${JSON.stringify({kind:\\\"session\\\",id,token,base:\\\"/s/\\\"+id+\\\"/\\\",layouts:[built layouts]})}</script>`; unbuilt layout → 302 to `/s/<id>/inbox` (D1). Unknown id → 404 HTML \\\"No such grill\\\".\",\"`GET /assets/<name>` for a whitelist (`core.js, tokens.css, map-view.js, board.js`), correct content types, `cache-control: no-store`.\",\"`GET /s/<id>/state` → state.json with `owner` from meta.json merged, last-good fallback (port `$JASON/server.mjs:153-159`); `GET /s/<id>/visual` (port 161–165); `GET /s/<id>/events.jsonl` raw log.\",\"`POST /s/<id>/send`: requires `x-grill-token` equal to meta.token (401 otherwise) and Origin absent or ∈ `{http://127.0.0.1:<port>, http://localhost:<port>}` (403 otherwise, `$JASON/server.mjs:167-172`); body `{actions:[...]}` non-empty (400); appends `{type:\\\"send\\\", seq, at, session, actions}`; per-session seq initialised from `lastSeq` on first use; returns `{ok, seq}`.\",\"`POST /s/<id>/heartbeat {agentId}` (token) → updates `meta.owner.heartbeat` if agentId matches (409 otherwise).\",\"Tests: port `$JASON/test/server.test.mjs:63-118, 159-172` to the hub (`new` → url), plus 401 on missing/wrong token, 403 on `Origin: http://evil.example`, 403 on `Origin: null` (sandboxed iframe), seq survives hub restart.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         9
@@ -99,7 +99,7 @@
     {
       "id": 11,
       "subject": "Task 12: SSE, directory watch, presence and /clients",
-      "status": "pending",
+      "status": "in_progress",
       "description": "**Goal:** Push `state` changes over the hub-wide SSE stream using a directory watch that survives atomic renames; presence tracking and `/clients`.\n\n**Depends on:** T11\n\n**Verify:** `node --test skills/grilling-ui/test/sse.test.mjs` → pass.\n\nSee plan section \"Task 12\".\n\n```json:metadata\n{\"files\":[\"lib/server.mjs\",\"test/sse.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/sse.test.mjs → pass.\",\"acceptanceCriteria\":[\"`GET /events` (SSE, `text/event-stream`, `retry: 2000`): sends `event: hello` `{pid, started}` on connect, then `event: s` `{\\\"id\\\"}` per session change and `event: m` `{\\\"key\\\"}` per map change; comment keep-alive every 25 s.\",\"Session watchers attach lazily on the first request touching `/s/<id>/…` (`fs.watch(dir)`; filter `state.json|meta.json|visual.html`; 30 ms debounce per id).\",\"`GET /s/<id>/presence?tab=<t>` → 204, records `tab → now`. `GET /s/<id>/clients` → `{count, lastSeen, hubStarted}` per D6.\",\"Tests: an EventSource-like reader (`fetch` streaming body, parse `event:`/`data:`) sees `s` pings after two consecutive `hub.mjs patch` calls (two atomic renames); presence counts two tabs, drops after `GRILL_PRESENCE_MS` (test override 300 ms).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         10
@@ -108,7 +108,7 @@
     {
       "id": 12,
       "subject": "Task 13: watch and wait (no gap), heartbeat through the hub",
-      "status": "pending",
+      "status": "in_progress",
       "description": "**Goal:** `watch` prints sends after `--after` already on disk then tails with no gap; `wait` blocks until sends exist; both heartbeat every 60 s via the hub.\n\n**Depends on:** T11\n\n**Verify:** `node --test skills/grilling-ui/test/watch.test.mjs` → pass.\n\nSee plan section \"Task 13\".\n\n```json:metadata\n{\"files\":[\"lib/events.mjs\",\"test/watch.test.mjs\",\"hub.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/watch.test.mjs → pass.\",\"acceptanceCriteria\":[\"`events.mjs` exports `readEvents, lastSeq` (port `$JASON/server.mjs:90-99`) and `tailLog(file, after, onLine)` that **installs `fs.watch` on the directory first, then drains**, tracks the byte offset, only emits complete lines with `seq > after`, dedupes by seq, and also re-drains every 1 s (safety net).\",\"`watch --session DIR --after N --agent-id ID`: runs `ensure`, prints each send line to stdout as it lands, never exits on its own; heartbeat `POST /s/<id>/heartbeat` every `GRILL_HEARTBEAT_MS` (default 60 000) and once at start; if the hub is down, `ensure` again.\",\"`wait --session DIR --after N --timeout S --agent-id ID`: same drain; prints all available lines `> N` and exits 0; exit 3 at timeout; heartbeats while waiting.\",\"`--map KEY` variants use `maps/<key>/events.jsonl` and `POST /m/<key>/heartbeat` (the map route lands in T14; until then, tests cover sessions only).\",\"Tests: lines written before start + 20 lines appended in a tight loop during startup are all printed exactly once in order; `wait` exit 0/3 (port `$JASON/test/server.test.mjs:120-157`); heartbeat updates `meta.json` (`GRILL_HEARTBEAT_MS=200`).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         10
@@ -392,5 +392,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T15:04:43.834Z"
+  "lastUpdated": "2026-09-25T15:09:34.542Z"
 }
