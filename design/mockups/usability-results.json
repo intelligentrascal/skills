@@ -1,0 +1,37 @@
+{
+  "order": {"task1":["inbox","brief","studio"],"task2":["brief","inbox","studio"],"task3":["brief","inbox","studio"],"task4":["inbox","brief","studio"]},
+  "results": {
+    "inbox": {
+      "task1": {"looks":3,"actions":2,"success":true,"ease":3,"confusion":["Sidebar loads scrolled to round 9; Q2 not visible until scrolling the list up","Q2 shows 'Why A' rationale in red next to a free-text answer, which briefly reads as if A was chosen"]},
+      "task2": {"looks":8,"actions":14,"success":true,"ease":4,"confusion":["Accept A does not advance to the next question; must click each list item then Accept","Accept button moves vertically per question (option count varies), so each one needs a fresh look"]},
+      "task3": {"looks":2,"actions":1,"success":true,"ease":4,"confusion":["Visual hidden behind a small 'Visual · v3' header chip; not obvious it swaps the centre pane","Q15 region only marked by a tiny 'assumed · Q15 open' tag on a dashed box"]},
+      "task4": {"looks":3,"actions":4,"success":true,"ease":4,"confusion":["Two text boxes (free-text answer vs 'Dig deeper' discussion); unclear which is 'pushback'","Reopened Q16 still shows option A with a green check, reading as settled"]}
+    },
+    "brief": {
+      "task1": {"looks":1,"actions":0,"success":true,"ease":5,"confusion":["Agent's refinement (two files) collapsed behind '1 note' then 'more' (2 extra clicks to read in full)","ToC groups by topic: open Q15/Q19-21 listed under 'Transport', which is odd"]},
+      "task2": {"looks":5,"actions":17,"success":true,"ease":4,"confusion":["'next' jumped first to reopened Q15 (round 8), not round 9","Round 9 isn't a group; its questions are scattered across topic sections and interleaved with reopened Q16, which had to be skipped by hand","Fast only with j/a keys; a mouse user would need a scroll and click per card"]},
+      "task3": {"looks":4,"actions":2,"success":true,"ease":3,"confusion":["Hovering Q15 in the ToC gave no visible outline change","Visual thumbnail is small; needed a zoom to read the region label; outline only confirmed after clicking Q15 ('outlined above' caption)"]},
+      "task4": {"looks":4,"actions":6,"success":true,"ease":3,"confusion":["Typed before focus landed (smooth scroll after ToC click): keystrokes fired j/k/a shortcuts and silently staged Q20 and Q21, with no warning","'Was:' struck-through text is identical to option A, which reads as a contradiction"]}
+    },
+    "studio": {
+      "task1": {"looks":2,"actions":1,"success":true,"ease":4,"confusion":["Have to map Q2 to round 2 (round pills, not question ids)","Decision line truncated with an ellipsis; the agent refinement bubble fills in the rest"]},
+      "task2": {"looks":9,"actions":13,"success":true,"ease":3,"confusion":["Narrow conversation column shows about one card at a time, so it's a scroll and look per question","No auto-advance after Accept","'7 open' badge doesn't change as items are staged; staged summary in the footer is truncated"]},
+      "task3": {"looks":2,"actions":1,"success":true,"ease":5,"confusion":[]},
+      "task4": {"looks":3,"actions":4,"success":true,"ease":4,"confusion":["Two paths ('Answer in words' on card vs '@q16 thread' composer); composer staged it as a thread message ('+1 msg'), not an answer, so it's unclear whether the agent treats it as a pushback answer"]}
+    }
+  },
+  "phone": {
+    "inbox": {
+      "task1": {"looks":5,"actions":4,"success":true,"ease":2,"confusion":["Question list is a short nested scroll strip (about 4 rows) above the card; scroll-in-scroll to find Q2, then scroll the page to see the answer"]},
+      "task4": {"looks":4,"actions":6,"success":true,"ease":3,"confusion":["Nested list scroll again; free-text box and Stage below the fold"]}
+    },
+    "brief": {
+      "task1": {"looks":2,"actions":1,"success":true,"ease":5,"confusion":["Visual card occupies the entire first screen before any content"]},
+      "task4": {"looks":5,"actions":7,"success":true,"ease":3,"confusion":["No ToC on phone; only 'N open ↓' chip, which cycles Q15, Q19, Q20, Q21, then Q16 (5 taps)"]}
+    },
+    "studio": {
+      "task1": {"looks":2,"actions":1,"success":true,"ease":4,"confusion":["Header, layout switcher and visual take the first screen; conversation starts below"]},
+      "task4": {"looks":3,"actions":5,"success":true,"ease":4,"confusion":["Same thread-vs-answer ambiguity as desktop"]}
+    }
+  }
+}

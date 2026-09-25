@@ -19,7 +19,7 @@
     {
       "id": 2,
       "subject": "Task 3: Inbox mockup",
-      "status": "in_progress",
+      "status": "completed",
       "description": "**Goal:** Static-interactive Inbox mockup (Jason's list | card | discussion) on `tokens.css`, plus the hover→highlight linkage.\n\n**Depends on:** T2\n\n**Verify:** `node design/mockups/build.mjs`, open `design/mockups/index.html?v=inbox` at 1440 px and at 390 px width: no horizontal scroll, Q15 hover outlines its region.\n\nSee plan section \"Task 3\".\n\n```json:metadata\n{\"files\":[\"design/mockups/inbox.template.html\"],\"verifyCommand\":\"node design/mockups/build.mjs, open design/mockups/index.html?v=inbox at 1440 px and at 390 px width: no horizontal scroll, Q15 hover outlines its region.\",\"acceptanceCriteria\":[\"Ported from `$JASON/design/mockups/a-inbox-clean.template.html` (layout `260px | 1fr | 33vw`), but links `../../skills/grilling-ui/page/tokens.css` and removes Google Fonts.\",\"Renders all rounds from `SESSION.questions`; selecting a question shows card + thread; options stage (dashed rec, staged highlight), free text stages, reopened/deferred marks, updated marker.\",\"Visual toggle shows `VISUAL_HTML` in `<iframe sandbox=\\\"allow-scripts\\\" srcdoc>`, with a stale strip (\\\"Out of date · regenerate…\\\").\",\"Hovering a nav item posts `{highlight:[id]}` to the iframe; clicking a `data-q` region selects that question.\",\"Stacks below 760 px (port `$JASON/page.html:153-183`).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         1
@@ -28,7 +28,7 @@
     {
       "id": 3,
       "subject": "Task 4: Brief mockup",
-      "status": "in_progress",
+      "status": "completed",
       "description": "**Goal:** Document-model mockup per spec §7 Brief row.\n\n**Depends on:** T2\n\n**Verify:** build; `index.html?v=brief` at 1440 / 1000 / 390 px.\n\nSee plan section \"Task 4\".\n\n```json:metadata\n{\"files\":[\"design/mockups/brief.template.html\"],\"verifyCommand\":\"build; index.html?v=brief at 1440 / 1000 / 390 px.\",\"acceptanceCriteria\":[\"One column max-width `68ch`; sections derived from dependency roots: for each question with `deps: []`, a section titled by that root question; every other question goes in the section of its first root ancestor (walk `deps[0]` to a root). Deferred questions in their own final section \\\"Deferred\\\".\",\"Answered question = one prose line `Title → chosen option text` (text answers show the text) + a \\\"reopen\\\" control.\",\"Open/reopened question = compact block: heading; options as a vertical list with full text; recommended option dashed and pre-selected (staged-looking); the why in one line; free-text field always visible; thread collapsed to bold first lines that expand inline on click.\",\"≥ 1100 px: left jump rail (section links + open counts) and the visual as a sticky figure on the right; < 1100 px the figure sits under the header; < 760 px everything stacks.\",\"Hovering a question block highlights its `data-q` regions (same postMessage).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         1
@@ -37,7 +37,7 @@
     {
       "id": 4,
       "subject": "Task 5: Studio mockup",
-      "status": "in_progress",
+      "status": "completed",
       "description": "**Goal:** Visual-first mockup per spec §7 Studio row.\n\n**Depends on:** T2\n\n**Verify:** build; `index.html?v=studio` at 1440 / 390 px.\n\nSee plan section \"Task 5\".\n\n```json:metadata\n{\"files\":[\"design/mockups/studio.template.html\"],\"verifyCommand\":\"build; index.html?v=studio at 1440 / 390 px.\",\"acceptanceCriteria\":[\"Visual iframe takes ~60% width; conversation rail on the right holds one timeline grouped under sticky round headers: open question cards in full, answered cards collapsed to one line, thread messages placed by `at` time, visual feedback (`visual.thread`) in the same stream.\",\"One composer at the bottom of the rail with a target chip: `@qN thread`, `@qN answer`, `visual`; clicking a card sets the chip to that question; the chip is a button cycling the three targets.\",\"Hover card → highlight regions; click region → select card (scroll into view).\",\"A toggle \\\"before first draw\\\" shows the empty state: \\\"Agreed so far\\\" (bullet list derived from answered questions: `title → answer`) and a Visualize call to action.\",\"Stacks below 760 px (visual above rail, `height: 60vh`).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         1
@@ -46,7 +46,7 @@
     {
       "id": 5,
       "subject": "Task 6: Screenshots and the layout comparison — HUMAN GATE (blocking M7)",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Screenshot all three at 1440 and 390 px, run the user's four timed tasks, and record which of Brief/Studio get built.\n\n**Depends on:** T3, T4, T5\n\n**Verify:** `PLAYWRIGHT_PKG=... node design/mockups/shoot.mjs` → prints 6 paths, exit 0; `node -e \"const d=require('./design/mockups/decision.json');if(!Array.isArray(d.build))process.exit(1)\"` → exit 0.\n\nSee plan section \"Task 6\".\n\n```json:metadata\n{\"files\":[\"design/mockups/shoot.mjs\",\"design/mockups/decision.json\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=... node design/mockups/shoot.mjs → prints 6 paths, exit 0; node -e \\\"const d=require('./design/mockups/decision.json');if(!Array.isArray(d.build))process.exit(1)\\\" → exit 0.\",\"acceptanceCriteria\":[\"`shoot.mjs` (Playwright via `PLAYWRIGHT_PKG`) writes `design/mockups/shots/{inbox,brief,studio}-{1440,390}.png` (full page) and asserts no horizontal overflow (`document.documentElement.scrollWidth <= innerWidth`) at each width.\",\"**HUMAN GATE:** the user runs the four tasks in each layout using the picker stopwatch: (1) \\\"What did we decide about Q2 transport?\\\", (2) answer the open round 9, (3) find which part of the visual Q15 changes, (4) push back on Q16 in free text. Randomise layout order per task.\",\"`decision.json` records `{ \\\"build\\\": [...], \\\"timings\\\": <picker JSON>, \\\"notes\\\": \\\"<user's words>\\\", \\\"date\\\": \\\"...\\\" }`. `build` ⊆ `[\\\"brief\\\",\\\"studio\\\"]` (Inbox is implicit).\",\"Do **not** mark this task complete until the user has given the result in chat.\"],\"humanGate\":true}\n```",
       "blockedBy": [
         2,
@@ -108,7 +108,7 @@
     {
       "id": 12,
       "subject": "Task 13: watch and wait (no gap), heartbeat through the hub",
-      "status": "in_progress",
+      "status": "completed",
       "description": "**Goal:** `watch` prints sends after `--after` already on disk then tails with no gap; `wait` blocks until sends exist; both heartbeat every 60 s via the hub.\n\n**Depends on:** T11\n\n**Verify:** `node --test skills/grilling-ui/test/watch.test.mjs` → pass.\n\nSee plan section \"Task 13\".\n\n```json:metadata\n{\"files\":[\"lib/events.mjs\",\"test/watch.test.mjs\",\"hub.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/watch.test.mjs → pass.\",\"acceptanceCriteria\":[\"`events.mjs` exports `readEvents, lastSeq` (port `$JASON/server.mjs:90-99`) and `tailLog(file, after, onLine)` that **installs `fs.watch` on the directory first, then drains**, tracks the byte offset, only emits complete lines with `seq > after`, dedupes by seq, and also re-drains every 1 s (safety net).\",\"`watch --session DIR --after N --agent-id ID`: runs `ensure`, prints each send line to stdout as it lands, never exits on its own; heartbeat `POST /s/<id>/heartbeat` every `GRILL_HEARTBEAT_MS` (default 60 000) and once at start; if the hub is down, `ensure` again.\",\"`wait --session DIR --after N --timeout S --agent-id ID`: same drain; prints all available lines `> N` and exits 0; exit 3 at timeout; heartbeats while waiting.\",\"`--map KEY` variants use `maps/<key>/events.jsonl` and `POST /m/<key>/heartbeat` (the map route lands in T14; until then, tests cover sessions only).\",\"Tests: lines written before start + 20 lines appended in a tight loop during startup are all printed exactly once in order; `wait` exit 0/3 (port `$JASON/test/server.test.mjs:120-157`); heartbeat updates `meta.json` (`GRILL_HEARTBEAT_MS=200`).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         10
@@ -271,12 +271,13 @@
     {
       "id": 29,
       "subject": "Task 30: Brief layout (if chosen)",
-      "status": "pending",
+      "status": "skipped",
       "description": "**Goal:** Production Brief layout on `core.js`, from the winning mockup.\n\n**Depends on:** T6, T20\n\n**Verify:** covered by T32 e2e.\n\nSee plan section \"Task 30\".\n\n```json:metadata\n{\"files\":[\"page/brief.html\",\"lib/server.mjs\",\"GRILL.layouts\"],\"verifyCommand\":\"covered by T32 e2e.\",\"acceptanceCriteria\":[\"Behaviour of `design/mockups/brief.template.html` (T4 criteria) driven by live `S` via `Grill.mount`; all core semantics (staging, pending, working, finished banner, explore table inline under the block, visualize, feedback composer under the sticky figure).\",\"Hooks: `current()` = focused block; `move(±1)` walks open/reopened blocks then answered lines in document order; `select(id)` scrolls the block into view and focuses its heading (`tabindex=-1`); `focusThread()` expands the thread and focuses its composer; `focusFree()` focuses the free-text field.\",\"Reopen control on an answered line stages `reopen`.\",\"When `finished.kind === \\\"map\\\"`, renders via `MapView` (D9).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         5,
         19
-      ]
+      ],
+      "skipReason": "decision.json build=[studio]"
     },
     {
       "id": 30,
@@ -392,5 +393,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T15:09:34.542Z"
+  "lastUpdated": "2026-09-25T15:22:56.123Z"
 }
