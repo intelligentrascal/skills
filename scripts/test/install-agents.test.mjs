@@ -32,10 +32,11 @@ function setup({ pocock = "agents", lock = true, codex = null } = {}) {
     "domain-modeling": { source: "mattpocock/skills", sourceType: "github", sourceUrl: "https://github.com/mattpocock/skills", skillFolderHash: "tree-dm", installedAt: "", updatedAt: "" },
   } }));
   if (codex !== null) { mkdirSync(join(home, ".codex")); writeFileSync(join(home, ".codex", "config.toml"), codex); }
-  const env = { PATH: process.env.PATH, HOME: home, REPO_ROOT: repo };
+  // Never reach the real npx from tests: auto-install is exercised only with a fake.
+  const env = { PATH: process.env.PATH, HOME: home, REPO_ROOT: repo, INSTALL_AGENTS_NPX: "/nonexistent/npx" };
   return { home, repo, dest, pocockDir, env };
 }
-const run = (env) => spawnSync("bash", [SCRIPT], { env, encoding: "utf8" });
+const run = (env, args = []) => spawnSync("bash", [SCRIPT, ...args], { env, encoding: "utf8" });
 // The agents pin goes to the per-machine, gitignored upstream.local.json; upstream.json is never written.
 const local = (repo) => JSON.parse(readFileSync(join(repo, "upstream.local.json"), "utf8"));
 const tracked = (repo) => readFileSync(join(repo, "upstream.json"), "utf8");
@@ -96,11 +97,11 @@ test("Pocock's skills found under ~/.pi/agent/skills; XDG_STATE_HOME lock; missi
   assert.deepEqual(local(b.repo).pocock.agents.skillFolderHash, { grilling: "x1", "domain-modeling": "x2" });
 });
 
-test("without Pocock's skills: links anyway, prints the npx hint, exits 2, pin untouched", () => {
+test("without Pocock's skills and --no-install: links anyway, prints the npx hint, exits 2, pin untouched", () => {
   const { repo, dest, env } = setup({ pocock: "none" });
-  const r = run(env);
+  const r = run(env, ["--no-install"]);
   assert.equal(r.status, 2, r.stdout + r.stderr);
-  assert.match(r.stdout + r.stderr, /npx skills add -g mattpocock\/skills/);
+  assert.match(r.stdout + r.stderr, /npx skills add mattpocock\/skills -g/);
   for (const s of SKILLS) assert.ok(lstatSync(join(dest, s)).isSymbolicLink());
   assert.ok(!existsSync(join(repo, "upstream.local.json")), "no local pin written");
   assert.equal(tracked(repo), TRACKED);
@@ -147,4 +148,28 @@ test("Codex sandbox: OK when network_access and the writable root are set (GRILL
   writeFileSync(join(off.home, ".codex", "config.toml"), `network_access = true\n[sandbox_workspace_write]\nwritable_roots = ["${join(off.home, ".intelligentrascal")}"]\n`);
   r = run(off.env);
   assert.match(r.stdout, /Codex sandbox: missing/);
+});
+
+test("without Pocock's skills: installs them with npx, then records the pin (exit 0)", () => {
+  const { repo, dest, env, home } = setup({ pocock: "none", lock: false });
+  const fake = join(home, "fake-npx");
+  // A fake npx that records its argv and installs the two skills where `skills add -g` would.
+  writeFileSync(fake, `#!/bin/sh\necho "$@" > "${home}/npx-args"\nfor s in grilling domain-modeling; do mkdir -p "${dest}/$s"; printf -- '---\\nname: %s\\ndescription: x\\n---\\n' "$s" > "${dest}/$s/SKILL.md"; done\n`, { mode: 0o755 });
+  const r = run({ ...env, INSTALL_AGENTS_NPX: fake });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(readFileSync(join(home, "npx-args"), "utf8"), /^-y skills add mattpocock\/skills -g -a codex opencode pi --skill grilling domain-modeling research prototype -y/);
+  assert.equal(local(repo).pocock.agents.skillFolderHash, null);
+  assert.equal(tracked(repo), TRACKED);
+});
+
+test("without Pocock's skills and no npx: warns and exits 2", () => {
+  const { env } = setup({ pocock: "none" });
+  const r = run(env);
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  assert.match(r.stderr, /npx not found/);
+});
+
+test("unknown option is refused", () => {
+  const { env } = setup();
+  assert.equal(run(env, ["--bogus"]).status, 1);
 });

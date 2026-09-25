@@ -3,15 +3,26 @@
 #
 #   1. Symlinks all four skills (never a subset) into $AGENTS_SKILLS_DIR (default ~/.agents/skills).
 #   2. Checks that Pocock's grilling and domain-modeling are discoverable
-#      (in $AGENTS_SKILLS_DIR or ~/.pi/agent/skills); if not, prints the npx command and exits 2.
+#      (in $AGENTS_SKILLS_DIR or ~/.pi/agent/skills); if not, installs them with
+#      `npx skills add mattpocock/skills` (skip with --no-install: then it prints the command and
+#      exits 2).
 #   3. Records the copy it found in upstream.local.json .pocock.agents (spec §8). That file is
 #      per-machine and gitignored, so running this never dirties the tracked upstream.json.
 #   4. Prints the Codex sandbox config and checks ~/.codex/config.toml for it.
 #
 # Environment (all optional): HOME, AGENTS_SKILLS_DIR, REPO_ROOT (default: this repo),
-# XDG_STATE_HOME (npx skills lock file location), GRILL_HOME (default ~/.intelligentrascal).
+# XDG_STATE_HOME (npx skills lock file location), GRILL_HOME (default ~/.intelligentrascal),
+# INSTALL_AGENTS_NPX (the npx executable; tests point it at a fake).
 # Idempotent. Exit: 0 ok, 1 refused (a real directory is in the way), 2 Pocock's skills missing.
 set -euo pipefail
+
+auto_install=1
+for a in "$@"; do
+  case "$a" in
+    --no-install) auto_install=0 ;;
+    *) echo "install-agents: unknown option $a (only --no-install)" >&2; exit 1 ;;
+  esac
+done
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="${REPO_ROOT:-$(cd "$here/.." && pwd)}"
@@ -36,10 +47,25 @@ done
 echo "Linked $SKILLS into $DEST"
 
 # ---- 2. Pocock's skills ----------------------------------------------------------------------
-found=""
-for d in "$DEST" "$HOME/.pi/agent/skills"; do
-  if [ -f "$d/grilling/SKILL.md" ] && [ -f "$d/domain-modeling/SKILL.md" ]; then found="$d"; break; fi
-done
+POCOCK_CMD="skills add mattpocock/skills -g -a codex opencode pi --skill grilling domain-modeling research prototype -y"
+find_pocock() {
+  found=""
+  for d in "$DEST" "$HOME/.pi/agent/skills"; do
+    if [ -f "$d/grilling/SKILL.md" ] && [ -f "$d/domain-modeling/SKILL.md" ]; then found="$d"; return; fi
+  done
+}
+find_pocock
+if [ -z "$found" ] && [ "$auto_install" = 1 ]; then
+  NPX="${INSTALL_AGENTS_NPX:-npx}"
+  if command -v "$NPX" >/dev/null 2>&1; then
+    echo "Pocock's skills not found; installing them: npx $POCOCK_CMD"
+    # shellcheck disable=SC2086
+    "$NPX" -y $POCOCK_CMD || echo "install-agents: npx skills add failed (see above)" >&2
+    find_pocock
+  else
+    echo "install-agents: npx not found; cannot install Pocock's skills automatically" >&2
+  fi
+fi
 
 # ---- 3. record the agents pin ----------------------------------------------------------------
 if [ -n "$found" ]; then
@@ -50,7 +76,7 @@ if [ -n "$found" ]; then
   echo "Pocock's skills: found in $found; recorded in upstream.local.json (pocock.agents)"
 else
   echo "Pocock's skills (grilling, domain-modeling) not found in $DEST or $HOME/.pi/agent/skills. Install them with:"
-  echo "  npx skills add -g mattpocock/skills"
+  echo "  npx $POCOCK_CMD"
 fi
 
 # ---- 4. Codex sandbox ------------------------------------------------------------------------

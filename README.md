@@ -41,13 +41,13 @@ this one too. Update later with `claude plugin marketplace update intelligentras
 
 ```bash
 git clone https://github.com/intelligentrascal/skills ~/intelligentrascal-skills
-npx skills add mattpocock/skills -g --skill grilling domain-modeling research prototype
 ~/intelligentrascal-skills/scripts/install-agents.sh
 ```
 
 `install-agents.sh` symlinks the four skills into `~/.agents/skills` (override with
-`AGENTS_SKILLS_DIR`), where Codex, OpenCode and Pi all find them; checks that Pocock's `grilling`
-and `domain-modeling` are installed (exit 2 with the `npx` hint if not); records their version
+`AGENTS_SKILLS_DIR`), where Codex, OpenCode and Pi all find them; installs Pocock's `grilling`,
+`domain-modeling`, `research` and `prototype` with `npx skills add` when they are missing (pass
+`--no-install` to only print the command); records their version
 in a local, gitignored `upstream.local.json` (so your clone stays clean); and checks the Codex
 sandbox. It is safe to re-run; `git pull` in the clone
 updates the skills in place. Then ask your agent to "grill me with ui about <topic>".
