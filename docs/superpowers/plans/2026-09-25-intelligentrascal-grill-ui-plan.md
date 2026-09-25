@@ -1428,3 +1428,14 @@ Read `design/mockups/decision.json`. Do T30 only if `build` contains `"brief"`, 
 | §10 testing | unit: T7–T16, T33, T36; e2e: T17–T20, T24, T32, T36; concurrency: T36; manual: T26, T29 |
 | §11 risks | T9 (sandbox msg), T13/T26 (Monitor), T16/T29 (wait discipline), T37 (restructure), T26 (override table) |
 | §12 deferred | README (T38) |
+
+---
+
+## Execution notes (amendments made while executing; binding)
+
+- **E1 Visual direction (Rahil).** Inbox = Jason's page exactly (`tokens.css` = Jason's `:root`; sub-AA pairs are documented exceptions in `tokens.test.mjs`). Studio = Apple + Craft theme (`theme-studio.css`, `design/mockups/DESIGN.md`), designed with the tastemaker and hallmark skills. This replaces T1's darkened `--stage`/`--ink-3` values and T3's "links tokens.css / dashed rec" criteria for Inbox.
+- **E2 T6 result.** `design/mockups/decision.json` `build: ["studio"]`. T30 (Brief) is skipped; T31 (Studio) carries the UX fixes listed in `decision.json.notes`. Rahil delegated the gate; the comparison was a screenshot-driven agent usability run (`design/mockups/usability-results.json`).
+- **E3 T8 claims.** `tickets[].hubClaim` in a map patch is rejected (including `null`); only `applyMapPatch(…, { hub: true })` (claim/release) writes it; a ticket removed and re-added in one patch keeps its `hubClaim`; `handled` only increases; a title may not be in both `tickets` and `closed`.
+- **E4 T9 lifecycle.** Handoff only to newer code (`codeTime`), lock staleness by age as well as pid, hub cwd = `GRILL_HOME`, Host header check, `GRILL_HOME` 0700 (spec §5 updated).
+- **E5 T16 profile values** were verified against sources (`docs/superpowers/verification/agent-profile-sources.md`): Codex `exec_command` has no `timeout_ms`; OpenCode's sub-agent tool id is `task` and is foreground unless `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS`; Pi `bash` `timeout` is in seconds; unknown agents leave research open. Spec §5b updated.
+- **E6 Playwright.** E2E scripts honour `PLAYWRIGHT_CHANNEL` (e.g. `chrome`) when Playwright's bundled browser isn't installed.

@@ -242,15 +242,24 @@ The end-of-grill Map screen uses the same data and always shows
   1. Reads `hub.json`, then calls `GET /health` on that port. It reuses the hub only if the
      response echoes the same `{pid, started}` as `hub.json` (this protects against a reused
      pid or port).
-  2. Otherwise it takes `hub.lock` (`O_EXCL`, contents = its own pid). The lock counts as
-     stale only if that pid is dead.
+  2. Otherwise it takes `hub.lock` (`O_EXCL`, contents = its own pid). The lock is stale if
+     that pid is dead, or if the lock file is older than the ensure timeout + 20 s (30 s by
+     default), which covers a pid reused by an unrelated process. A stale lock is renamed to
+     `hub.lock.stale-<pid>-<rand>` and deleted only if it is still the file judged stale
+     (same contents and mtime); otherwise it is put back. Then `ensure` retries.
   3. It spawns the hub on the remembered port and waits up to 10 s for `/health`.
 
   Two agents starting at once therefore get one hub.
-- **Version change (plugin update).** `ensure` sees `version` differ, calls
-  `POST /admin/handoff` on the old hub (loopback only, with the admin token from
-  `hub.json`), and the old hub exits. The new hub binds the **same port**. SSE clients
-  reconnect by themselves, and URLs never change mid-grill.
+- **Version change (plugin update).** `/health` and `hub.json` carry `version` (a hash of the
+  hub code) and `codeTime` (the newest mtime over the same files). `ensure` replaces the
+  running hub only when `version` differs **and** the caller's `codeTime` is greater;
+  otherwise it reuses the running hub, prints `"stale": true` and warns on stderr, so two
+  installed copies (plugin cache and `~/.agents/skills`) never hand off back and forth. To
+  replace it, `ensure` calls `POST /admin/handoff` on the old hub (loopback only, admin
+  token from `hub.json`); if that fails it sends SIGTERM to the `/health`-verified pid and
+  waits up to 3 s for the port. The new hub starts detached with its working directory set
+  to `GRILL_HOME` and binds the **same port**. SSE clients reconnect by themselves, and
+  URLs never change mid-grill.
 - **Idle exit.** The hub exits after 30 minutes with no SSE client **and** no fresh agent
   heartbeat in any unfinished session or map listener. It never exits while an agent is
   waiting or watching, because watchers heartbeat through the hub (see ownership).
@@ -281,10 +290,15 @@ The end-of-grill Map screen uses the same data and always shows
 
 ### Security
 
-- Each session and map gets a random **token**, created by `new` and stored in `state.json`.
-  The served page embeds it, and CLI calls read it from disk.
+- Each session and map gets a random **token**, created by `new` (or the first `map-patch`)
+  and stored in `meta.json` (mode 0600), not `state.json`, because the hub also writes
+  heartbeats there. The served page embeds it, and CLI calls read it from disk.
 - `POST /s/<id>/send`, `/m/<key>/…` and `/admin/*` require the token header and a matching
-  Origin (Jason's check, kept).
+  (or absent) Origin (Jason's check, kept); `Origin: null` is rejected.
+- Every request must carry `Host: 127.0.0.1:<port>` or `localhost:<port>` (DNS-rebinding
+  guard). `GRILL_HOME` is created with mode 0700.
+- The visual is served with `Content-Security-Policy: sandbox allow-scripts`, so opening it
+  in its own tab cannot reach the page's token.
 - An unrelated local process or web page can't inject sends or claims.
 
 ### Updates to the page
@@ -321,9 +335,9 @@ Verified against each agent's source (September 2026):
 | `npx skills add -g` puts Pocock's skills in | n/a (use the plugin) | `~/.agents/skills` | `~/.agents/skills` | `~/.pi/agent/skills` |
 | Loading a skill | Skill tool | `skills.read` / `$name` | `skill` tool | model reads the file; `/skill:name` |
 | Skill dir exposed as | `${CLAUDE_SKILL_DIR}` | `<path>` of SKILL.md | "Base directory for this skill" | `location` of SKILL.md |
-| Model command limits | Bash ≤ 10 min | exec default 10 s, yields at 30 s; background terminal ≤ 5 min | default 2 min, hard max 10 min; no model background jobs | no default timeout; Esc kills the process tree |
+| Model command limits | Bash ≤ 10 min | `exec_command` `yield_time_ms` 250–30 000 (no per-call timeout); empty `write_stdin` polls clamp 5 000–300 000 ms | `bash` `timeout` in ms, default 2 min, no hard max in source; no model background jobs | `bash` `timeout` optional, in seconds, no default; Esc kills the process tree |
 | Wake on external event | Monitor (≤ 30 min, re-arm) | none | none built in (server API needs `opencode serve`) | none built in |
-| Background sub-agent | Agent tool | `spawn_agent` | Task tool | none |
+| Background sub-agent | Agent tool | `spawn_agent` | `task` tool (foreground unless `OPENCODE_EXPERIMENTAL_BACKGROUND_SUBAGENTS`) | none |
 | Sandbox | optional | Seatbelt/Landlock; **localhost blocked by default** | none | none |
 
 ### Installation
@@ -372,12 +386,14 @@ skill follows verbatim. Push adapters are out of scope (§12).
 
 - **Claude Code (`monitor`):** a Monitor on `hub.mjs watch` (§5), re-armed on expiry.
 - **Codex (`wait`, background terminal):**
-  - Start `hub.mjs wait --after N --timeout 280` with `timeout_ms: 300000`.
+  - Start `hub.mjs wait --after N --timeout 280` with `exec_command` and
+    `yield_time_ms: 30000` (Codex has no per-call timeout; the wait's own `--timeout` bounds
+    each run).
   - Exec yields after 30 s, so the model polls the same terminal in ≤ 30 s steps until it
     exits. This is Jason's "poll in bounded steps" rule.
   - Exit 3 means start a new wait.
 - **OpenCode (`wait`):** `hub.mjs wait --after N --timeout 540` with the shell tool's
-  `timeout: 600000` (the 10-minute hard max).
+  `timeout: 600000` (10 minutes; the source has no hard max, but 10 minutes keeps turns short).
 - **Pi (`wait`):** `hub.mjs wait --after N --timeout 900` with no tool timeout. Pressing Esc
   kills only the wait; the hub survives because it is double-forked.
 - **All wait modes:** this is Jason's listener contract, kept.
@@ -443,7 +459,11 @@ localStorage), which beats Inbox.
   All three layouts share Jason's semantics: staging survives reload, one Send = one turn,
   the updated/rec-changed marker, deferred and reopened questions.
 - **Switching layouts:** by path, with a header switch. Nothing is written to state.
-- **One token set (`tokens.css`), used by all layouts and the board.**
+- **Visual direction (Rahil, 2026-09-25).** Inbox and the board use Jason's page exactly:
+  `tokens.css` holds Jason's `:root` values verbatim, and pairs below WCAG AA with those
+  values are documented exceptions in `test/tokens.test.mjs`. Studio layers
+  `theme-studio.css` (Apple DESIGN.md + Craft inspired, system fonts, recorded in
+  `design/mockups/DESIGN.md`) on top of the same token names. Shared rules:
   - System fonts: serif headings, sans body.
   - No network.
   - Contrast checked on the real pairings.
@@ -458,6 +478,10 @@ localStorage), which beats Inbox.
 | **Inbox** | Queue | Jason's list \| card \| discussion. Added: hovering a question highlights its `data-q` regions in the visual. |
 | **Brief** | Document | One column (~68ch), with sections derived from dep roots (each section is titled by its root question). Answered question = one prose line `title → chosen option` with a reopen control. Open or reopened question = a compact block: heading, full-text options as a vertical list, the recommendation dashed and pre-selected, the why in one line, a free-text field always visible, and the thread collapsed to bold first lines that expand inline. Deferred questions get their own section. At 1100 px and wider there is a left jump rail and the visual as a sticky figure on the right; below that the figure sits under the header. Also used for the Wayfinder Map screen. |
 | **Studio** | Visual-first conversation | The visual iframe takes about 60%. A conversation rail shows everything in one timeline, grouped under sticky round headers: question cards in full, answered cards collapsed to one line, thread messages placed by `at`, and visual feedback in the same stream. One composer with a target chip (`@qN thread`, `@qN answer`, `visual`). Hovering a card highlights its regions; clicking a region selects its card. Before the first draw, the main area shows "agreed so far" (derived from the answers) and a Visualize call to action. |
+
+**Built (milestone 1 result, `design/mockups/decision.json`):** Inbox and Studio. Brief was
+not built; the Wayfinder Map screen is the shared `map-view.js` module (plan D9), which
+every built layout uses.
 
 ### Keyboard shortcuts (all layouts and the board)
 
