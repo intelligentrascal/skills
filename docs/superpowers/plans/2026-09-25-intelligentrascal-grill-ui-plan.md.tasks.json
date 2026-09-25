@@ -57,13 +57,13 @@
     {
       "id": 6,
       "subject": "Task 7: util + session state patch/validate (port)",
-      "status": "in_progress",
+      "status": "completed",
       "description": "**Goal:** Port Jason's patch/merge/stamp/validate into `lib/state.mjs` with the new fields, as pure functions with unit tests.\n\n**Depends on:** none\n\n**Verify:** `node --test skills/grilling-ui/test/state.test.mjs` → all pass.\n\nSee plan section \"Task 7\".\n\n```json:metadata\n{\"files\":[\"skills/grilling-ui/lib/util.mjs\",\"skills/grilling-ui/lib/state.mjs\",\"skills/grilling-ui/hub.mjs\",\"skills/grilling-ui/test/state.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/state.test.mjs → all pass.\",\"acceptanceCriteria\":[\"`util.mjs` exports `parseArgs, print, die, writeJson, readJson, rand(hexChars), sleep, isObj, oneLine` (port `$JASON/server.mjs:31-49`; `die` prefix `grill:`; `writeJson` atomic temp+rename).\",\"`state.mjs` exports `PatchError, applyPatch(state, patch, nowIso), validateState(state)` ported from `$JASON/server.mjs:254-450` with these additions:\",\"All patch tests from `$JASON/test/server.test.mjs:291-572` ported as direct `applyPatch`/`validateState` calls (the CLI-level ones — stdin/`--file`/exit codes, lines 487–612 — are ported in T10).\",\"`hub.mjs`: shebang, `parseArgs`, a `cmds` table (own keys only, `$JASON/server.mjs:485-489`), usage message listing all subcommands of the CLI contract below.\"],\"humanGate\":false}\n```"
     },
     {
       "id": 7,
       "subject": "Task 8: Map patch/validate (pure)",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** `lib/maps.mjs` with `applyMapPatch` and `validateMap` for the §4a `map` shape (used both for `map.json` and the session `state.map` snapshot).\n\n**Depends on:** T7\n\n**Verify:** `node --test skills/grilling-ui/test/maps.test.mjs` → pass; `node --test skills/grilling-ui/test/state.test.mjs` still passes.\n\nSee plan section \"Task 8\".\n\n```json:metadata\n{\"files\":[\"skills/grilling-ui/lib/maps.mjs\",\"skills/grilling-ui/test/maps.test.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/maps.test.mjs → pass; node --test skills/grilling-ui/test/state.test.mjs still passes.\",\"acceptanceCriteria\":[\"`validateMap(m)`: object; `title, link, at, destination, notes` strings (optional except `title`); `decisions`, `closed`: arrays of `{title, link?, gist?}` strings; `tickets`: array of `{title (required, unique), link?, type ∈ research|prototype|grilling|task, state ∈ frontier|blocked|claimed, blockedBy?: string[] (each must name another ticket or a closed title), assignee?: string, session?: string (http URL of the grill working it, used by T34), hubClaim?: {agentId: string, at: string, seq?: number}}`; `fog`: string[]; `outOfScope`: `{gist, link?}[]`; `listener?`: `{agentId, heartbeat}`; `handled?`: whole number. Error messages name the ticket title and field.\",\"`applyMapPatch(map, patch, now)`: `null` deletes; `tickets`, `closed`, `decisions` keyed by `title` (known title merges one level, `null` field deletes, new title appended; a ticket moved to `closed` in the same patch may be removed with `{\\\"title\\\": T, \\\"remove\\\": true}` in `tickets`); `fog`, `outOfScope` replaced whole; `listener` in a patch → rejected (\\\"listener is written by the hub\\\"); stamps `at = now` on every patch.\",\"Tests cover each rule plus unknown `blockedBy` rejection and duplicate titles.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         6
@@ -72,7 +72,7 @@
     {
       "id": 8,
       "subject": "Task 9: GRILL_HOME, project key, hub lifecycle (ensure / serve skeleton / handoff / idle exit)",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** One hub per user: `ensure` reuses a healthy hub with the same `{pid, started}`, otherwise takes `hub.lock` and spawns a detached hub on the remembered port; version change → handoff on the same port; idle exit; clear errors on an unwritable root or denied bind.\n\n**Depends on:** T7\n\n**Verify:** `node --test skills/grilling-ui/test/lifecycle.test.mjs` → pass; `ps aux | grep \"hub.mjs serve\"` after the run shows none from the test homes.\n\nSee plan section \"Task 9\".\n\n```json:metadata\n{\"files\":[\"lib/home.mjs\",\"lib/lifecycle.mjs\",\"lib/log.mjs\",\"lib/server.mjs\",\"test/helpers.mjs\",\"test/lifecycle.test.mjs\",\"hub.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/lifecycle.test.mjs → pass; ps aux | grep \\\"hub.mjs serve\\\" after the run shows none from the test homes.\",\"acceptanceCriteria\":[\"`home.mjs`: `grillHome()` = `GRILL_HOME` or `~/.intelligentrascal`; `projectRoot(cwd)` (port `$JASON/server.mjs:58-64`); `projectKey(cwd)` per D2; `branchOf(cwd)` (`git rev-parse --abbrev-ref HEAD`, `\\\"\\\"` outside git); `assertWritable(home)` creates `home`, `logs/`, `grill-sessions/`, `maps/` and probes a write; on `EPERM|EACCES|EROFS` exits 1 with the \"],\"humanGate\":false}\n```",
       "blockedBy": [
         6
@@ -81,7 +81,7 @@
     {
       "id": 9,
       "subject": "Task 10: Sessions — new, sessions, resume/ownership, pending, patch CLI",
-      "status": "pending",
+      "status": "in_progress",
       "description": "**Goal:** Session folders per D2/D3, ownership with heartbeat and `--take`, resume selection, `pending`, and the `patch` CLI with Jason's exit/one-line contract.\n\n**Depends on:** T9\n\n**Verify:** `node --test skills/grilling-ui/test/sessions.test.mjs` → pass.\n\nSee plan section \"Task 10\".\n\n```json:metadata\n{\"files\":[\"lib/sessions.mjs\",\"test/sessions.test.mjs\",\"hub.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/sessions.test.mjs → pass.\",\"acceptanceCriteria\":[\"`new`: runs `ensure`; creates `grill-sessions/<projectKey>/<id>/` with `state.json` `{id, topic, doc, project, projectKey, cwd, branch, created, agent:{status:\\\"working\\\",since}, terms:[], questions:[]}` (+ `phase`, `mapKey` when given), empty `events.jsonl`, `meta.json` `{token: rand(32), owner: {agentId: rand(12), agent, heartbeat: now}}`. `--doc` default `docs/<slug(topic)>-design.md`. Prints `{session, id, projectKey, agentId, url, doc}` (url = `http://127.0.0.1:<port>/s/<id>/`).\",\"`sessions [--all]`: this project's sessions newest first (port `$JASON/server.mjs:106-123`) with added `branch, cwd, ageSec, inUse` (heartbeat < `GRILL_FRESH_MS`), `owner.agent`.\",\"`resume`: without `--session`: unfinished sessions of this project; exactly one and not in use → pick it; otherwise print `{\\\"choose\\\":[rows]}` and exit 0 (skill asks the user). With `--session`: if in use and no `--take` → print `{\\\"inUse\\\":true,\\\"agent\\\":..,\\\"ageSec\\\":..}` exit 4; else mint a new agentId, write owner, print `{session, agentId, url, handled, pending: <count past handled>}`.\",\"`patch --session DIR --agent-id ID [--file P]`: port `$JASON/server.mjs:452-483` (stdin via `tty.isatty(0)` guard, one-line errors, exit 2 on rejects, exit 1 on write failure); runs `ensure` first (best effort: a hub failure prints a warning to stderr but the patch still applies); refreshes `meta.owner.heartbeat` when `--agent-id` matches the owner; if it does not match, rejects with `\\\"session is owned by another agent (<agent>, <age>); resume --take to take it\\\"` exit 4.\",\"`pending --session DIR`: port `$JASON/server.mjs:126-133`.\",\"CLI-level tests ported from `$JASON/test/server.test.mjs:35-61` (key/worktree), `199-289` (sessions/pending), `487-612` (patch CLI) with the new key format and `--agent-id`.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         8
@@ -136,7 +136,7 @@
     {
       "id": 15,
       "subject": "Task 16: `agent-profile`",
-      "status": "pending",
+      "status": "in_progress",
       "description": "**Goal:** Detect the agent and print exact listening/draw parameters the skill follows verbatim.\n\n**Depends on:** T7\n\n**Verify:** `node --test skills/grilling-ui/test/profile.test.mjs` → pass.\n\nSee plan section \"Task 16\".\n\n```json:metadata\n{\"files\":[\"lib/profile.mjs\",\"test/profile.test.mjs\",\"hub.mjs\"],\"verifyCommand\":\"node --test skills/grilling-ui/test/profile.test.mjs → pass.\",\"acceptanceCriteria\":[\"`detectAgent(env, flag)`: flag wins; else D13 env order claude → codex → opencode → pi; else `\\\"unknown\\\"`.\",\"`profile(agent, {skill, session, agentId, handled, project, topic})` returns JSON with `agent`, `mode` (`monitor|wait`), `listen` (exact tool + params, placeholders `<session> <handled> <agentId>` filled when given), `repeat` (what to do on expiry/exit 3), `draw` (`{tool, background}`), `research` (`subagent|leave-open`), `loadSkill` (how to call a skill by name), `notes` (≤ 3 lines).\",\"Values (verify Codex/OpenCode/Pi tool and param names against `$RESEARCH` sources while implementing — Codex: `grep -rn yield_time_ms $RESEARCH/openai-codex/codex-rs`; OpenCode: `$RESEARCH/sst-opencode/packages/opencode/src/tool/` bash tool; Pi: `$RESEARCH/badlogic-pi-mono/packages/coding-agent/src/core/tools/bash.ts` — and adjust the names in this table, keeping the timeouts):\",\"Tests with env fixtures for all five plus `--agent` override; snapshot of the claude Monitor params (exact strings).\"],\"humanGate\":false}\n```",
       "blockedBy": [
         6
@@ -392,5 +392,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T14:48:39.181Z"
+  "lastUpdated": "2026-09-25T14:54:03.004Z"
 }
