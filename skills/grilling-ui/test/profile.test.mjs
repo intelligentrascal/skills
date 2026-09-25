@@ -37,13 +37,15 @@ test("detectAgent: env fixtures for all five", () => {
   assert.equal(detectAgent({}), "unknown");
 });
 
-test("detectAgent: exact values only, order claude → codex → opencode → pi", () => {
+test("detectAgent: exact values only, order codex → opencode → pi → claude", () => {
   assert.equal(detectAgent({ CLAUDECODE: "0" }), "unknown");
   assert.equal(detectAgent({ OPENCODE: "true" }), "unknown");
   assert.equal(detectAgent({ PI_CODING_AGENT: "1" }), "unknown");
   assert.equal(detectAgent({ CODEX_THREAD_ID: "" }), "unknown");
-  // Claude Code started from inside a Codex shell inherits both; the innermost one set CLAUDECODE.
-  assert.equal(detectAgent({ ...ENV.codex, ...ENV.claude }), "claude");
+  // Every child inherits CLAUDECODE=1, so Codex/OpenCode/Pi launched from a Claude Code terminal
+  // carry it too (T29 smoke run): their own markers win. The skills pass --agent, which is exact.
+  assert.equal(detectAgent({ ...ENV.codex, ...ENV.claude }), "codex");
+  assert.equal(detectAgent({ ...ENV.claude, ...ENV.pi }), "pi");
   assert.equal(detectAgent({ ...ENV.opencode, ...ENV.codex }), "codex");
   assert.equal(detectAgent({ ...ENV.pi, ...ENV.opencode }), "opencode");
 });

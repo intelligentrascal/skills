@@ -41,10 +41,12 @@ export const defaultDoc = (topic) => `docs/${slug(topic)}-design.md`;
 // D13 agent detection, used when --agent is not given. (T16's lib/profile.mjs detectAgent is the
 // full version; this keeps `new`/`resume` independent of it.)
 export function agentFromEnv(env = process.env) {
-  if (env.CLAUDECODE === "1") return "claude";
+  // Innermost agent first: every child process inherits CLAUDECODE=1, so a Codex/OpenCode/Pi run
+  // launched from a Claude Code terminal still carries it (T29 smoke run). Their own markers win.
   if (env.CODEX_THREAD_ID || env.CODEX_SANDBOX) return "codex";
   if (env.OPENCODE === "1") return "opencode";
   if (env.PI_CODING_AGENT === "true") return "pi";
+  if (env.CLAUDECODE === "1") return "claude";
   return "unknown";
 }
 // What an owner's `agent` may be (the hub's take route checks it).

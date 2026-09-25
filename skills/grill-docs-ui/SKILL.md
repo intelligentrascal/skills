@@ -10,7 +10,7 @@ description: Grill with docs, with ui. Runs Matt Pocock's grilling and domain-mo
    - Call the Skill tool with `domain-modeling` (in Claude Code: `mattpocock-skills:domain-modeling`).
 
    If either cannot be loaded, stop and tell the user to install Pocock's skills — Claude Code: `claude plugin install mattpocock-skills@mattpocock`; other agents: `npx skills add -g mattpocock/skills`. Never grill from memory.
-2. Call the Skill tool with `grilling-ui` (in Claude Code: `intelligentrascal:grilling-ui`). It loads last; its Overrides table wins.
+2. Call the Skill tool with `grilling-ui` (in Claude Code: `intelligentrascal:grilling-ui`). It loads last; its Overrides table wins. If it cannot be loaded, stop and tell the user this plugin is incompletely installed: Claude Code: `claude plugin install intelligentrascal@intelligentrascal`; other agents: re-run `scripts/install-agents.sh` from the intelligentrascal repo. Pocock's skills are not the cause.
 3. Follow grilling-ui **Start** with the user's topic, doc path `docs/<slug>-design.md` (the user may change it), and finish profile **docs**. For "resume", follow grilling-ui **Resume**.
 
 `CONTEXT.md` and `docs/adr/` are the source of truth, updated during the grill as `domain-modeling` says. After every `CONTEXT.md` edit, patch the page `terms` with the terms touched in this grill only.

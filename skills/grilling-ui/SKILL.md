@@ -92,18 +92,22 @@ GRILL_PATCH
 
 The wrapper gives you: the topic, a doc path (or none), the finish profile, and any `--phase` / `--map-key`.
 
+Start is silent: make the tool calls in steps 1–5 without writing any text before, between or after them (no "creating the session", no "Round 1 is on the page", no "arming the listener now"). The only thing Start prints to the terminal is the line in step 6.
+
 1. From the project directory run
    `node "$SKILL/hub.mjs" new --topic "<topic>" --doc "<doc path>" --agent <agent>`
-   `<agent>` is `claude`, `codex`, `opencode` or `pi`; leave `--agent` out if you are none of these. Leave `--doc` out when the wrapper gives no doc path; add `--phase <phase>` and `--map-key <key>` when it gives them. It prints `{"session","id","projectKey","agentId","url","doc"}`; keep `session` and `agentId`.
+   `<agent>` is `claude`, `codex`, `opencode` or `pi`: the harness you are running in, not a guess from the environment (a Codex started from a Claude Code terminal is `codex`). Leave `--agent` out if you are none of these. Leave `--doc` out when the wrapper gives no doc path; add `--phase <phase>` and `--map-key <key>` when it gives them. It prints `{"session","id","projectKey","agentId","url","doc"}`; keep `session` and `agentId`.
+
+   If it fails with `grill: cannot write GRILL_HOME` or `cannot bind 127.0.0.1` and a Codex config block: stop, show the user that message verbatim (it is the fix: a sandbox setting only they can change, then a restart), and end. Never work around it by setting `GRILL_HOME`, `--port`, or anything else yourself.
 2. Patch round 1: **the whole frontier** (see **Handling a send**, step 4, for how a question card is written), any `terms`, and `"agent": { "status": "waiting" }`.
-3. Run `node "$SKILL/hub.mjs" agent-profile --session "<session>" --agent-id <agentId>`. It prints your **profile**: `mode`, `listen`, `repeat`, `draw`, `research`, `loadSkill`, `notes`. Follow it verbatim for the rest of the grill.
+3. Run `node "$SKILL/hub.mjs" agent-profile --agent <agent> --session "<session>" --agent-id <agentId>` (the same `<agent>` as step 1; leave `--agent` out only if you left it out there). It prints your **profile**: `mode`, `listen`, `repeat`, `draw`, `research`, `loadSkill`, `notes`. Follow it verbatim for the rest of the grill.
 4. Arm the listener: call `listen.tool` with `listen.params` exactly as printed (see **Listening**).
 5. Run `node "$SKILL/hub.mjs" open --session "<session>"`. It opens the page in the browser unless a tab of it is already open, and prints `{"opened":…,"url":…}`.
-6. Print ONE line: the URL, how many questions are open, and the doc path (the user can change it by typing in the terminal). Return to listening.
+6. Print ONE line, and nothing else: the URL, how many questions are open, and the doc path (the user can change it by typing in the terminal). That line is your whole message for Start. Return to listening.
 
 ## Listening
 
-**Return to listening** means the action for your profile's `mode`. Either way, follow `repeat` for how a listener ends: exit 4 or a `{"type":"taken"}` line means another agent took the session (stop, tell the user, do not restart); exit 1 or 2 means report the error line (do not loop).
+**Return to listening** means the action for your profile's `mode`, without adding text: when a step prints a status line, that line is the whole message. Either way, follow `repeat` for how a listener ends: exit 4 or a `{"type":"taken"}` line means another agent took the session (stop, tell the user, do not restart); exit 1 or 2 means report the error line (do not loop).
 
 **`monitor` (Claude Code).** The armed Monitor delivers each Send as an event, even after your turn ends: publish the update and end the turn. On the Monitor's expiry notice, re-run `agent-profile` (step 3 of **Start**; it reads the current `agent.handled`) and arm the new `listen` exactly as printed.
 

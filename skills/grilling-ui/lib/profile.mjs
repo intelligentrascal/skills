@@ -15,10 +15,12 @@ export function detectAgent(env = process.env, flag) {
     if (typeof flag !== "string" || !AGENTS.includes(flag)) throw new Error(`--agent must be one of ${AGENTS.join("|")}`);
     return flag;
   }
-  if (env.CLAUDECODE === "1") return "claude";
+  // Innermost agent first: every child process inherits CLAUDECODE=1, so a Codex/OpenCode/Pi run
+  // launched from a Claude Code terminal still carries it (T29 smoke run). Their own markers win.
   if (env.CODEX_THREAD_ID || env.CODEX_SANDBOX) return "codex";
   if (env.OPENCODE === "1") return "opencode";
   if (env.PI_CODING_AGENT === "true") return "pi";
+  if (env.CLAUDECODE === "1") return "claude";
   return "unknown";
 }
 

@@ -1,5 +1,3 @@
 interface:
   display_name: "Grilling UI (engine)"
   short_description: "Browser transport for the -ui grill skills"
-policy:
-  allow_implicit_invocation: false

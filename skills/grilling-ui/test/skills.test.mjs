@@ -146,17 +146,23 @@ test("wayfinder-ui: vendored upstream/wayfinder.md is byte-identical to the pinn
 });
 
 test("upstream.json: pins", () => {
-  // Shape, not values: install-agents.sh records `agents` and sync-pocock.sh bumps the pins.
+  // Shape, not values: sync-pocock.sh bumps the pins. The tracked file holds only the maintainer's
+  // pins; install-agents.sh records each machine's `agents` pin in the gitignored upstream.local.json.
   const u = JSON.parse(readFileSync(join(ROOT, "upstream.json"), "utf8")).pocock;
   const sha = /^[0-9a-f]{40}$/;
   assert.equal(u.plugin, "mattpocock-skills");
   assert.match(u.claude.version, /^\d+\.\d+\.\d+$/);
   assert.match(u.claude.commit, sha);
   assert.match(u.wayfinder.vendoredFrom, sha);
-  if (u.agents !== null) {
-    assert.equal(typeof u.agents.dir, "string");
-    assert.match(u.agents.contentSha, /^[0-9a-f]{64}$/);
-    assert.ok(u.agents.skillFolderHash === null || typeof u.agents.skillFolderHash === "object");
+  assert.equal(u.agents, null, "agents pin belongs in upstream.local.json, not the tracked upstream.json");
+  const localFile = join(ROOT, "upstream.local.json");
+  if (existsSync(localFile)) {
+    const a = JSON.parse(readFileSync(localFile, "utf8")).pocock?.agents;
+    if (a != null) {
+      assert.equal(typeof a.dir, "string");
+      assert.match(a.contentSha, /^[0-9a-f]{64}$/);
+      assert.ok(a.skillFolderHash === null || typeof a.skillFolderHash === "object");
+    }
   }
 });
 
@@ -221,7 +227,7 @@ test("wayfinder-ui: Board mode replaces the hook: profile --map, watcher, open, 
   const text = read("wayfinder-ui");
   assert.doesNotMatch(text, /HOOK|Not built yet|board mode is coming/);
   const s = section(text, "## Board mode (`/wayfinder-ui board <map>`)");
-  for (const w of ['node "$ENGINE/hub.mjs" agent-profile --map <mapKey>', 'node "$ENGINE/hub.mjs" open --map <mapKey>',
+  for (const w of ['node "$ENGINE/hub.mjs" agent-profile --agent <agent> --map <mapKey>', 'node "$ENGINE/hub.mjs" open --map <mapKey>',
     "**exactly one**", "<boardAgentId>", "`listen.tool`", "`repeat`", "grilling-ui **Board events**"]) assert.ok(s.includes(w), `mentions ${w}`);
 });
 
@@ -260,10 +266,12 @@ function readYaml(text) {
 }
 const sidecar = (skill) => readYaml(readFileSync(join(SKILLS, skill, "agents", "openai.yaml"), "utf8"));
 
-test("openai.yaml: grilling-ui is hidden from implicit invocation", () => {
+// No policy block on grilling-ui: allow_implicit_invocation false keeps a skill out of the model's
+// context entirely (only a user's `$grilling-ui` reaches it), so the wrappers could not load it
+// (T29 Codex smoke run). Its trigger-free description keeps it from firing on its own.
+test("openai.yaml: grilling-ui stays loadable by the wrappers (no policy block)", () => {
   assert.deepEqual(sidecar("grilling-ui"), {
     interface: { display_name: "Grilling UI (engine)", short_description: "Browser transport for the -ui grill skills" },
-    policy: { allow_implicit_invocation: false },
   });
 });
 
