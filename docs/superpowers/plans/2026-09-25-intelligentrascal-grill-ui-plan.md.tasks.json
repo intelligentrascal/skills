@@ -164,7 +164,7 @@
     {
       "id": 18,
       "subject": "Task 19: Keyboard layer and cheatsheet",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Linear/Gmail-style shortcuts for all layouts (board keys land in T34), with the §7 guard rules and a `?` cheatsheet.\n\n**Depends on:** T18\n\n**Verify:** `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/keyboard.e2e.mjs` → PASS.\n\nSee plan section \"Task 19\".\n\n```json:metadata\n{\"files\":[\"page/core.js\",\"page/inbox.html\",\"test/keyboard.e2e.mjs\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=… node skills/grilling-ui/test/keyboard.e2e.mjs → PASS.\",\"acceptanceCriteria\":[\"One `keydown` listener on `document`. Ignored when `e.isComposing`, when `e.ctrlKey || e.altKey` (except `Ctrl+Enter`), and when focus is in `input, textarea, [contenteditable]` — except `⌘↵/Ctrl↵` (send) and `Esc` (blur field / close overlay).\",\"Keys: `j/k` → `layout.move(±1)`; `1`–`4` → stage option A–D only if it exists; `a` → stage accept of `rec.option`; `r` → `layout.focusThread()`; `f` → `layout.focusFree()`; `d`/`o` → stage defer/reopen; `e` → toast \\\"Exploring Qn… Undo\\\" for 3 s, then `explore(id)` unless undone (`u` or click Undo); `v` → toggle visual or `visualize()`; `g` then `i/b/s/m` within 1 s → navigate to that layout (only built ones) or `/m/<mapKey>/` when `S.mapKey`; `u` → clear this question's staged action; `?` → cheatsheet overlay (table of the §7 rows) with an \\\"Turn shortcuts off\\\" switch stored at `localStorage[\\\"grill:keys\\\"]=\\\"off\\\"` (when off, only ⌘↵ and Esc remain).\",\"Toast and overlay are `role=\\\"status\\\"` / `role=\\\"dialog\\\"` with focus return.\",\"E2E: each shortcut's effect; `j` typed in the thread textarea types a `j`; `1` with 2 options does nothing for `3`; IME composition ignored (dispatch `keydown` with `isComposing: true`); ⌘↵ from a textarea sends; `?` opens and Esc closes; off switch persists across reload.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         17
@@ -173,7 +173,7 @@
     {
       "id": 19,
       "subject": "Task 20: Visual linkage (data-q) and visual-brief",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Region highlighting and click-to-select between questions and the sandboxed visual, ⌘↵/Esc forwarded out of the iframe; port `visual-brief.md` with the verbatim listener.\n\n**Depends on:** T19\n\n**Verify:** `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/keyboard.e2e.mjs` and `page.e2e.mjs` → PASS.\n\nSee plan section \"Task 20\".\n\n```json:metadata\n{\"files\":[\"skills/grilling-ui/visual-brief.md\",\"page/core.js\",\"page/inbox.html\",\"test/keyboard.e2e.mjs\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=… node skills/grilling-ui/test/keyboard.e2e.mjs and page.e2e.mjs → PASS.\",\"acceptanceCriteria\":[\"`visual-brief.md` = `$JASON/visual-brief.md` with \\\"grill-with-ui\\\" → \\\"grilling-ui\\\", plus a section \\\"Linking regions to questions\\\": every region that a question decides gets `data-q=\\\"qN\\\"`; the file must include the listener below **verbatim** before `</body>`; `grep -n 'data-q' visual.html` must return at least one hit per answered question the visual depicts.\",\"Parent side in `core.js`: `Grill.highlight(ids)` posts `{highlight: ids}` to `#visual-frame`; `message` handler accepts only `e.source === frame.contentWindow`, `clicked` matching `/^q\\\\d+$/` → `layout.select(id)`; `key: \\\"send\\\"` → `send()`; `key: \\\"escape\\\"` → focus returns to the page (`document.body` → current question heading).\",\"Inbox: `mouseenter` on a nav item / card → `highlight([id])`; `mouseleave` → `highlight([])`.\",\"E2E (extend keyboard.e2e): a fixture `visual.html` containing the listener and `data-q` regions; hover Q2 → region has class `grill-hl`; click region `q3` → Q3 selected; ⌘↵ pressed with focus inside the iframe sends staged actions.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         18
@@ -212,7 +212,7 @@
     {
       "id": 23,
       "subject": "Task 24: Map screen, phase header, no-map state",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Render the Wayfinder Map snapshot at the end of a grill in every layout (D9), show `phase` in the header, and the \"No map needed — see terminal\" state.\n\n**Depends on:** T8, T17\n\n**Verify:** `PLAYWRIGHT_PKG=… node skills/grilling-ui/test/map.e2e.mjs` → PASS.\n\nSee plan section \"Task 24\".\n\n```json:metadata\n{\"files\":[\"page/map-view.js\",\"test/map.e2e.mjs\",\"page/core.js\",\"page/inbox.html\",\"lib/server.mjs\"],\"verifyCommand\":\"PLAYWRIGHT_PKG=… node skills/grilling-ui/test/map.e2e.mjs → PASS.\",\"acceptanceCriteria\":[\"`map-view.js` exports `window.MapView.render(el, map, {now})`: header (destination, \\\"Snapshot at <time> · canonical: <link>\\\"), sections Decisions so far (title→gist), Frontier / Blocked (with blockedBy titles) / Claimed tickets (type chip, assignee), Closed (gist), Not yet specified (fog), Out of scope. Links render as `<a>` only for `http(s):` URLs; anything else is plain text (§4a). All text escaped.\",\"`core.js`: when `S.finished && S.finished.kind === \\\"map\\\"` the layout body is replaced by the Map screen (with a \\\"Back to questions\\\" toggle); `no-map` shows a banner \\\"No map needed — see terminal\\\"; header shows `phase` label (Destination / Frontier / Ticket).\",\"E2E: fixture session with `finished.kind: \\\"map\\\"` and a map with a local path link → Map screen renders sections, the path is plain text, snapshot time shown; `no-map` fixture shows the banner; phase label visible.\"],\"humanGate\":false}\n```",
       "blockedBy": [
         7,
@@ -395,5 +395,5 @@
       ]
     }
   ],
-  "lastUpdated": "2026-09-25T15:57:05.194Z"
+  "lastUpdated": "2026-09-25T18:13:25.735Z"
 }

@@ -68,6 +68,12 @@
   const drawing = () => { const v = visual(); return v && v.drawing && typeof v.drawing === "object" ? v.drawing : null; };
   const drawStuck = () => { const d = drawing(); return !!d && Date.now() - Date.parse(d.since || 0) > DRAW_GRACE_MS; };
   const activeView = () => (local.view === "visualize" && hasVisual() ? "visualize" : "questions");
+  // Wayfinder Map screen (plan T24, D9): a grill finished with kind "map" opens on its map snapshot;
+  // "Back to questions" (local.mapView = "questions") shows the layout again.
+  const mapReady = () => !!(S && S.finished && S.finished.kind === "map" && S.map && typeof S.map === "object");
+  const mapShown = () => mapReady() && local.mapView !== "questions";
+  const MAP_KEY_RE = /^[a-z0-9-]+\/[a-z0-9-]+$/;
+  const boardUrl = () => (S && typeof S.mapKey === "string" && MAP_KEY_RE.test(S.mapKey) ? `/m/${S.mapKey}/` : null);
   const timeOf = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); };
   const fmtMs = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`; };
   const baseName = (p) => String(p || "").replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "";
@@ -227,6 +233,135 @@
     };
   }
 
+  // ---- keyboard layer (plan T19, spec §7 Keyboard shortcuts) ----
+  // Grill.keys(opts) → kb. Shared by every page (the board adds its own keys in T34). opts:
+  //   rows          [[keys html, action text], …] for the `?` cheatsheet
+  //   handle(key, e)  a plain key the page may act on; return true when it did (the key's default
+  //                 action is then prevented, so a key that moved focus into a field never types there)
+  //   go(key)       the key after `g` (within 1 s); return true when it navigated
+  //   send()        ⌘↵ / Ctrl↵, from anywhere (also forwarded from the visual, T20)
+  //   closeOverlays()  the page's own popovers (e.g. the terms panel); return true if one closed
+  // kb: { toast(text, {undo, ms}), undo() → bool, openSheet(), closeSheet(), closeOverlays() → bool,
+  //       off() → bool, setOff(bool) }.
+  // Rules: one keydown listener on document; ignored during IME composition; ⌘↵/Ctrl↵ sends and
+  // Esc leaves a field / closes an overlay from anywhere; everything else is ignored while Ctrl,
+  // Alt or ⌘ is held, while focus is in a text field, and while shortcuts are off
+  // (localStorage "grill:keys" = "off", the cheatsheet's switch).
+  const inField = (el) => !!el && el !== document.body && !!el.matches && el.matches("input, textarea, select, [contenteditable]:not([contenteditable='false']), [contenteditable]:not([contenteditable='false']) *");
+  const KEYS_OFF = "grill:keys";
+  const TOAST_MS = 3000;
+  function keys(o) {
+    const noop = () => false;
+    const handle = o.handle || noop, go = o.go || noop, sendKey = o.send || noop, pageOverlays = o.closeOverlays || noop;
+    const off = () => store.get(KEYS_OFF) === "off";
+    const setOff = (v) => { if (v) store.set(KEYS_OFF, "off"); else { try { localStorage.removeItem(KEYS_OFF); } catch {} } };
+    let gAt = 0;
+
+    // toast: role=status, one at a time; an `undo` callback adds an Undo button (and makes `u` undo)
+    let toastEl = null, toastTimer = null, pendingUndo = null;
+    function hideToast() {
+      clearTimeout(toastTimer); toastTimer = null; pendingUndo = null;
+      if (toastEl) { toastEl.classList.remove("show"); const b = toastEl.querySelector("button"); if (b && b === document.activeElement) b.blur(); }
+    }
+    function toast(text, { undo = null, ms = TOAST_MS } = {}) {
+      if (!toastEl) {
+        toastEl = document.createElement("div");
+        toastEl.id = "grill-toast"; toastEl.className = "toast";
+        toastEl.setAttribute("role", "status"); toastEl.setAttribute("aria-live", "polite");
+        document.body.appendChild(toastEl);
+      }
+      hideToast();
+      toastEl.innerHTML = `<span class="toast-text">${esc(text)}</span>${undo ? `<button type="button" class="toast-undo" aria-keyshortcuts="u">Undo</button>` : ""}`;
+      pendingUndo = undo;
+      if (undo) toastEl.querySelector("button").onclick = () => undoNow();
+      toastEl.classList.add("show");
+      toastTimer = setTimeout(hideToast, ms);
+    }
+    function undoNow() { const u = pendingUndo; if (!u) return false; hideToast(); u(); return true; }
+
+    // cheatsheet: role=dialog, focus moves in and comes back on close
+    let sheet = null, returnTo = null;
+    const sheetOpen = () => !!sheet && !sheet.hidden;
+    function buildSheet() {
+      sheet = document.createElement("div");
+      sheet.id = "grill-keys"; sheet.className = "keys-sheet"; sheet.hidden = true;
+      sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-modal", "true"); sheet.setAttribute("aria-labelledby", "grill-keys-title");
+      sheet.innerHTML = `<div class="keys-panel" tabindex="-1">
+          <h2 id="grill-keys-title">Keyboard shortcuts</h2>
+          <table><tbody>${(o.rows || []).map(([k, t]) => `<tr><td>${k}</td><td>${esc(t)}</td></tr>`).join("")}</tbody></table>
+          <div class="keys-foot"><label><input type="checkbox" role="switch" id="grill-keys-off"> Turn shortcuts off <span class="keys-note">(⌘↵ and Esc still work)</span></label><button type="button" id="grill-keys-close">Close</button></div>
+        </div>`;
+      document.body.appendChild(sheet);
+      sheet.addEventListener("click", (e) => { if (e.target === sheet) closeSheet(); });
+      sheet.querySelector("#grill-keys-close").onclick = closeSheet;
+      const sw = sheet.querySelector("#grill-keys-off");
+      sw.onchange = () => setOff(sw.checked);
+      // keep Tab inside the dialog
+      sheet.addEventListener("keydown", (e) => {
+        if (e.key !== "Tab") return;
+        const f = [...sheet.querySelectorAll("input, button")];
+        const i = f.indexOf(document.activeElement);
+        if (e.shiftKey ? i <= 0 : i === f.length - 1) { e.preventDefault(); f[e.shiftKey ? f.length - 1 : 0].focus(); }
+      });
+    }
+    function openSheet() {
+      if (!sheet) buildSheet();
+      if (sheetOpen()) return;
+      returnTo = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
+      sheet.querySelector("#grill-keys-off").checked = off();
+      sheet.hidden = false;
+      sheet.querySelector(".keys-panel").focus();
+    }
+    function closeSheet() {
+      if (!sheetOpen()) return false;
+      sheet.hidden = true;
+      const r = returnTo; returnTo = null;
+      if (r && r.isConnected && r.focus) r.focus(); else if (document.activeElement && sheet.contains(document.activeElement)) document.activeElement.blur();
+      return true;
+    }
+    const closeOverlays = () => closeSheet() || !!pageOverlays();
+
+    document.addEventListener("keydown", (e) => {
+      if (e.isComposing || e.keyCode === 229) return;
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key === "Enter") { e.preventDefault(); sendKey(); return; }
+      if (e.key === "Escape") {
+        if (closeOverlays()) { e.preventDefault(); return; }
+        const a = document.activeElement; if (inField(a)) a.blur();
+        return;
+      }
+      if (e.ctrlKey || e.altKey || e.metaKey || inField(document.activeElement) || off()) return;
+      if (sheetOpen()) { if (e.key === "?") { e.preventDefault(); closeSheet(); } return; }
+      if (e.key === "?") { e.preventDefault(); openSheet(); return; }
+      if (gAt) {
+        const fresh = Date.now() - gAt < 1000; gAt = 0;
+        if (fresh) { if (go(e.key)) e.preventDefault(); return; }
+      }
+      if (e.key === "g") { gAt = Date.now(); e.preventDefault(); return; }
+      if (e.key === "u" && undoNow()) { e.preventDefault(); return; }
+      if (handle(e.key, e)) e.preventDefault();
+    });
+    return { toast, hideToast, undo: undoNow, openSheet, closeSheet, closeOverlays, off, setOff, inField };
+  }
+  // The §7 table (the board's `w` row is added by the board).
+  const kbd = (...ks) => ks.map((k) => `<kbd>${esc(k)}</kbd>`).join(" / ");
+  const SESSION_ROWS = [
+    [kbd("j", "k"), "Next / previous question"],
+    [`${kbd("1")}–${kbd("4")}`, "Pick option A–D (staged)"],
+    [kbd("a"), "Accept the recommendation (staged)"],
+    [kbd("r"), "Write in this question's discussion"],
+    [kbd("f"), "Free-text answer"],
+    [kbd("d", "o"), "Defer / reopen (staged)"],
+    [kbd("e"), "Explore deeper (sends after a 3 s undo)"],
+    [kbd("v"), "Toggle the visual / Visualize"],
+    // only the built layouts (plus the Map board): with Inbox alone that is `g m`
+    [`${kbd("g")} then ${kbd(...LAYOUTS.filter((l) => l !== "inbox" || LAYOUTS.length > 1).map((l) => l[0]), "m")}`,
+      [...LAYOUTS.filter((l) => l !== "inbox" || LAYOUTS.length > 1).map((l) => l[0].toUpperCase() + l.slice(1)), "Map board"].join(" / ")],
+    [kbd("u"), "Unstage this question (or undo Explore)"],
+    [`${kbd("⌘↵")} / ${kbd("Ctrl↵")}`, "Send, from anywhere, including the visual"],
+    [kbd("Esc"), "Leave the text field / close this / leave the visual"],
+    [kbd("?"), "This list"],
+  ];
+
   // This session's connection (started by mount).
   const conn = transport({
     kind: "s", key: G.id, url: BASE + "state", presence: BASE + "presence",
@@ -356,14 +491,100 @@
   function setView(v) { local.view = v; commit(); }
   const toggleVisual = () => { if (hasVisual()) setView(activeView() === "visualize" ? "questions" : "visualize"); else visualize(); };
 
+  // ---- this page's shortcuts (§7 table), on the current question ----
+  let kb = null;
+  const EXPLORE_UNDO_MS = 3000;
+  // `e`: a 3 s toast with Undo, then the same immediate send as the button.
+  function exploreSoon(id) {
+    const q = byId(id);
+    if (!q || !(q.options || []).length || locked() || isExploring(id) || sendState(false).disabled) return false;
+    let undone = false;
+    const timer = setTimeout(() => { if (!undone) { kb.hideToast(); explore(id); } }, EXPLORE_UNDO_MS);
+    kb.toast(`Exploring ${id.toUpperCase()}…`, { undo: () => { undone = true; clearTimeout(timer); }, ms: EXPLORE_UNDO_MS + 500 });
+    return true;
+  }
+  function sessionKey(k) {
+    const id = window.Grill.current(), q = byId(id), lk = locked();
+    const s = (q && local.staged[q.id]) || {};
+    const rec = (q && q.rec) || {};
+    if (k === "j" || k === "k") { move(k === "j" ? 1 : -1); return true; }
+    if (k === "v") { toggleVisual(); return true; }
+    if (k === "r") { if (L.focusThread) L.focusThread(); return true; }
+    if (k === "f") { if (L.focusFree && !lk) L.focusFree(); return true; }
+    if (!q || lk) return false;
+    if (/^[1-4]$/.test(k)) {
+      const o = (q.options || [])[Number(k) - 1];
+      if (!o) return false; // only options that exist
+      stageAnswer(q.id, { kind: o.k === rec.option ? "accept" : "option", option: o.k });
+      return true;
+    }
+    if (k === "a") { if (!rec.option || !(q.options || []).some((o) => o.k === rec.option)) return false; stageAnswer(q.id, { kind: "accept", option: rec.option }); return true; }
+    if (k === "d") { if (!isOpen(q)) return false; if (s.defer) clearStaged(q.id); else stageDefer(q.id); return true; }
+    if (k === "o") { if (isOpen(q)) return false; if (s.reopen) clearStaged(q.id); else stageReopen(q.id); return true; }
+    if (k === "u") { if (!local.staged[q.id]) return false; clearStaged(q.id); return true; }
+    if (k === "e") return exploreSoon(q.id);
+    return false;
+  }
+  function sessionGo(k) {
+    const layout = { i: "inbox", b: "brief", s: "studio" }[k];
+    if (layout) {
+      if (!LAYOUTS.includes(layout) || (L && L.layout === layout)) return false;
+      store.set("grill:layout", layout); location.href = BASE + layout; return true;
+    }
+    if (k === "m" && boardUrl()) { location.href = boardUrl(); return true; }
+    return false;
+  }
+  // ---- visual linkage (plan T20, spec §7 Visual linkage) ----
+  // The visual (#visual-frame, sandboxed, opaque origin) carries visual-brief.md's verbatim
+  // listener: parent → child {highlight:[ids]}; child → parent {clicked:id} and {key:"send"|"escape"}.
+  // Only messages from that frame's window count, and only as ids or keys.
+  const Q_ID = /^q\d+$/;
+  const frameEl = () => $("visual-frame");
+  let hoverId = null, shownHl = null;
+  function highlight(ids) {
+    const list = (Array.isArray(ids) ? ids : []).filter((x) => typeof x === "string" && Q_ID.test(x));
+    shownHl = list.join(",");
+    const f = frameEl();
+    if (f && f.contentWindow) f.contentWindow.postMessage({ highlight: list }, "*");
+  }
+  const targets = (id) => (L && L.highlightTargets ? L.highlightTargets(id) : [id]);
+  // Outline the question under the pointer; with the visual open and nothing hovered, the selected one.
+  function restHighlight(force) {
+    const ids = hoverId ? targets(hoverId) : activeView() === "visualize" && selected ? targets(selected) : [];
+    if (force || ids.join(",") !== shownHl) highlight(ids);
+  }
+  function hover(id) { hoverId = id && byId(id) ? id : null; restHighlight(); }
+  function leaveVisual() {
+    const f = frameEl(); if (f) f.blur();
+    const h = $("card-title");
+    if (h && h.getClientRects().length) { h.focus(); return; }
+    if (!document.body.hasAttribute("tabindex")) document.body.tabIndex = -1;
+    document.body.focus();
+  }
+  function onFrameMessage(e) {
+    const f = frameEl();
+    if (!f || !f.contentWindow || e.source !== f.contentWindow) return;
+    const d = e.data;
+    if (!d || typeof d !== "object") return;
+    // a click in the visual means the pointer is there, whatever mouseleave the page missed
+    if (typeof d.clicked === "string") { if (Q_ID.test(d.clicked) && byId(d.clicked)) { hoverId = null; select(d.clicked); } }
+    else if (d.key === "send") send();
+    else if (d.key === "escape") leaveVisual();
+  }
+
+  function closeTerms() { const t = $("terms"); if (t && t.classList.contains("show")) { t.classList.remove("show"); return true; } return false; }
+
   // ---- rendering ----
   function render() {
     withThreadScroll(() => withInputs(() => {
       document.body.classList.toggle("visualize", activeView() === "visualize");
+      document.body.classList.toggle("mapview", mapShown());
       renderBanner(); renderHeader();
       if (L) L.renderBody();
+      renderMap();
       renderFooter();
     }));
+    restHighlight();
   }
   function tick() { renderStatus(); renderSend(); }
   function withInputs(fn) {
@@ -396,7 +617,14 @@
   }
   function renderBanner() {
     const b = $("banner"); if (!b) return;
-    if (S && S.finished) { b.className = "show done"; b.textContent = `Finished · the design doc was written to ${S.finished.doc || S.doc || "the doc path"}${S.finished.visual ? ", the visual to " + S.finished.visual : ""}${S.finished.at ? " at " + timeOf(S.finished.at) : ""}.`; }
+    const f = S && S.finished;
+    if (f && f.kind === "no-map") { b.className = "show done"; b.textContent = "No map needed — see terminal"; }
+    else if (f && f.kind === "map") {
+      b.className = "show done";
+      b.innerHTML = `Finished · the Wayfinder map is on the tracker${f.at ? " at " + esc(timeOf(f.at)) : ""}.${mapReady() && !mapShown() ? ' <a href="#" id="show-map">Show the map</a>' : ""}`;
+      const a = $("show-map"); if (a) a.onclick = (e) => { e.preventDefault(); setMapView(true); };
+    }
+    else if (f) { b.className = "show done"; b.textContent = `Finished · the design doc was written to ${f.doc || S.doc || "the doc path"}${f.visual ? ", the visual to " + f.visual : ""}${f.at ? " at " + timeOf(f.at) : ""}.`; }
     else if (gone) { b.className = "show"; b.textContent = "Hub down — reconnecting…"; }
     else { b.className = ""; b.textContent = ""; }
   }
@@ -454,6 +682,27 @@
     link.type = "image/svg+xml";
     link.dataset.status = status;
     link.href = "data:image/svg+xml," + encodeURIComponent(svg);
+  }
+  // The Map screen: #map-screen (the layout provides the slot) gets a bar (Back to questions, Open
+  // board →) and the MapView snapshot. Rebuilt only when the map or the board link changes.
+  function setMapView(on) {
+    local.mapView = on ? "map" : "questions"; commit();
+    const t = on ? $("map-back") : $("show-map") || $("card-title");
+    if (t) t.focus();
+  }
+  let shownMap = null;
+  function renderMap() {
+    const el = $("map-screen"); if (!el) return;
+    if (!mapShown()) { el.hidden = true; return; }
+    el.hidden = false;
+    const key = JSON.stringify([S.map, boardUrl()]);
+    if (key === shownMap) return;
+    shownMap = key;
+    const board = boardUrl();
+    el.innerHTML = `<div class="map-bar"><button type="button" id="map-back">Back to questions</button>${board ? `<a id="open-board" href="${esc(board)}">Open board →</a>` : ""}</div><div id="map-body"></div>`;
+    $("map-back").onclick = () => setMapView(false);
+    if (window.MapView) window.MapView.render($("map-body"), S.map, { now: Date.now() });
+    else $("map-body").textContent = "The map view failed to load.";
   }
   function renderStatus() {
     const dot = $("agent-dot"), txt = $("agent-status"), hd = document.querySelector("header"), li = $("listener");
@@ -521,6 +770,10 @@
   //   focusThread()     focus the thread composer for the current question, synchronously
   //   focusFree()       focus the free-text answer for the current question, synchronously
   //   highlightTargets(id)  ids whose visual regions to outline when `id` is pointed at (default [id])
+  // The layout calls Grill.hover(id) when the pointer is over a question (list item, card) and
+  // Grill.hover(null) when it leaves; the core outlines those regions in #visual-frame (T20). The
+  // core owns the keyboard (Grill.keys, T19) and the frame's messages (click → select, ⌘↵ → send,
+  // Esc → focus back to #card-title or the body).
   function mount(hooks) {
     if (L) throw new Error("Grill.mount called twice");
     if (!hooks || typeof hooks.renderBody !== "function" || !hooks.layout) throw new Error("Grill.mount needs {layout, renderBody}");
@@ -531,7 +784,10 @@
     on("visualize", toggleVisual);
     on("terms-toggle", () => $("terms") && $("terms").classList.toggle("show"));
     document.addEventListener("click", (e) => { const t = $("terms"); if (t && !e.target.closest("#terms") && !e.target.closest("#terms-toggle")) t.classList.remove("show"); });
-    document.addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); send(); } });
+    kb = keys({ rows: SESSION_ROWS, handle: sessionKey, go: sessionGo, send, closeOverlays: closeTerms });
+    on("keys-help", (e) => { e.preventDefault(); kb.openSheet(); });
+    window.addEventListener("message", onFrameMessage);
+    { const f = frameEl(); if (f) { f.addEventListener("load", () => restHighlight(true)); f.addEventListener("mouseenter", () => hover(null)); } } // a (re)loaded visual starts unhighlighted
     setInterval(tick, 1000);
     render();
     conn.start();
@@ -540,7 +796,9 @@
   window.Grill = {
     boot: G, base: BASE, layouts: LAYOUTS,
     // shared with the board (T34): the connection factory, and this page's connection
-    transport, conn, POLL_NOTE,
+    transport, conn, POLL_NOTE, keys, inField, kbd,
+    get kb() { return kb; },
+    highlight, hover, mapReady, mapShown, setMapView, boardUrl,
     get S() { return S; }, local,
     get selected() { return selected; },
     get gone() { return gone; },

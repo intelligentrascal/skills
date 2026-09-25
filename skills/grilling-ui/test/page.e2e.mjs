@@ -16,7 +16,7 @@ const PAGE = join(here, "..", "page");
 
 // The shipped page files, plus a stub Studio so D1 and the header switch have two built layouts.
 const pageDir = tmp("grill-e2e-page-");
-for (const f of ["inbox.html", "core.js", "tokens.css"]) symlinkSync(join(PAGE, f), join(pageDir, f));
+for (const f of ["inbox.html", "core.js", "tokens.css", "map-view.js"]) symlinkSync(join(PAGE, f), join(pageDir, f));
 writeFileSync(join(pageDir, "studio.html"), `<!doctype html><meta charset="utf-8"><title>studio stub</title><!--GRILL_BOOT--><p id="studio-stub">studio stub</p>`);
 const { home, env } = mkHome({ GRILL_PAGE_DIR: pageDir });
 const proj = tmp("grill-e2e-proj-");
@@ -299,7 +299,9 @@ try {
   s.visual = { kind: "prototype", version: 1, at: new Date().toISOString(), note: "v1: first cut", thread: [], stale: false };
   writeState(s);
   await page.waitForFunction(() => document.body.classList.contains("visualize"), null, { timeout: 5000 });
-  check("view flips to the visual by itself; list and card are hidden", await page.locator("nav").isHidden() && await page.locator("main").isHidden() && await page.locator("#visual-frame").isVisible());
+  // The list stays beside the visual for hover linkage (plan T20, the approved inbox.template.html); only the card gives way.
+  const vgeo = await page.evaluate(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); return { nav: r("nav"), visual: r("#visual") }; });
+  check("view flips to the visual by itself; the list stays beside it, the card is hidden", await page.locator("nav").isVisible() && await page.locator("main").isHidden() && await page.locator("#visual-frame").isVisible() && Math.abs(vgeo.visual.left - vgeo.nav.right) < 2, JSON.stringify(vgeo));
   check("iframe src carries the version and the sandbox has no same-origin", (await page.locator("#visual-frame").getAttribute("src")).includes("v=1") && (await page.locator("#visual-frame").getAttribute("sandbox")) === "allow-scripts");
   check("strip shows the kind, version and note", (await page.locator("#visual-strip").textContent()).includes("Prototype") && (await page.locator("#visual-strip").textContent()).includes("v1: first cut"));
   check("iframe shows the agent's file", (await page.frameLocator("#visual-frame").locator("#proto-heading").textContent()) === "Prototype v1 heading");

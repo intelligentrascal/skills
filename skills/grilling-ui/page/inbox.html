@@ -209,7 +209,15 @@
      2. The list opens scrolled to the current round's header (inbox.template.html), earlier
         rounds above it; after that it only scrolls to keep the selection in view.
      3. Below 760px the visual strip wraps: one row overflows 390px once "regenerating…" shows
-        (design/mockups/inbox.template.html addition 3). */
+        (design/mockups/inbox.template.html addition 3).
+     4. Keyboard layer (core.js Grill.keys): the footer's "⌘↩ send" hint opens the cheatsheet
+        (unchanged look); the toast is inbox.template.html's, plus an Undo button; the `?`
+        cheatsheet is the #terms panel (panel, rule, radius, shadow) with the round label's
+        small caps for its heading. No new colours or fonts.
+     5. The question list stays beside the visual (page.html hides it and lets the visual span
+        both columns) so hovering a question outlines its regions (inbox.template.html addition 1).
+     6. The Wayfinder Map screen (plan T24): a grill finished with a map shows map-view.js's
+        snapshot across the content row; its bar reuses the header's small button and link type. */
   header .phase { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
   header .status .listener:empty { display: none; }
   header .status .listener::before { content: "·"; margin: 0 8px; color: var(--ink-3); }
@@ -221,6 +229,34 @@
   @media (max-width: 760px) {
     #visual-strip { flex-wrap: wrap; gap: 4px 14px; padding: 8px 16px; }
   }
+  body.visualize nav { display: block; }
+  @media (min-width: 761px) { #visual { grid-column: 2; } }
+  #map-screen { grid-row: 3; grid-column: 1 / -1; min-height: 0; overflow-y: auto; padding: 28px 44px 60px; background: var(--panel); }
+  #map-screen[hidden] { display: none; }
+  body.mapview nav, body.mapview main, body.mapview aside, body.mapview #visual { display: none; }
+  .map-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; font-size: 13px; }
+  .map-bar button { font-size: 12px; padding: 4px 10px; }
+  .map-bar a { text-decoration: none; }
+  @media (max-width: 760px) { #map-screen { grid-row: auto; padding: 20px 16px 28px; } }
+  footer a.hint { text-decoration: none; } footer a.hint:hover { color: var(--accent); }
+  .toast { position: fixed; right: 24px; bottom: 72px; display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--ink); color: #fff; font-size: 13px; border-radius: 6px; opacity: 0; transform: translateY(6px); transition: .25s; pointer-events: none; z-index: 6; }
+  .toast.show { opacity: 1; transform: none; pointer-events: auto; }
+  .toast button, .toast button:hover { padding: 0; border: 0; background: none; color: #fff; font-size: 13px; text-decoration: underline; }
+  .toast button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  .keys-sheet { position: fixed; inset: 0; z-index: 7; display: flex; align-items: flex-start; justify-content: center; padding: 12vh 16px 16px; }
+  .keys-sheet[hidden] { display: none; }
+  .keys-panel { width: 480px; max-width: 100%; max-height: 76vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 20px 16px; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+  .keys-panel:focus { outline: none; }
+  .keys-panel h2 { margin: 0 0 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  .keys-panel table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .keys-panel td { padding: 7px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  .keys-panel td:first-child { width: 160px; padding-right: 12px; color: var(--ink-3); font-size: 12px; white-space: nowrap; }
+  .keys-panel kbd { font-family: var(--sans); font-size: 12px; padding: 1px 6px; border: 1px solid var(--rule); border-radius: 4px; background: var(--bg); color: var(--ink); }
+  .keys-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 13px; color: var(--ink-2); }
+  .keys-foot label { display: flex; align-items: center; gap: 8px; cursor: pointer; } .keys-foot input { accent-color: var(--accent); margin: 0; }
+  .keys-foot .keys-note { color: var(--ink-3); font-size: 12px; }
+  .keys-foot button { font-size: 12px; padding: 4px 10px; }
+  @media (max-width: 760px) { .toast { left: 16px; right: 16px; top: 12px; bottom: auto; transform: translateY(-6px); } .keys-panel td:first-child { width: auto; } }
 </style>
 </head>
 <body>
@@ -241,14 +277,16 @@
 <main id="main"></main>
 <section id="visual" aria-label="Visual"><div id="visual-strip"></div><div id="visual-wait" hidden><span class="spin"></span>Drawing the first version…</div><iframe id="visual-frame" title="Visual" sandbox="allow-scripts"></iframe></section>
 <aside id="aside"></aside>
+<section id="map-screen" aria-label="Map" hidden></section>
 <footer>
   <span class="staged-list" id="staged-list"></span>
   <span class="warn" id="send-why"></span>
-  <span class="hint">⌘↩ send</span>
+  <a href="#" class="hint" id="keys-help" aria-label="Keyboard shortcuts" title="Keyboard shortcuts (?)" aria-keyshortcuts="?">⌘↩ send</a>
   <span id="finish-area"></span>
   <button class="primary" id="send" type="button" disabled>Send to Agent</button>
 </footer>
 <!--GRILL_BOOT-->
+<script src="/assets/map-view.js"></script>
 <script src="/assets/core.js"></script>
 <script>
 // Inbox renders: page.html:435-455 (visual) and 467-590 (list, card, discussion, visual
@@ -287,6 +325,7 @@
   let navOpened = false;
   function renderNav() {
     const nav = $("nav"); const keep = nav.scrollTop; nav.innerHTML = "";
+    nav.onmouseleave = () => G.hover(null); // the list persists: an item rebuilt under the pointer never sees its mouseleave
     const S = G.S; if (!S) return;
     if (S.note) { const n = document.createElement("div"); n.className = "note"; n.textContent = S.note; nav.appendChild(n); }
     const all = rounds();
@@ -305,6 +344,10 @@
           : `<span class="mark ${esc(q.status)}">${q.status === "answered" ? CHECK + esc((q.answer && q.answer.option) || "text") : esc(q.status)}</span>`;
         el.innerHTML = `<span class="id">${esc(q.id).toUpperCase()}</span><span class="t">${esc(q.title)}</span>${mark}`;
         el.onclick = () => select(q.id);
+        // hover outlines the question's regions in the visual (T20); mousemove, not mouseenter: a
+        // list rebuilt under a resting pointer must not steal the outline (inbox.template.html)
+        el.onmousemove = () => G.hover(q.id);
+        el.onmouseleave = () => G.hover(null);
         nav.appendChild(el);
       }
     }
@@ -363,6 +406,9 @@
         ${opts ? `<ul class="opts">${opts}</ul>` : ""}
         ${why}${stagedLine}${controls}
       </article>`;
+    const card = main.querySelector(".card");
+    card.onmousemove = () => G.hover(q.id);
+    card.onmouseleave = main.onmouseleave = () => G.hover(null);
     main.querySelectorAll("[data-go]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); select(a.dataset.go); }));
     if (lk) return;
     main.querySelectorAll(".opt:not(.text-answer)").forEach((o) => (o.onclick = () => stageAnswer(q.id, { kind: o.dataset.opt === rec.option ? "accept" : "option", option: o.dataset.opt })));
