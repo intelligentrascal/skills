@@ -3,12 +3,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import { chmodSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync, existsSync, readdirSync, realpathSync, readlinkSync, utimesSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { mkHome, run, runAsync, hubInfo, sleep, waitUntil, stopHub, tmp } from "./helpers.mjs";
 import { createLog } from "../lib/log.mjs";
 import { grillHome, projectKeyOf, projectKey, codexFix } from "../lib/home.mjs";
+import { freshHeartbeat } from "../lib/server.mjs";
+import { takeLock } from "../lib/lifecycle.mjs";
 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; } };
 // Shut the hub down and make sure its process is gone, whatever the test did.
@@ -47,8 +50,9 @@ test("ensure: output shape, reuse, hub.json 0600 with admin token, /health echoe
   assert.equal(statSync(join(home, "hub.json")).mode & 0o777, 0o600);
   assert.match(info.adminToken, /^[0-9a-f]{32,}$/);
   assert.deepEqual([info.port, info.pid, info.version, info.started], [one.port, one.pid, one.version, one.started]);
+  assert.ok(Number.isFinite(info.codeTime) && info.codeTime > 0, "hub.json carries codeTime");
   const h = await (await fetch(`http://127.0.0.1:${one.port}/health`)).json();
-  assert.deepEqual(h, { pid: one.pid, started: one.started, version: one.version });
+  assert.deepEqual(h, { pid: one.pid, started: one.started, version: one.version, codeTime: info.codeTime });
   const two = ensure(env);
   assert.deepEqual({ ...two, reused: false }, one); assert.equal(two.reused, true);
   for (const d of ["logs", "grill-sessions", "maps"]) assert.ok(statSync(join(home, d)).isDirectory(), d);
@@ -103,16 +107,108 @@ test("a stale lock (dead pid) is taken over", async (t) => {
   assert.ok(!existsSync(join(home, "hub.lock")));
 });
 
+const v1 = { GRILL_VERSION_OVERRIDE: "v1", GRILL_CODETIME_OVERRIDE: "1000" };
+const v2 = { GRILL_VERSION_OVERRIDE: "v2", GRILL_CODETIME_OVERRIDE: "2000" };
 test("version change hands off on the same port", async (t) => {
   const { home, env } = mkHome(); t.after(() => cleanup(home));
-  const one = JSON.parse(run({ ...env, GRILL_VERSION_OVERRIDE: "v1" }, ["ensure"]));
-  const two = JSON.parse(run({ ...env, GRILL_VERSION_OVERRIDE: "v2" }, ["ensure"]));
+  const one = JSON.parse(run({ ...env, ...v1 }, ["ensure"]));
+  const two = JSON.parse(run({ ...env, ...v2 }, ["ensure"]));
   assert.equal(two.port, one.port); assert.notEqual(two.pid, one.pid); assert.equal(two.reused, false);
   assert.equal(one.version, "v1"); assert.equal(two.version, "v2");
   await waitUntil(() => !alive(one.pid), 3000);
   assert.equal(hubInfo(home).pid, two.pid);
-  const again = JSON.parse(run({ ...env, GRILL_VERSION_OVERRIDE: "v2" }, ["ensure"]));
+  const again = JSON.parse(run({ ...env, ...v2 }, ["ensure"]));
   assert.equal(again.pid, two.pid); assert.equal(again.reused, true);
+  assert.ok(!("stale" in again));
+});
+
+test("an older caller reuses a newer running hub (no handoff ping-pong)", async (t) => {
+  const { home, env } = mkHome(); t.after(() => cleanup(home));
+  const two = JSON.parse(run({ ...env, ...v2 }, ["ensure"]));
+  for (const ct of ["1000", "2000"]) { // older, and equally old
+    const r = await runAsync({ ...env, ...v1, GRILL_CODETIME_OVERRIDE: ct }, ["ensure"]);
+    assert.equal(r.code, 0, r.err);
+    const one = JSON.parse(r.out);
+    assert.deepEqual([one.pid, one.version, one.reused, one.stale], [two.pid, "v2", true, true]);
+    assert.equal(r.err, "grill: a newer hub (v2) is running; using it");
+  }
+  assert.ok(alive(two.pid));
+  assert.equal(hubInfo(home).pid, two.pid);
+});
+
+test("a failed handoff call SIGTERMs the verified old hub and takes its port", async (t) => {
+  const { home, env } = mkHome(); t.after(() => cleanup(home));
+  const one = JSON.parse(run({ ...env, ...v1 }, ["ensure"]));
+  const info = hubInfo(home);
+  writeFileSync(join(home, "hub.json"), JSON.stringify({ ...info, adminToken: "wrong" })); // /admin/handoff → 401
+  const two = JSON.parse(run({ ...env, ...v2 }, ["ensure"]));
+  assert.notEqual(two.pid, one.pid); assert.equal(two.port, one.port); assert.equal(two.reused, false);
+  await waitUntil(() => !alive(one.pid), 3000);
+});
+
+// The spawned hub's working directory (not the agent's): /proc on Linux, lsof on macOS.
+function cwdOf(pid) {
+  try { return readlinkSync(`/proc/${pid}/cwd`); } catch { /* not Linux */ }
+  try { return execFileSync("lsof", ["-a", "-p", String(pid), "-d", "cwd", "-Fn"], { encoding: "utf8" }).split("\n").find((l) => l.startsWith("n"))?.slice(1) ?? null; } catch { return null; }
+}
+test("the detached hub runs in GRILL_HOME, not the caller's cwd", async (t) => {
+  const { home, env } = mkHome(); t.after(() => cleanup(home));
+  const elsewhere = tmp("grill-cwd-"); t.after(() => rmSync(elsewhere, { recursive: true, force: true }));
+  const { pid } = JSON.parse(run(env, ["ensure"], { cwd: elsewhere }));
+  const cwd = cwdOf(pid);
+  if (cwd === null) return t.skip("neither /proc nor lsof available");
+  assert.equal(realpathSync(cwd), realpathSync(home));
+});
+
+test("a lock whose pid is alive but whose mtime is older than timeout + 20 s is stale", async (t) => {
+  const { home, env } = mkHome(); t.after(() => cleanup(home));
+  const lock = join(home, "hub.lock");
+  writeFileSync(lock, String(process.pid)); // alive: a reused pid
+  const old = (Date.now() - 60_000) / 1000; utimesSync(lock, old, old);
+  const one = ensure(env);
+  assert.equal(one.reused, false);
+  assert.ok(!existsSync(lock));
+  assert.deepEqual(readdirSync(home).filter((f) => f.startsWith("hub.lock")), [], "no hub.lock.stale-* left behind");
+});
+
+test("takeLock: a live fresh lock is held; a stale one is renamed aside, checked, removed and retaken", () => {
+  const dir = tmp("grill-lock-"); const lock = join(dir, "hub.lock");
+  writeFileSync(lock, String(process.pid));
+  assert.equal(takeLock(lock, 30_000), false, "fresh lock of a live pid");
+  writeFileSync(lock, "999999");
+  assert.equal(takeLock(lock, 30_000), true, "dead pid");
+  assert.equal(readFileSync(lock, "utf8"), String(process.pid));
+  const old = (Date.now() - 60_000) / 1000; utimesSync(lock, old, old);
+  assert.equal(takeLock(lock, 30_000), true, "old lock, live pid");
+  assert.deepEqual(readdirSync(dir), ["hub.lock"]);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("every route checks Host: only 127.0.0.1:<port> and localhost:<port>", async (t) => {
+  const { home, env } = mkHome(); t.after(() => cleanup(home));
+  const { port } = ensure(env);
+  const get = (host) => new Promise((res, rej) => {
+    http.get({ host: "127.0.0.1", port, path: "/health", headers: { host } }, (r) => { r.resume(); res(r.statusCode); }).on("error", rej);
+  });
+  assert.equal(await get(`127.0.0.1:${port}`), 200);
+  assert.equal(await get(`localhost:${port}`), 200);
+  for (const h of ["evil.example", `evil.example:${port}`, `127.0.0.1:${port + 1}`, "127.0.0.1", `127.0.0.1.evil.example:${port}`]) assert.equal(await get(h), 403, h);
+  const { adminToken } = hubInfo(home);
+  const post = await new Promise((res, rej) => {
+    const r = http.request({ host: "127.0.0.1", port, path: "/admin/shutdown", method: "POST", headers: { host: "evil.example", "x-grill-admin": adminToken } }, (x) => { x.resume(); res(x.statusCode); });
+    r.on("error", rej); r.end();
+  });
+  assert.equal(post, 403, "admin routes too");
+});
+
+test("GRILL_HOME is 0700: created so, and tightened when group/world-accessible", { skip: process.platform === "win32" }, async (t) => {
+  const { home, env } = mkHome(); t.after(() => cleanup(home));
+  chmodSync(home, 0o755);
+  mkdirSync(join(home, "logs"), { mode: 0o755 }); chmodSync(join(home, "logs"), 0o755);
+  ensure(env);
+  assert.equal(statSync(home).mode & 0o777, 0o700);
+  for (const d of ["grill-sessions", "maps"]) assert.equal(statSync(join(home, d)).mode & 0o777, 0o700, d);
+  assert.equal(statSync(join(home, "logs")).mode & 0o777, 0o755, "existing subdirectories are left alone");
 });
 
 const idleEnv = { GRILL_IDLE_MS: "300", GRILL_TICK_MS: "100" };
@@ -150,6 +246,24 @@ test("idle exit is blocked by a fresh heartbeat until it goes stale (GRILL_FRESH
   await sleep(800);
   assert.ok(alive(pid), "still fresh");
   await waitUntil(() => !alive(pid), 5000);
+});
+
+test("idle exit: any HTTP request restarts the idle clock", async (t) => {
+  const { home, env } = mkHome(idleEnv); t.after(() => cleanup(home));
+  const { pid, port } = ensure(env);
+  for (const end = Date.now() + 1200; Date.now() < end; await sleep(100)) await fetch(`http://127.0.0.1:${port}/health`);
+  assert.ok(alive(pid), "requests keep the hub up");
+  await waitUntil(() => !alive(pid), 5000);
+});
+
+test("freshHeartbeat: a heartbeat more than 5 s in the future is not fresh", (t) => {
+  const home = tmp("grill-hb-"); t.after(() => rmSync(home, { recursive: true, force: true }));
+  const now = Date.now();
+  const at = (ms) => { fakeSession(home, { heartbeat: new Date(now + ms).toISOString() }); return freshHeartbeat(home, 180_000, now); };
+  assert.equal(at(-1000), true);
+  assert.equal(at(3000), true, "small clock skew is tolerated");
+  assert.equal(at(3_600_000), false, "an hour ahead");
+  assert.equal(at(-200_000), false, "too old");
 });
 
 test("idle exit is blocked by a fresh map listener heartbeat", async (t) => {

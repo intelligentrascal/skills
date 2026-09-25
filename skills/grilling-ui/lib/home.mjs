@@ -51,11 +51,15 @@ export class HomeError extends Error {
   constructor(message, code) { super(message); this.code = code; }
 }
 
-// Creates home, logs/, grill-sessions/, maps/ and probes a write. Throws HomeError whose message
+// Creates home, logs/, grill-sessions/, maps/ (mode 0700) and probes a write. A home we own that
+// is group/world-accessible is tightened to 0700 (it holds hub.json's admin token and every
+// session's token); existing subdirectories are left alone. Throws HomeError whose message
 // is the Codex fix on EPERM/EACCES/EROFS (no fallback location), or a one-line error otherwise.
 export function assertWritable(home) {
   try {
-    for (const d of ["", "logs", "grill-sessions", "maps"]) fs.mkdirSync(path.join(home, d), { recursive: true });
+    for (const d of ["", "logs", "grill-sessions", "maps"]) fs.mkdirSync(path.join(home, d), { recursive: true, mode: 0o700 });
+    const st = fs.statSync(home);
+    if ((st.mode & 0o077) && (!process.getuid || st.uid === process.getuid())) fs.chmodSync(home, 0o700);
     const probe = path.join(home, `.probe-${process.pid}`);
     fs.writeFileSync(probe, "");
     fs.rmSync(probe, { force: true });

@@ -136,3 +136,35 @@ test("session state.map is validated by validateMap", () => {
   assert.throws(() => validateState({ ...s, map: "not a map" }), (e) => e instanceof PatchError && /map must be an object/.test(e.message));
   assert.throws(() => validateState({ ...s, map: { title: "M", tickets: [tk("B", { blockedBy: ["X"] })] } }), /B\.blockedBy names unknown "X"/);
 });
+
+test("map patch: hubClaim is hub-written; a ticket removed and re-added in one patch keeps it", () => {
+  const bad = (p) => assert.throws(() => applyMapPatch(full(), p, NOW), (e) => e instanceof PatchError && /tickets C: hubClaim is written by the hub \(claim\/--release\)/.test(e.message));
+  bad({ tickets: [{ title: "C", hubClaim: { agentId: "me", at: NOW } }] });
+  bad({ tickets: [{ title: "C", hubClaim: null }] });
+  assert.throws(() => applyMapPatch(full(), { tickets: [tk("Z", { hubClaim: { agentId: "me", at: NOW } })] }, NOW), /tickets Z: hubClaim is written by the hub/);
+  // A full-snapshot rewrite: remove C, then add it back without hubClaim.
+  const m = applyMapPatch(full(), { tickets: [{ title: "C", remove: true }, tk("C", { type: "prototype", state: "claimed" })] }, LATER);
+  assert.deepEqual(m.tickets.find((t) => t.title === "C").hubClaim, full().tickets[2].hubClaim);
+  validateMap(m);
+  // A plain merge keeps it too; removal alone drops it.
+  assert.deepEqual(applyMapPatch(full(), { tickets: [{ title: "C", assignee: "x" }] }, LATER).tickets[2].hubClaim, full().tickets[2].hubClaim);
+  assert.ok(!applyMapPatch(full(), { tickets: [{ title: "C", remove: true }] }, LATER).tickets.some((t) => t.title === "C"));
+  // The hub's own claim code may write it.
+  const h = applyMapPatch(full(), { tickets: [{ title: "D", state: "claimed", hubClaim: { agentId: "a1b2", at: LATER, seq: 4 } }] }, LATER, { hub: true });
+  assert.deepEqual(h.tickets[3].hubClaim, { agentId: "a1b2", at: LATER, seq: 4 });
+  assert.ok(!("hubClaim" in applyMapPatch(h, { tickets: [{ title: "D", hubClaim: null }] }, LATER, { hub: true }).tickets[3]));
+});
+
+test("map patch: handled only increases", () => {
+  assert.equal(applyMapPatch(full(), { handled: 5 }, NOW).handled, 5);
+  assert.equal(applyMapPatch(full(), { handled: 3 }, NOW).handled, 3);
+  assert.equal(applyMapPatch(full(), { handled: 1 }, NOW).handled, 3, "a lower value is ignored");
+  assert.equal(applyMapPatch(full(), { handled: null }, NOW).handled, 3, "null does not reset it");
+  assert.equal(applyMapPatch({ title: "M" }, { handled: 2 }, NOW).handled, 2);
+  assert.throws(() => validateMap(applyMapPatch(full(), { handled: "7" }, NOW)), /map\.handled must be a whole number/);
+});
+
+test("validateMap: a title cannot be both a ticket and closed", () => {
+  rejects({ title: "M", tickets: [tk("A")], closed: [{ title: "A" }] }, /"A" is in both tickets and closed/);
+  assert.throws(() => validateMap(applyMapPatch(full(), { closed: [{ title: "D", gist: "done" }] }, NOW)), /"D" is in both tickets and closed/);
+});

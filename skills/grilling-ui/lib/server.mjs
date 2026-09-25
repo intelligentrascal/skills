@@ -22,9 +22,11 @@ export const readBody = (req, limit = 1 << 20) => new Promise((resolve, reject) 
 });
 
 // Idle-exit inputs (spec §5 Idle exit): a fresh owner heartbeat in any unfinished session, or a
-// fresh map listener heartbeat. Cheap enough to scan once per tick.
+// fresh map listener heartbeat. Cheap enough to scan once per tick. A heartbeat more than
+// FUTURE_SKEW_MS in the future is not fresh (a bad clock or a hand-edited file must not pin the hub).
+export const FUTURE_SKEW_MS = 5000;
 export function freshHeartbeat(home, freshMs, now = Date.now()) {
-  const fresh = (iso) => { const t = Date.parse(iso); return Number.isFinite(t) && now - t < freshMs; };
+  const fresh = (iso) => { const t = Date.parse(iso); return Number.isFinite(t) && now - t < freshMs && t - now <= FUTURE_SKEW_MS; };
   const subdirs = (dir) => { try { return fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => path.join(dir, d.name)); } catch { return []; } };
   for (const proj of subdirs(path.join(home, "grill-sessions"))) {
     for (const s of subdirs(proj)) {
@@ -44,12 +46,14 @@ export function freshHeartbeat(home, freshMs, now = Date.now()) {
   return false;
 }
 
-// hub: { home, version, log, env? }. Returns the hub object:
+// hub: { home, version, codeTime?, log, env? }. Returns the hub object:
 //   server, routes, pid, started, adminToken, sse (Set of open /events responses, T12),
-//   port (after listen), selfOrigins(), originOk(req), isAdmin(req), exit(reason), startIdleTimer()
-export function createHub({ home, version, log = () => {}, env = process.env }) {
+//   port (after listen), lastBusy, selfOrigins(), hostOk(req), originOk(req), isAdmin(req),
+//   exit(reason), startIdleTimer()
+export function createHub({ home, version, codeTime = 0, log = () => {}, env = process.env }) {
   const hub = {
-    home, version, log, env,
+    home, version, codeTime, log, env,
+    lastBusy: Date.now(),
     pid: process.pid,
     started: new Date().toISOString(),
     adminToken: rand(32),
@@ -61,6 +65,12 @@ export function createHub({ home, version, log = () => {}, env = process.env }) 
     freshMs: envMs("GRILL_FRESH_MS", 180_000, env),
   };
   hub.selfOrigins = () => [`http://127.0.0.1:${hub.port}`, `http://localhost:${hub.port}`];
+  // DNS rebinding guard: every request must name the hub by loopback address in Host. The port
+  // comes from the bound socket, so this holds before `hub.port` is set.
+  hub.hostOk = (req) => {
+    const port = hub.server.address()?.port ?? hub.port;
+    return [`127.0.0.1:${port}`, `localhost:${port}`].includes(String(req.headers.host || "").toLowerCase());
+  };
   // Browsers set Origin on every POST, same-origin or not; a mismatch (another site, or the
   // sandboxed visual iframe whose Origin is "null") is rejected. No Origin at all (curl, the
   // CLI, tests) is allowed; the token check is separate.
@@ -86,12 +96,14 @@ export function createHub({ home, version, log = () => {}, env = process.env }) 
     json(res, 200, { ok: true, pid: hub.pid });
   };
   hub.routes.push(
-    ["GET", /^\/health$/, (req, res) => json(res, 200, { pid: hub.pid, started: hub.started, version: hub.version })],
+    ["GET", /^\/health$/, (req, res) => json(res, 200, { pid: hub.pid, started: hub.started, version: hub.version, codeTime: hub.codeTime })],
     ["POST", /^\/admin\/handoff$/, admin("handoff")],
     ["POST", /^\/admin\/shutdown$/, admin("shutdown")],
   );
 
   hub.server = http.createServer(async (req, res) => {
+    hub.lastBusy = Date.now(); // any request (ensure's /health included) restarts the idle clock
+    if (!hub.hostOk(req)) return json(res, 403, { error: "bad Host header" });
     let url;
     try { url = new URL(req.url, "http://127.0.0.1"); } catch { return json(res, 400, { error: "bad url" }); }
     try {
@@ -109,13 +121,13 @@ export function createHub({ home, version, log = () => {}, env = process.env }) 
   });
 
   // Idle exit: every tick, the hub is busy if any /events client is open or any agent heartbeat
-  // is fresh; after idleMs without being busy it exits.
+  // is fresh; any HTTP request also counts (hub.lastBusy). After idleMs without being busy it exits.
   hub.startIdleTimer = () => {
-    let lastBusy = Date.now();
+    hub.lastBusy = Date.now();
     const iv = setInterval(() => {
       const now = Date.now();
-      if (hub.sse.size > 0 || freshHeartbeat(home, hub.freshMs, now)) { lastBusy = now; return; }
-      if (now - lastBusy >= hub.idleMs) { clearInterval(iv); hub.exit(`idle for ${now - lastBusy} ms (no SSE client, no fresh heartbeat)`); }
+      if (hub.sse.size > 0 || freshHeartbeat(home, hub.freshMs, now)) { hub.lastBusy = now; return; }
+      if (now - hub.lastBusy >= hub.idleMs) { clearInterval(iv); hub.exit(`idle for ${now - hub.lastBusy} ms (no SSE client, no fresh heartbeat, no request)`); }
     }, hub.tickMs);
     return iv;
   };

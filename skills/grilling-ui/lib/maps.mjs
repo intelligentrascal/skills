@@ -8,7 +8,11 @@
 //     (a no-op when T is unknown). A ticket resolved in this patch is typically removed from
 //     tickets and added to closed in the same patch, so blockedBy edges stay valid.
 //   listener: rejected (written by the hub from heartbeats)
-//   any other key (fog, outOfScope, title, handled, …): replaced whole
+//   tickets[].hubClaim: rejected (written by the hub: claim / claim --release). A ticket removed
+//     and re-added under the same title in one patch keeps its hubClaim. The hub's own claim
+//     code passes { hub: true } to write it.
+//   handled: only increases; a lower value (or null) is ignored
+//   any other key (fog, outOfScope, title, …): replaced whole
 //   at: always stamped with `now`
 import { isObj } from "./util.mjs";
 import { PatchError, bad, clean, fieldsOf, mergeOne } from "./state.mjs";
@@ -17,35 +21,47 @@ const TYPES = ["research", "prototype", "grilling", "task"];
 const STATES = ["frontier", "blocked", "claimed"];
 const KEYED = ["tickets", "closed", "decisions"];
 
-function patchKeyed(current, list, key) {
+function patchKeyed(current, list, key, hub) {
   if (!Array.isArray(list)) bad(`${key} in a map patch must be an array of entries, each with a title`);
   if (current !== undefined && !Array.isArray(current)) bad(`${key} in map.json is not an array`);
   let out = (current || []).slice();
+  const removedClaims = new Map(); // title → hubClaim of a ticket removed earlier in this patch
   for (const p of list) {
     if (!isObj(p) || typeof p.title !== "string" || !p.title) bad(`every ${key} entry in a map patch needs a string title`);
     const where = `${key} ${p.title}`;
     fieldsOf(p, where);
+    if (key === "tickets" && !hub && Object.hasOwn(p, "hubClaim")) bad(`${where}: hubClaim is written by the hub (claim/--release)`);
     const i = out.findIndex((x) => isObj(x) && x.title === p.title);
     if ("remove" in p) {
       if (p.remove !== true) bad(`${where}: remove must be true`);
-      if (i >= 0) out = out.filter((_, j) => j !== i);
+      if (i >= 0) {
+        if (key === "tickets" && isObj(out[i].hubClaim)) removedClaims.set(p.title, out[i].hubClaim);
+        out = out.filter((_, j) => j !== i);
+      }
       continue;
     }
     if (i >= 0) out[i] = mergeOne(out[i], p, where);
-    else out.push(clean(p));
+    else {
+      const e = clean(p);
+      if (removedClaims.has(p.title) && !Object.hasOwn(p, "hubClaim")) e.hubClaim = removedClaims.get(p.title);
+      out.push(e);
+    }
   }
   return out;
 }
 
 // Returns a new map; never mutates its inputs. Throws PatchError on a bad shape. Does not
 // validate the result: callers run validateMap on it (and keep the old map on failure).
-export function applyMapPatch(map, p, now) {
+// opts.hub: the hub's own claim code (T33), which may write tickets[].hubClaim.
+export function applyMapPatch(map, p, now, { hub = false } = {}) {
   if (!isObj(p)) bad("the map patch must be a JSON object shaped like map.json");
   if (Object.hasOwn(p, "listener")) bad("listener is written by the hub, not by map-patch");
   const out = isObj(map) ? { ...map } : {};
   for (const [k, v] of fieldsOf(p, "the map patch")) {
+    // handled only moves forward (a late or replayed patch must not re-queue handled events).
+    if (k === "handled" && Number.isInteger(out.handled) && (v === null || (typeof v === "number" && v < out.handled))) continue;
     if (v === null) delete out[k];
-    else if (KEYED.includes(k)) out[k] = patchKeyed(out[k], v, k);
+    else if (KEYED.includes(k)) out[k] = patchKeyed(out[k], v, k, hub);
     else out[k] = clean(v);
   }
   out.at = now;
@@ -95,6 +111,7 @@ export function validateMap(m) {
     check(t, "hubClaim", (v) => isObj(v) && str(v.agentId) && str(v.at) && (!("seq" in v) || (Number.isInteger(v.seq) && v.seq >= 0)),
       `${w}.hubClaim must be {"agentId","at","seq"?}`);
   });
+  for (const t of tickets) need(!closed.has(t), `${JSON.stringify(t)} is in both tickets and closed`);
   for (const t of m.tickets || []) {
     for (const b of t.blockedBy || []) {
       need(b !== t.title, `ticket ${t.title}.blockedBy names the ticket itself`);
