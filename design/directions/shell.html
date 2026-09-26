@@ -170,30 +170,19 @@
 
   // ---- brief ----
   const brief = `<div class="doc">
-    <h2>Three ways the grill page could beat Inbox</h2>
-    <p class="lead">Inbox is what we settled on: a list of questions by round, one focused card and a discussion pane. These are three alternatives built on the same data and the same rules, each from a different mix of design skills. Every one is a working mockup: stage answers, hover the visual, press <kbd>?</kbd> for keys.</p>
+    <h2>Three bets on what the grill page is</h2>
+    <p class="lead">Inbox treats a grill as a queue: a list, a card and a pane. These three start from what the grill actually is, a wall of work to critique, an interview on the record, or a graph of decisions, and let the form follow. Each was designed by its own agent from a different mix of design skills, with no view of the others or of Inbox. They're working mockups on the real session: stage answers, press <kbd>?</kbd> for keys.</p>
     <div class="cards">${DIRECTIONS.map((d, i) => `<button type="button" class="card" data-go="d${i + 1}">
       <span class="n">Direction ${i + 1}</span><h4>${esc(d.name)}</h4><p>${esc(d.tagline)}</p>
       <p><b>Model:</b> ${esc(d.model)}</p>${skillChips(d)}<span class="open">Open →</span></button>`).join("")}</div>
     <h3>What we're after</h3>
     <p>The job is fast shared understanding between you and the agent. At a glance you should see what the agent is asking and recommending and why, what's decided, what's open and what you've staged, the discussion on each question, and the visual and how it links to the questions. Then you should be able to clear a round of 7–8 open questions quickly and find any earlier decision in one look.</p>
-    <h3>Held constant across all three</h3>
+    <h3>The only rule: serve the purpose</h3>
+    <p>There were no design constraints on these three. Keys, controls, flow, theme and type were all open. Each one also had to meet a second rule: it had to be one self-contained offline file built on the real session data: rounds 1–8 from a real grill, round 9 open, Q15 and Q16 reopened, Q23 deferred and the visual stale.</p>
+    <h3>If one of these gets built</h3>
     <ul>
-      <li>Same data: the real <code>grill-with-ui</code> session (rounds 1–8), with round 9 open, Q15 and Q16 reopened, Q23 deferred and the visual stale.</li>
-      <li>Same semantics: nothing is sent until Send; one Send is one turn; Explore deeper and Visualize send at once, with undo; Finish asks for confirmation and shows the doc path.</li>
-      <li>Same visual contract: a sandboxed iframe with <code>data-q</code> regions and two-way hover and click linkage over postMessage.</li>
-      <li>Same keys: <kbd>j</kbd>/<kbd>k</kbd>, <kbd>1</kbd>–<kbd>4</kbd>, <kbd>a</kbd>, <kbd>r</kbd>, <kbd>f</kbd>, <kbd>d</kbd>/<kbd>o</kbd>, <kbd>e</kbd>, <kbd>v</kbd>, <kbd>u</kbd>, <kbd>⌘↵</kbd>, <kbd>Esc</kbd>, <kbd>?</kbd>.</li>
-      <li>Product rules win over the skills: no network, system fonts only, light theme, WCAG AA. Desktop only (1440×900 first).</li>
-    </ul>
-    <h3>Usability findings every direction had to fix</h3>
-    <ul>
-      <li>Auto-advance to the next open question after Accept or stage.</li>
-      <li>Open counts that count down as you stage.</li>
-      <li>One unambiguous path for free-text answers and pushback.</li>
-      <li>Reopened questions that don't look settled.</li>
-      <li>A visual that is first-class and discoverable, with linkage you can see.</li>
-      <li>The current round first, with earlier rounds one step away.</li>
-      <li>Shortcuts that never fire while focus is moving to a text field.</li>
+      <li>Any change a direction makes to how the page and the agent's visual talk to each other is listed in its notes under contract changes. The iframe sandbox that keeps agent-written code away from the session stays in all three.</li>
+      <li>Costs relative to a plain list UI are listed honestly under each direction's notes, together with the places where a skill's advice was overridden.</li>
     </ul>
   </div>`;
 
@@ -210,7 +199,7 @@
         ${row("Skills", (d) => skillChips(d))}
         ${row("Philosophy", (d) => esc(d.philosophy))}
         ${row("Best for", (d) => esc(d.bestFor))}
-        ${row("Costs vs Inbox", (d) => list(d.tradeoffs, esc))}
+        ${row("Costs", (d) => list(d.tradeoffs, esc))}
         ${row("Type", (d) => esc(d.type))}
         ${row("Palette", (d) => `<div class="pal">${(d.palette || []).map((p) => `<i style="background:${esc(p.hex)}" title="${esc(p.name)} ${esc(p.hex)}: ${esc(p.role)}"></i>`).join("")}</div>`)}
       </tbody>
@@ -223,11 +212,12 @@
     <h3>Layout model</h3><p>${esc(d.model)}</p>
     <h3>Philosophy</h3><p>${esc(d.philosophy)}</p>
     <h3>Principles → decisions</h3>${list(d.principles, (p) => `<b>${esc(p.principle)}</b><span>${esc(p.decision)}</span>`)}
-    <h3>Usability findings → fixes</h3>${list(d.fixes, (f) => `<b>${esc(f.finding)}</b><span>${esc(f.how)}</span>`)}
-    <h3>Costs vs Inbox</h3>${list(d.tradeoffs, esc)}
+    <h3>How it serves the purpose</h3>${list(d.fixes, (f) => `<b>${esc(f.finding)}</b><span>${esc(f.how)}</span>`)}
+    <h3>Costs</h3>${list(d.tradeoffs, esc)}
     <h3>Best for</h3><p>${esc(d.bestFor)}</p>
     <h3>Palette</h3><div class="swatches">${(d.palette || []).map((p) => `<div class="sw"><i style="background:${esc(p.hex)}"></i><div>${esc(p.name)}<br><code>${esc(p.hex)}</code><br><span style="color:var(--ink-3)">${esc(p.role)}</span></div></div>`).join("")}</div>
     <h3>Type</h3><p>${esc(d.type)}</p>
+    ${(d.contractChanges || []).length ? `<h3>Contract changes</h3>${list(d.contractChanges, (c) => esc(typeof c === "string" ? c : JSON.stringify(c)))}` : ""}
     ${(d.skillOverrides || []).length ? `<h3>Where product rules overrode a skill</h3>${list(d.skillOverrides, (o) => esc(typeof o === "string" ? o : [o.skill, o.advice, o.override || o.why].filter(Boolean).join(": ")))}` : ""}`;
 
   main.innerHTML = `<section class="view" id="view-brief" role="tabpanel" aria-labelledby="tab-brief" hidden>${brief}</section>` +

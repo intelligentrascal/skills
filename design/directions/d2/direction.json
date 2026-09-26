@@ -1,0 +1,55 @@
+{
+  "name": "The Interview",
+  "tagline": "Each round is an issue: one question at full volume, the agent's verdict as a pull-quote, your reply as a first-class voice, and everything decided typeset as the record.",
+  "skills": ["taste-skill", "ui-ux-pro-max", "make-interfaces-feel-better"],
+  "model": "Editorial interview: filmstrip of the round on top, one question per page, verdict-first choices, a flip-over record, and the visual as a captioned plate.",
+  "philosophy": "A grill is a conversation about decisions, so the page is typeset like an interview rather than laid out like an inbox. Hierarchy comes from scale first: the question at 58px, the agent's recommendation as an italic pull-quote with its why and cost right under it, the alternatives beside it, and everything else in a margin. Red is the only colour and it means one thing: not yet printed (staged, reopened, stale, new recommendation). Black is settled, grey is parked. The record and the plate are not panes; they are pages you flip to with one key and back with Esc.",
+  "principles": [
+    { "principle": "BLUF / inverted pyramid", "decision": "Each page reads top-down as question, then the recommendation as a pull-quote with WHY and COST split out, then the alternatives, then the actions. The cost sentence is detected from the rec's why and labelled in red so the trade-off is never buried." },
+    { "principle": "Hierarchy by scale and weight before colour", "decision": "Newsreader display at 58px for the question, 28px italic for the verdict, 17px for other options, 12px mono for kickers. One accent (vermilion) carries only the not-yet-settled states; decided is plain ink." },
+    { "principle": "Hick's law and one primary action per view", "decision": "The recommendation is the first choice (keys 1 and a), the remaining options are listed under 'Or instead', and there is exactly one path for writing: 'Object, or answer in your own words' (r). Send is the single dark block in the corner." },
+    { "principle": "Recognition over recall", "decision": "The kicker names what the question hangs off (Q9 What Finish writes) and the margin prints that dependency's actual decision; the strip shows every frame of the round with its state word, so you never remember where you are." },
+    { "principle": "Preattentive state encoding and Gestalt common region", "decision": "Open, staged, decided, deferred, reopened and new-rec are words plus one hue plus one form: staged edits are red proofreader marks (open ^ B) in the send bar, reopened gets a red band above the title that says 'Not settled', decided gets an ink band." },
+    { "principle": "Norman's signifiers and feedback", "decision": "Every action shows its key as a keycap; staging changes the option row, the strip frame, the counts and the send bar in the same beat; Send toasts 'Sent N actions as one turn' and the masthead lamp pulses while the agent works; Explore sends at once with an Undo toast." },
+    { "principle": "Fitts's law for Send", "decision": "Send is a full-height black block pinned to the bottom-right corner of the viewport, with ⌘↵ printed on it." },
+    { "principle": "Statements, not chrome", "decision": "The record is a typeset document of statements ('Transport: \"Simpler: the web app writes to a local JSON...\"', 'Chose B over the recommended A', 'Locked'), grouped by round with the agent's refinement under each, filtered as you type." }
+  ],
+  "fixes": [
+    { "finding": "Capability 2: states must be unmistakable, reopened must not read as settled", "how": "State is always a word, never a dot: the strip frame shows OPEN / STAGED / DECIDED / DEFERRED / REOPENED, NEW REC; the page opens with a red band 'Reopened by the agent at 22:44. Not settled.' quoting the old answer and the agent's reason; the record strikes the old statement through and prints the reopen note in red italic; a new recommendation is tagged 'updated' in red beside 'The agent recommends'." },
+    { "finding": "Capability 3: pick 1-4, accept, one unambiguous way to write, defer, reopen, explore, thread with staged messages", "how": "The pull-quote is option 1/a; other options keyed by their letter position; one 'Object, or answer in your own words' path (r, f is an alias) opens a red-ruled voice block directly under the question, Enter stages it; d defers; o on a decided question opens the same voice block as a reopen note; e sends 'explore deeper' at once with a 5 s Undo; the margin thread shows AGENT/YOU entries with times and staged messages in red italic marked 'staged'." },
+    { "finding": "Capability 4: live counts, auto-advance, unstage, clear Send summary", "how": "The strip header counts open / staged / reopened in tabular numerals and ticks as you stage; after any stage the page slides to the next unstaged open or reopened question; u unstages; the send bar lists every staged edit as a proofreader mark (Q18 open ^ accept A) and the button reads 'Send 3 as one turn'." },
+    { "finding": "Capability 5: visual with two-way linkage and redraw when stale", "how": "One sandboxed iframe is drawn as a small plate in the margin and expands to a full spread on v; hovering a frame, dependency or figure caption posts {highlight}; the child posts {clicked} and the page jumps to that question and takes keyboard focus back; figure pins (Q1, Q12, Q15...) are placed from the child's region boxes; the stale banner names which reopened question invalidated it and 'Visualize again' (shift+v) redraws to v4 after the working state." },
+    { "finding": "Capability 8: find a past decision in one look or one action", "how": "l flips to the record: a document with summary numerals (14 decided, 6 locked, 2 reopened...), a round index, and one statement per question; typing 'transport' filters live to 'Q2 Transport: \"Simpler: the web app writes to a local JSON...\" In your own words, instead of the recommended A. AGENT 21:11 Refinement: two files...'; Enter opens it on the stage. Dependencies in the kicker and margin also open the record at that decision." }
+  ],
+  "tradeoffs": [
+    "One question per page means you cannot scan a whole round's option texts at once; the strip gives states and titles only, and you clear the round by moving through it.",
+    "The margin plate is a picture, not a hit target (the iframe is pointer-events:none while small); region clicks need the full plate (v), which is one extra key.",
+    "Editorial scale eats vertical room: with the reply open at 1440x900 the options drop just below the fold until you stage or close it.",
+    "The record is a filtered document rather than a graph; the dependency graph appears only locally (hangs off / feeds), not as a drawn tree."
+  ],
+  "bestFor": "A developer clearing a round of 7-8 questions from the keyboard who wants to read the agent's verdict and cost at a glance, object in their own words without hunting for a textarea, and re-read what was decided as prose rather than as a list of cards.",
+  "palette": [
+    { "name": "Newsprint", "hex": "#EEEDE7", "role": "page" },
+    { "name": "Newsprint 2", "hex": "#E6E4DD", "role": "hover and quiet bands" },
+    { "name": "Sheet", "hex": "#F5F4EF", "role": "plate backing" },
+    { "name": "Ink", "hex": "#161513", "role": "text, settled state, Send block" },
+    { "name": "Ink 2", "hex": "#514E48", "role": "body copy, secondary text (7.0:1)" },
+    { "name": "Ink 3", "hex": "#66625A", "role": "kickers and labels (5.1:1)" },
+    { "name": "Rule", "hex": "#CFCDC5", "role": "hairlines" },
+    { "name": "Edge", "hex": "#86837A", "role": "control borders and keycaps (3.05:1)" },
+    { "name": "Vermilion", "hex": "#BA2A12", "role": "the only accent: staged, reopened, stale, new rec, cost (5.2:1 on page)" },
+    { "name": "Vermilion tint", "hex": "#F3DDD7", "role": "reopened band, picked option" }
+  ],
+  "type": "Newsreader (Google Fonts, static latin instances): opsz 72 at 400 and 300 for display (question 58px at 1440, 50px at 1280, 84px at 1920; 'The record' and 'Plate v3' 44px), opsz 36 italic 400 for the verdict pull-quote (28/26/36px), opsz 16 at 400/500/600 and italic 400 for body (19px), options (17px), record statements (19px) and margin (15px). IBM Plex Mono 400/500 for keycaps, kickers, counts, states, Q numbers and paths at 10.5-13px. All embedded as base64 woff2, 179 KB total.",
+  "skillOverrides": [
+    "taste-skill serif discipline: a serif is the default here because the concept is explicitly a publication/interview; Newsreader was chosen (not Fraunces or Instrument Serif) and is paired with a mono, no UI sans.",
+    "taste-skill dark-mode-by-default: shipped light-only, using its own exception for print-emulating editorial; the palette is a cool newsprint grey, not the banned warm cream + brass family.",
+    "taste-skill rotated-text ban: the two chapter dividers in the filmstrip ('Reopened', 'Deferred') are set vertically because they are real section labels in a 78px strip, not decoration.",
+    "taste-skill 'no hand-rolled SVG / real images': the page has no images by design; the only picture is the agent's live prototype in the sandboxed iframe.",
+    "ui-ux-pro-max 44px touch targets: desktop-only tool, so the floor is make-interfaces-feel-better's 32-40px for dense desktop; every visible control is at least 32px tall.",
+    "Brief key map kept but extended: l flips to the record, / also opens it in find mode, shift+v redraws a stale plate, f is an alias of r."
+  ],
+  "contractChanges": [
+    "Child also posts {regions:[{id,x,y,w,h}]} on load and resize (ids and integers only), so the parent can place figure pins over the plate. Demoed by appending a 300-byte listener to VISUAL_HTML before assigning srcdoc; the sandbox (allow-scripts, no same-origin) and postMessage-only contract are unchanged."
+  ]
+}
