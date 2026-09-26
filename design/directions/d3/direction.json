@@ -1,0 +1,50 @@
+{
+  "name": "Blast Radius",
+  "tagline": "The grill drawn as the graph of decisions it is: rounds flow down, dependencies are edges, and every settled node states what we decided.",
+  "skills": ["gpt-taste", "web-design-engineer (Dieter Rams / Braun recipe, pushed dark)", "hallmark (slop test as gate)", "make-interfaces-feel-better"],
+  "model": "A dependency map you read and drive like an instrument: the map is the surface, a console under it opens the selected node in place, and a command palette answers or acts on any question in one line.",
+  "philosophy": "The real shape of a grill is a dependency graph, not a list: settling Q1 unlocked Q2, and reopening Q15 puts Q17, Q19 and Q20 at risk. So the graph is the page. Time runs top to bottom like a commit log, the frontier row is the heaviest thing on screen because it is where the work is, and every decided node carries its decision as a short statement so the map itself answers 'what did we decide?'. Everything that needs my hand is the single signal colour; everything settled is neutral. Motion exists only to explain causality: a ripple travels down the edges when something reopens, and a commit flash marks what Send just shipped.",
+  "principles": [
+    { "principle": "Recognition over recall", "decision": "Settled nodes print the decision (\"Q2 Transport · the web app writes to a local JSON…\") on the map; hovering shows the full sentence. You never open anything to remember a past decision." },
+    { "principle": "BLUF / inverted pyramid", "decision": "The console leads with the recommendation in a signal-bordered block (option text, then the why that names the cost); the options list and your-words field follow." },
+    { "principle": "Preattentive state encoding", "decision": "State is shape and fill before colour: decided = filled neutral, open = signal ring with a soft glow, staged = hatched signal fill with a → line, reopened = dashed signal ring with the old answer struck through, deferred = dotted neutral, at risk = dashed with a lit edge. One accent hue carries all of 'needs me'." },
+    { "principle": "Norman's feedback and causality", "decision": "Hovering Reopen previews the ripple; staging it sends a one-shot dash travel down every downstream edge with a depth-staggered flash on each dependent, and the rail chip says 'Q5 reopen → Q8 Q9 Q12 … at risk' before you Send." },
+    { "principle": "One primary action per view", "decision": "Accept is the only filled button in the console; Send is the only filled button on the page, pinned in the bottom-right corner (Fitts) and labelled with the live action count." },
+    { "principle": "Hick's law", "decision": "Round 9's seven questions are cleared with a, 1–4, d or f; each stage auto-advances to the next open node. The palette's 'Accept the recommendation on all open (7)' collapses the round to one decision when the recs are right." },
+    { "principle": "Gestalt: common region and proximity", "decision": "Rounds are horizontal bands with a left label; the frontier band is taller and carries a signal bar. Children are placed at the barycentre of their parents so most edges are short and vertical." },
+    { "principle": "Data-ink ratio", "decision": "No cards inside cards, no icons; the map is nodes, edges and labels. Edges not in the selected lineage dim so the lineage reads; the visual's regions connect to nodes with a single dotted leader instead of a legend." }
+  ],
+  "fixes": [
+    { "finding": "Every question state unmistakable (cap. 2)", "how": "Six visually distinct node treatments by shape and fill (see principles), a 'rec updated' dot and a filled 'durable' square as marks, plus a header readout with live counts: open · reopened · staged · decided · deferred. Reopened nodes strike through the old answer and the console tag reads 'reopened · not settled'." },
+    { "finding": "Answering, one way to write my own words (cap. 3)", "how": "a accepts, 1–4 pick, f focuses the single 'answer or push back in your words' field (Enter stages), r focuses the thread reply (a discussion message, visually separate), d defers, o reopens with a hover preview of the blast radius, e explores at once with an undo toast. Staged text answers and replies appear in the thread inside a dashed signal box labelled 'staged, not sent'." },
+    { "finding": "Staging with live counts, auto-advance, unstage, and a clear Send summary (cap. 4)", "how": "Counts in the header change as you stage; after each stage the next open node in reading order is selected; u unstages, each rail chip has ×, and the rail lists every staged action as a statement ('Q18 accept A: Copy it next to the doc…', 'Q5 reopen → Q8 Q9 … at risk'). Send shows 'Sent N actions as one turn', flashes a commit ring on each shipped node, and the lamp blinks 'agent working…' for 2 s." },
+    { "finding": "The visual with two-way linkage and redraw (cap. 5)", "how": "The visual docks as a picture-in-picture screen in the console (v expands it to 58vh and shrinks the map to a compact strip). Hovering a node posts {highlight} and draws a dotted leader from its region in the PiP up to the node; clicking a region in the frame selects the node; nodes drawn in the visual carry a small outline mark. Stale state is a hatched overlay plus a strip 'stale since Q15 was reopened · Visualize'; Visualize redraws (v3 → v4) with a working state." },
+    { "finding": "Find a past decision in one look or one action (cap. 8)", "how": "One look: the statement is printed on the node. One action: ⌘K then 'transport' shows 'Q2 Transport — decided · Transport: the web app writes to a local JSON…' as the top item; Enter opens it with the full decision, the agent's refinement in the thread, and its lineage lit on the map." }
+  ],
+  "tradeoffs": [
+    "Time runs top to bottom (rounds as rows) rather than left to right as the concept sketched; it was the only way to fit 25 nodes with readable statements at 1440×900 and 1280×800. The trade is that the console sits under the map, so the map gets ~470 px of height and the frontier row's titles are clamped to two lines.",
+    "A graph is denser to learn than a list: state is carried by six node treatments plus edges, so the first minute costs more than an inbox. The payoff is that dependencies, blast radius and history are visible at once instead of being reconstructed.",
+    "At 1280×800 the question body is hidden in the console (only the title, recommendation, why and options remain) to keep the map's two-line nodes; the body is one hover or one node click away.",
+    "The sandboxed iframe contract is kept intact (sandbox=\"allow-scripts\", postMessage only, source check). The one extension, the child posting its region rectangles, is appended at runtime and is ids and numbers only; without it the leader lines simply do not draw."
+  ],
+  "bestFor": "Sessions past round 3, where dependencies and reopens matter more than the next card: multi-week design grills with durable decisions, and anyone who asks 'what did we decide on X, and what depends on it?' more than once a day.",
+  "palette": [
+    { "name": "paper", "hex": "#1a1815", "role": "ground, warm charcoal (oklch 17% 0.007 60)" },
+    { "name": "paper-2 / paper-3 / paper-4", "hex": "#201d1a / #29251f / #332e28", "role": "console, decided-node fill, raised surfaces" },
+    { "name": "ink", "hex": "#ece7dd", "role": "primary text, selection outline, lineage edges" },
+    { "name": "ink-2", "hex": "#bab3a6", "role": "secondary text, durable mark" },
+    { "name": "muted", "hex": "#978f82", "role": "labels, statements on decided nodes, readout keys" },
+    { "name": "signal", "hex": "#f08a44", "role": "the one accent: open ring, staged hatch, reopened dash, at-risk edges, Accept and Send, agent lamp" },
+    { "name": "signal-ink", "hex": "#1e1612", "role": "text on signal fills" }
+  ],
+  "type": "IBM Plex Sans (variable, 400–600) for titles, body and controls; IBM Plex Mono 400/500 for ids, statements, readouts, key caps and the palette meta. Scale 11 / 12 / 13 / 14 / 15 / 17 px; node title 13 medium, statement 11 mono, console title 17 medium, recommendation 15 medium. Tabular numerals on every live count. Embedded latin subsets, ~59 KB raw / ~79 KB base64.",
+  "skillOverrides": [
+    "gpt-taste: ignored the marketing-page directives (AIDA sections, hero, bento, GSAP, picsum imagery); kept its no-emoji, no-meta-label and container-width discipline. Round labels and question ids are real data axes, not meta-labels.",
+    "web-design-engineer: skipped the confirm-before-coding checkpoints (no user in the loop) and used the Dieter Rams / Braun recipe inverted to a dark faceplate with the single signal orange instead of a light concrete ground.",
+    "hallmark: no macrostructure catalog rotation, nav or footer archetype (this is an app surface, not a page); the stamp, token discipline, slop-test contrast gates and the ban on italic headers and re-drawn chrome were applied. The visual's own browser chrome belongs to the agent's VISUAL_HTML and is left untouched.",
+    "make-interfaces-feel-better: shadows-for-elevation was not applied to nodes because their borders carry state; scale-on-press at 0.96, tabular numerals, concentric radii (2/3/4 px) and property-specific transitions were."
+  ],
+  "contractChanges": [
+    "The child also posts {regions:[{id,x,y,w,h}]} on load and resize (and on document resize via ResizeObserver), ids and rounded numbers only; the parent uses it to draw dotted leader lines from a region to its node. Demoed by appending a 9-line listener to VISUAL_HTML before assigning srcdoc. Highlight and clicked messages are unchanged."
+  ]
+}
