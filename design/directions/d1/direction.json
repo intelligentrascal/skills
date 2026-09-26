@@ -1,0 +1,56 @@
+{
+  "name": "The Crit Wall",
+  "tagline": "The agent's prototype is pinned up as the stage; questions are pins on it, decisions are labels beside it, and your unsent marks are the only colour in the room.",
+  "skills": ["hallmark", "web-design-engineer", "make-interfaces-feel-better"],
+  "model": "Annotate the work in place: select a pin, read the recommendation first, answer with one key, the note moves to the next pin, and Send hands every mark back as one turn.",
+  "philosophy": "A design review does not happen in a list; it happens on the wall, in front of the work, with everyone pointing at the same region. So the prototype is the room and everything else is annotation on or beside it. State is encoded physically: pins for what is being asked, orange marks for what is mine and unsent, dashed and tilted pins for what has been unsettled, labels with leader lines for what is decided, and a sepia print with an inked seal for a drawing that has gone out of date. The right edge is deliberately not a pane: it is the record you consult and the tray you hand back.",
+  "principles": [
+    { "principle": "BLUF / inverted pyramid", "decision": "The note at a pin opens with the recommendation and its cost before the options; the strip line, the labels and the ledger all lead with the decision statement, not the question." },
+    { "principle": "Recognition over recall (visual as the room)", "decision": "Every question that has a region, or whose direct dependency has one, is a numbered pin on that region of the print; several on one region cluster into one marker with a count. You recognise where a question lives instead of recalling it." },
+    { "principle": "Preattentive state encoding, hierarchy before colour", "decision": "Open = paper pin; staged = the one accent, grease-pencil orange; reopened = dashed ring, tilted 14°, hatched region; deferred = hollow ring; decided = a label beside the print with a leader line. Colour is reserved for what is mine and unsent." },
+    { "principle": "One primary action per view", "decision": "Inside a note the only filled button is Accept; on the page the only accent-filled button is Send, fixed at the bottom-right corner of the viewport (Fitts's law) so it is the easiest target on screen." },
+    { "principle": "Progressive disclosure", "decision": "The print shows numbers and decision labels only; the body, options, why, thread and free-text field live in the note that opens at the pin; siblings on the same marker are one click away in the note header." },
+    { "principle": "Gestalt: common region and proximity", "decision": "Pins sit on the top-right edge of the region they concern; a leader line joins each decision label to its region; questions without a region stay in the strip and say so, rather than being pinned somewhere false." },
+    { "principle": "Norman's signifiers and feedback", "decision": "The stale drawing is sepia with an inked OUT OF DATE seal and a red caption naming the reopened questions; staging turns the pin orange, drops the open count, and the tray lists what Send will ship; Send toasts what shipped and the lamp goes to working." },
+    { "principle": "Statements, not chrome", "decision": "Labels and ledger rows read 'Q2 · Transport — Simpler: the web app writes to a local JSON…', derived from the accepted option or the user's own words; durable ones carry a locked mark." }
+  ],
+  "fixes": [
+    { "finding": "Capability 2: every state unmistakable", "how": "Six visually distinct pin states (open paper, staged accent fill, reopened dashed+tilted with a 'Qn reopened' tag and a hatched region, deferred hollow ring, decided rust ring, rec-updated chip) repeated identically on the print, in the round strip and in the note header; reopened questions also strike their old answer and show the agent's reason in the note; dependants of a reopened question tilt the other way and carry an 'after Q15 ↺' chip." },
+    { "finding": "Capability 3: answering", "how": "1–4 pick, a accepts the rec, f is the single free-text field ('In my words — an answer or a pushback', staged with ⌘↵), d defers, o reopens a decided question, e explores deeper at once with an Undo toast, r replies in the thread where staged replies are labelled 'staged · not sent'. Clicking an option row does the same as its key." },
+    { "finding": "Capability 4: staging", "how": "Counts in the strip update live (open goes down, staged goes up in accent); after each mark the note auto-advances to the next open pin and, when the round is clear, focuses Send; u or the × in the tray unstages; the Handing-back tray lists every mark as a statement and the button reads 'Send N as one turn'." },
+    { "finding": "Capability 5: the visual, two-way", "how": "Hovering or selecting any pin, label or ledger row posts {highlight:[region]} to the sandboxed frame and lights the region overlay; a click inside the frame posts {clicked:id} and selects that question (a decided one opens as a record with Reopen). The stale print is sepia with a seal and caption; v or Redraw asks the agent, the lamp works for ~2 s, then v4 arrives clean." },
+    { "finding": "Capability 8: find a past decision", "how": "The Settled ledger is always on screen, newest round first, each row a statement with a locked mark; / focuses the find field and 'transport' leaves one row (Q2) with the match highlighted; clicking it opens the record note at the row, with the decision, the agent's recommendation and whether it was taken or overruled." }
+  ],
+  "tradeoffs": [
+    "Pins carry numbers, not titles, so the first read of a marker needs the strip line or a hover; a list shows titles for free.",
+    "Because pins are placed where the visual has regions, the coverage of the print decides how much of the round is spatial; a visual with few regions pushes most questions into the strip and the wall reads emptier.",
+    "The note opens over the gutter and the top of the record while you answer, so the decision labels and the top ledger rows are hidden until Esc; a fixed side pane would never cover them.",
+    "The print is scaled with a CSS transform to fill the stage, so region coordinates are multiplied by the scale on the parent side; at scales below 1 the prototype's text is smaller than the agent drew it. The sandbox is untouched: the frame stays sandbox=\"allow-scripts\", talks only via postMessage, and the parent filters on e.source."
+  ],
+  "bestFor": "Rounds where the agent has drawn a prototype and most questions are about parts of it: reviewing layout, surfaces and flows with the work in front of you, mostly from the keyboard.",
+  "palette": [
+    { "name": "Wall", "hex": "#2b2622", "role": "room surface; oklch(21% 0.012 55), warm charcoal with grain and a top light" },
+    { "name": "Wall deep", "hex": "#251f1c", "role": "masthead and margin surfaces; the shadowed edges of the room" },
+    { "name": "Ink", "hex": "#ebe7df", "role": "text on the wall; oklch(93% 0.010 80)" },
+    { "name": "Muted", "hex": "#a29b90", "role": "secondary text on the wall; ≥ 4.5:1" },
+    { "name": "Print", "hex": "#f6f3ec", "role": "paper of the pinned prototype, the notes and the toasts; oklch(96.5% 0.010 80)" },
+    { "name": "Paper ink", "hex": "#2c2621", "role": "text on paper" },
+    { "name": "Grease pencil", "hex": "#f08a5a", "role": "the one accent: my staged marks, the Send button, the lit region; oklch(73% 0.165 42)" },
+    { "name": "Accent deep", "hex": "#b3491f", "role": "the same pencil on paper (staged text inside a note)" },
+    { "name": "Stamp", "hex": "#8a4a3a", "role": "rust stamp ink: reopened tags, the OUT OF DATE seal, decided rings; oklch(46% 0.11 30)" },
+    { "name": "Focus", "hex": "#f2c26a", "role": "focus ring on the wall; pins get a paper ring over a dark halo so it reads on both surfaces" }
+  ],
+  "type": "Bricolage Grotesque (variable; opsz/wdth/wght, latin, text-subset) for the topic, round, pin numerals at 85% width and note titles; IBM Plex Sans (variable 100–700, latin) for all reading text at 13–14 px; JetBrains Mono (variable, latin) as the single machine register: keys, doc path, question ids, label titles, stamps and seals. Scale: 11 · 12.5 · 14 · 16 · 20 · 25 px. Embedded as base64 @font-face, about 170 KB of woff2.",
+  "skillOverrides": [
+    "Hallmark 2+1 rule: the mono outlier appears in more than two slots (keys, ids, paths, label titles, stamps); it is one register, machine text, and every instance of that role uses it.",
+    "Hallmark gate 24 (4 px spacing scale): dense tool paddings use 5/7/9/11 px odd values where optical alignment with 1 px rules needs them.",
+    "Hallmark gate 25 (45–75 ch measure): ledger statements and gutter labels run at ~28–36 ch because they are index entries, not prose; the note body keeps ~45 ch.",
+    "Hallmark 'one shadow' rule: the print and the note use layered shadows (make-interfaces-feel-better surfaces guidance) because they are the two physically elevated objects in the room.",
+    "make-interfaces-feel-better scale-on-press 0.96: rectangular buttons press with translateY(1px) per Hallmark; only the round pins use scale(0.96).",
+    "Hallmark design-context gate: could not ask the PM the three questions from inside a parallel design run; inferred audience = the developer being interviewed, use = clear a round fast and find any decision, tone = technical studio (crit wall), and stated them in the CSS stamp.",
+    "web-design-engineer checkpoints (design-system confirmation, v0 pause): run without pauses because the brief asked for a finished direction; the Design Read is recorded here instead: artifact = tool prototype, visual-variance 8, motion 3, density 8, asset-dependence 2, brand-fidelity 2."
+  ],
+  "contractChanges": [
+    "Child posts {regions:[{id,x,y,w,h}], w, h} on load and resize (ids matched to /^q\\d+$/, numbers only) so the parent can place pins, labels and hatches and size the print to its content. Implemented by appending a 9-line listener to VISUAL_HTML before </body> at runtime."
+  ]
+}

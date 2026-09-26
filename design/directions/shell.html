@@ -83,7 +83,7 @@
   .notes .tagline { color: var(--ink-2); margin: 0 0 14px; font-size: 14.5px; text-wrap: pretty; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
   .chip { font: 500 12px/20px var(--ui); padding: 0 8px; border-radius: var(--r-sm); background: var(--wash); color: var(--ink-2); }
-  .chip.lead { background: var(--ink); color: var(--on-ink); }
+  .chip.is-lead { background: var(--ink); color: var(--on-ink); }
   .notes h3 { font: 600 12px var(--ui); color: var(--ink-3); margin: 20px 0 6px; letter-spacing: 0; }
   .notes p { margin: 0 0 8px; text-wrap: pretty; }
   .notes ul { margin: 0; padding: 0; list-style: none; }
@@ -144,6 +144,7 @@
   <h1>Grill page <span>three new directions · 2026-09-25</span></h1>
   <div class="tabs" role="tablist" aria-label="Views" id="tabs"></div>
   <div class="spacer"></div>
+  <button type="button" class="btn dir-only" id="popBtn" hidden title="Open this direction on its own at full window size">Open full window ↗</button>
   <button type="button" class="btn dir-only" id="notesBtn" aria-pressed="false" hidden>About this direction</button>
 </header>
 <main id="main"></main>
@@ -155,14 +156,15 @@
 (() => {
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const main = document.getElementById("main"), tabsEl = document.getElementById("tabs");
-  const notesBtn = document.getElementById("notesBtn");
+  const notesBtn = document.getElementById("notesBtn"), popBtn = document.getElementById("popBtn");
+  let current = "brief";
   const pref = { notes: false };
   const SKILL = {
     "hallmark": "Hallmark", "web-design-engineer": "Web Design Engineer", "ui-ux-pro-max": "UI/UX Pro Max",
     "taste-skill": "Taste", "gpt-taste": "GPT Taste", "gpt-tasteskill": "GPT Taste",
     "make-interfaces-feel-better": "Make Interfaces Feel Better",
   };
-  const skillChips = (d) => `<div class="chips">${(d.skills || []).map((s, i) => `<span class="chip${i === 0 ? " lead" : ""}">${esc(SKILL[s] || s)}${i === 0 ? " · lead" : ""}</span>`).join("")}</div>`;
+  const skillChips = (d) => `<div class="chips">${(d.skills || []).map((s, i) => s.split(" (")[0]).map((s, i) => `<span class="chip${i === 0 ? " is-lead" : ""}">${esc(SKILL[s] || s)}${i === 0 ? " · lead" : ""}</span>`).join("")}</div>`;
 
   const views = [{ id: "brief", label: "Brief" }, ...DIRECTIONS.map((d, i) => ({ id: "d" + (i + 1), label: d.name, n: i + 1 })), { id: "compare", label: "Compare" }];
 
@@ -248,7 +250,8 @@
       document.getElementById("view-" + v.id).hidden = !on;
     });
     const isDir = /^d\d$/.test(id);
-    notesBtn.hidden = !isDir;
+    notesBtn.hidden = popBtn.hidden = !isDir;
+    current = id;
     if (isDir) mount(+id.slice(1) - 1);
     const t = document.getElementById("tab-" + id);
     t.scrollIntoView({ block: "nearest", inline: "nearest" });
@@ -265,6 +268,11 @@
   });
   main.addEventListener("click", (e) => { const c = e.target.closest("[data-go]"); if (c) show(c.dataset.go, true); });
   notesBtn.addEventListener("click", () => { pref.notes = !pref.notes; apply(); });
+  // Each mockup was designed for a whole 1440×900 window; this gives it one, without the bar above.
+  popBtn.addEventListener("click", () => {
+    const i = +current.slice(1) - 1;
+    window.open(URL.createObjectURL(new Blob([DOCS[i]], { type: "text/html" })), "_blank");
+  });
   addEventListener("hashchange", () => show(location.hash.slice(1)));
 
   apply();
