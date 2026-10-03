@@ -38,8 +38,19 @@ test("every provenance/graft line names a pinned source at its pinned commit", (
 test("no rascal skill file references an upstream plugin namespace", () => {
   for (const f of files(SKILLS)) {
     // provenance/graft lines name upstream paths (e.g. .../setup-matt-pocock-skills/...), so they are not checked
-    const text = readFileSync(f, "utf8").split("\n").filter((l) => !/^(<!--|\/\/|#) ?(provenance|graft):/.test(l)).join("\n");
-    assert.doesNotMatch(text, /superpowers:|mattpocock-skills:|\/setup-matt-pocock-skills/, relative(SKILLS, f));
+    const lines = readFileSync(f, "utf8").split("\n").filter((l) => !/^(<!--|\/\/|#) ?(provenance|graft):/.test(l));
+    const text = lines.join("\n");
+    const rel = relative(SKILLS, f);
+    assert.doesNotMatch(text, /superpowers:|mattpocock-skills:|\/setup-matt-pocock-skills|using-superpowers|docs\/superpowers\//, rel);
+    for (const l of lines) {
+      for (const sentence of l.split(/(?<=[.!?])\s+/)) {
+        const at = sentence.search(/Skill tool/i);
+        if (at < 0) continue;
+        for (const m of sentence.slice(at).matchAll(/"([^"]+)"/g)) {
+          assert.ok(m[1].startsWith("rascal-"), `${rel}: Skill tool names "${m[1]}": ${l.trim()}`);
+        }
+      }
+    }
   }
 });
 

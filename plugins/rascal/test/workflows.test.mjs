@@ -16,9 +16,12 @@ export const WORKFLOWS = {
   "rascal-scheduled-runbook": ["sources", "recommend", "handoff"],
   "rascal-orchestrate": ["questions", "three-variants", "autonomy", "recommend", "handoff"],
 };
-const present = () => Object.keys(WORKFLOWS).filter(has);
+const present = () => Object.keys(WORKFLOWS);
 
-test("at least one workflow exists", () => assert.ok(present().length > 0));
+test("all five workflows exist", () => {
+  assert.equal(present().length, 5);
+  for (const w of present()) assert.ok(has(w), `${w} missing`);
+});
 
 test("each workflow carries its rule blocks, expanded", () => {
   for (const w of present()) {
@@ -39,21 +42,35 @@ test("every rascal skill a workflow names exists", () => {
   }
 });
 
-test("workflows are model-invocable and ship openai.yaml", () => {
+// every skill a workflow calls must also be model-invocable
+const CALLED = ["rascal-wayfinder", "rascal-planning", "rascal-grilling", "rascal-domain-modeling", "rascal-prototype", "rascal-review",
+  "rascal-grill-docs-ui", "rascal-plan", "rascal-tdd"];
+
+test("workflows and every skill they call are model-invocable", () => {
+  for (const s of CALLED) {
+    assert.ok(has(s), `${s} missing`);
+    assert.doesNotMatch(read(s), /disable-model-invocation/, s);
+  }
   for (const w of present()) {
-    assert.doesNotMatch(read(w), /disable-model-invocation/, w);
+    for (const m of read(w).matchAll(/"(rascal-[a-z-]+)"/g)) {
+      assert.ok(has(m[1]), `${w} calls ${m[1]}`);
+      assert.doesNotMatch(read(m[1]), /disable-model-invocation/, `${w} calls ${m[1]}`);
+    }
+  }
+});
+
+test("workflows ship openai.yaml", () => {
+  for (const w of present()) {
     assert.ok(existsSync(join(SKILLS, w, "agents", "openai.yaml")), w);
   }
 });
 
 test("rascal-plan: fog → wayfinder, grill with docs, write it down", () => {
-  if (!has("rascal-plan")) return;
   const t = read("rascal-plan");
   for (const s of ['"rascal-wayfinder"', '"rascal-grilling"', '"rascal-domain-modeling"', '"rascal-grill-docs-ui"', "docs/<slug>-design.md"]) assert.ok(t.includes(s), s);
 });
 
 test("rascal-feature: plan → planning → review, resumable at execute, ships", () => {
-  if (!has("rascal-feature")) return;
   const t = read("rascal-feature");
   const i = (s) => t.indexOf(s);
   assert.ok(i('"rascal-plan"') > 0 && i('"rascal-plan"') < i('"rascal-planning"') && i('"rascal-planning"') < i('"rascal-review"'));
@@ -61,7 +78,6 @@ test("rascal-feature: plan → planning → review, resumable at execute, ships"
 });
 
 test("rascal-ui: steps in order, parity gate, walkthrough with Playwright fallback", () => {
-  if (!has("rascal-ui")) return;
   const t = read("rascal-ui");
   const order = ['"rascal-prototype"', "## 3. Review in parallel", "## 4. Design language", "## 5. Feedback loop", "## 6. Parity gate", "## 7. Persona walkthrough", "## 8. Ship"];
   for (let k = 1; k < order.length; k++) assert.ok(t.indexOf(order[k - 1]) < t.indexOf(order[k]) && t.indexOf(order[k - 1]) >= 0, order[k]);
@@ -70,7 +86,6 @@ test("rascal-ui: steps in order, parity gate, walkthrough with Playwright fallba
 });
 
 test("rascal-scheduled-runbook: ten guardrail sections in order, siblings, test run", () => {
-  if (!has("rascal-scheduled-runbook")) return;
   const t = read("rascal-scheduled-runbook");
   const order = ["**Purpose and output.**", "**Preconditions.**", "**Trust boundary.**", "**Watermark.**", "**Cheap exit.**", "**Work.**",
     "**Dry run, then commit.**", "**Record before render.**", "**Render and verify.**", "**Report-only fallback.**", "## 3. Siblings", "## 4. Test"];
@@ -78,7 +93,6 @@ test("rascal-scheduled-runbook: ten guardrail sections in order, siblings, test 
 });
 
 test("rascal-orchestrate: experimental, cap 2, independence, two review paths", () => {
-  if (!has("rascal-orchestrate")) return;
   const t = read("rascal-orchestrate");
   assert.match(t, /^description: "Experimental\./m);
   for (const s of ['"rascal-planning"', '"rascal-plan"', "at most **2**", "independent", "[worker-brief.md](worker-brief.md)", "[review-loop.md](review-loop.md)",
