@@ -1,6 +1,9 @@
 # Privacy scrub allowlist (scripts/scrub.mjs). One per line: "glob" (whole file) or "glob:literal"
 # (that text in that file). Keep entries narrow and say why. Never allowlist docs/** wholesale.
 
+# This file lists the allowed literals, so it always contains them.
+.scrub-allow
+
 # Synthetic test data: the scrub's own tests, and the plan that specifies them.
 scripts/test/scrub.test.mjs:/Users/alice/
 scripts/test/scrub.test.mjs:bob@example.org
@@ -20,3 +23,7 @@ docs/superpowers/plans/2026-10-02-rascal-steps-1-3.md*:BEGIN OPENSSH PRIVATE KEY
 
 # Synthetic path in a project-key test.
 skills/grilling-ui/test/lifecycle.test.mjs:/Users/a/
+
+# Synthetic transcript fixtures and the extractor tests that read them.
+plugins/rascal/test/**:/Users/alice/
+plugins/rascal/test/**:alice@corp.io
