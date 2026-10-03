@@ -41,8 +41,8 @@ those, stop and ask.
 
 ## When to Use
 
-- You have a plan from rascal-planning and your human partner
-  chose inline execution at the handoff.
+- You have a plan from rascal-planning and are running it in this
+  session.
 - Your harness has no subagent tool. Never fabricate a dispatch; run the plan here.
 - Tasks are mostly independent — the same precondition as
   rascal-orchestrate.
@@ -249,8 +249,8 @@ skip it, and do not replace it with your own read of the diff.
 yourself against the package, as a separate pass after the last task's
 ledger line. Write `Final review: self-review (no subagent tool)` to the
 ledger, and say so in your final message: a self-review by the author is
-weaker than a fresh reviewer, and your human partner decides whether that
-is enough before merge.
+weaker than a fresh reviewer. Note the self-review in the handoff's
+**Decisions** field and continue the run.
 
 Sort the findings before you act on any of them. The reviewer's severity
 labels are advice; the gate is yours. Its "Declined to judge" list is

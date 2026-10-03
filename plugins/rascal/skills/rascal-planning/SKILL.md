@@ -16,7 +16,7 @@ Write the spec to `docs/specs/<YYYY-MM-DD>-<slug>.md`. Publish it to the issue t
 
 Check with the user that these seams match their expectations.
 
-3. Write the spec using the template below, then save it to that path.
+3. Write the spec using the template below, save it to that path, and commit it on the current branch (a calling workflow has already branched).
 
 <spec-template>
 
@@ -77,9 +77,9 @@ Any further notes about the feature.
 ## Plan
 <!-- graft: superpowers skills/writing-plans/SKILL.md @ 8ca22dba9a94f28898bbce59f2537ff4d87c747d -> ## Plan -->
 
-Once the spec is saved, a fresh agent writes the task plan from the spec alone. Dispatch a subagent with the spec path and [plan-format.md](plan-format.md); without a subagent tool, re-read only the spec and write it yourself. The plan goes to `docs/plans/<YYYY-MM-DD>-<slug>.md`. Skip its Execution Handoff section: the next step is always **Execute** below, run without asking.
+Once the spec is saved, a fresh agent writes the task plan from the spec alone. Dispatch a subagent with the spec path and [plan-format.md](plan-format.md); without a subagent tool, re-read only the spec and write it yourself. The plan goes to `docs/plans/<YYYY-MM-DD>-<slug>.md`; commit it on the current branch once it's written. Skip its Execution Handoff section: the next step is always **Execute** below, run without asking.
 
 ## Execute
 <!-- graft: superpowers skills/executing-plans/SKILL.md @ 8ca22dba9a94f28898bbce59f2537ff4d87c747d -> ## Execute -->
 
-Execute the plan with [executing.md](executing.md), in a git worktree on a new branch, without check-ins between tasks. Its scripts are in this skill's `scripts/` folder. For a plan with many independent tasks, the user may run `rascal-orchestrate` instead.
+Execute the plan with [executing.md](executing.md), in a git worktree on its own branch (rascal-feature's, or a new one), without check-ins between tasks. Its scripts are in this skill's `scripts/` folder. For a plan with many independent tasks, the user may run `rascal-orchestrate` instead.

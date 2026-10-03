@@ -13,7 +13,7 @@ Dispatch a code reviewer subagent to catch issues before they cascade. The revie
 ## When to Request Review
 
 **Mandatory:**
-- After each task in subagent-driven development
+- After each task (rascal-planning or rascal-orchestrate)
 - After completing major feature
 - Before merge to main
 
@@ -58,7 +58,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 
 [Dispatch code reviewer subagent]
   DESCRIPTION: Added verifyIndex() and repairIndex() with 4 issue types
-  PLAN_OR_REQUIREMENTS: Task 2 from docs/superpowers/plans/deployment-plan.md
+  PLAN_OR_REQUIREMENTS: Task 2 from docs/plans/deployment-plan.md
   BASE_SHA: a7981ec
   HEAD_SHA: 3df7661
 
@@ -94,6 +94,10 @@ You: [Fix progress indicators]
 - Request clarification
 
 See template at: [code-reviewer.md](code-reviewer.md)
+
+## Without a subagent tool
+
+Perform the review yourself from [code-reviewer.md](code-reviewer.md), as a separate pass after the work is finished, and say in the handoff that it was a self-review.
 
 ## Before claiming done
 <!-- graft: superpowers skills/verification-before-completion/SKILL.md @ 8ca22dba9a94f28898bbce59f2537ff4d87c747d -> ## Before claiming done -->
