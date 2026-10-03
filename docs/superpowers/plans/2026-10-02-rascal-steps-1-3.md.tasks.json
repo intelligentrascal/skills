@@ -1,0 +1,128 @@
+{
+  "planPath": "docs/superpowers/plans/2026-10-02-rascal-steps-1-3.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: rascal plugin scaffold",
+      "status": "pending",
+      "description": "**Goal:** `rascal` is installable from the existing marketplace as an empty plugin with notices and source pins.\n\n**Verify:** `node --test scripts/test/manifest.test.mjs plugins/rascal/test/manifest.test.mjs` → all pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/.claude-plugin/plugin.json\",\"plugins/rascal/sources.json\",\"plugins/rascal/THIRD_PARTY_NOTICES.md\",\"plugins/rascal/test/manifest.test.mjs\",\".claude-plugin/marketplace.json\",\"scripts/test/manifest.test.mjs:24-32\"],\"verifyCommand\":\"`node --test scripts/test/manifest.test.mjs plugins/rascal/test/manifest.test.mjs` → all pass\",\"acceptanceCriteria\":[\"The marketplace lists `intelligentrascal` (source `./`) and `rascal` (source `./plugins/rascal`).\",\"rascal's plugin.json has no `dependencies` (standalone, Q2).\",\"`sources.json` pins Pocock at the commit in `upstream.json` (`3cca18b368ae95cdbdebbff572ccafa662551015`), and obra/superpowers, pcvelz/superpowers and cursor/plugins with `commit: null` (not derived from yet).\",\"THIRD_PARTY_NOTICES carries Pocock's MIT text.\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: rascal's terminal grilling skills",
+      "status": "pending",
+      "blockedBy": [
+        1
+      ],
+      "description": "**Goal:** `rascal-grilling`, `rascal-domain-modeling`, `rascal-grill-me` and `rascal-grill-with-docs` exist as rascal's own copies of Pocock's skills, each with a provenance header.\n\n**Verify:** `node --test plugins/rascal/test/skills.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-grilling/{SKILL.md,agents/openai.yaml}\",\"plugins/rascal/skills/rascal-domain-modeling/{SKILL.md,CONTEXT-FORMAT.md,ADR-FORMAT.md,agents/openai.yaml}\",\"plugins/rascal/skills/rascal-grill-me/SKILL.md\",\"plugins/rascal/skills/rascal-grill-with-docs/SKILL.md\",\"plugins/rascal/test/skills.test.mjs\"],\"verifyCommand\":\"`node --test plugins/rascal/test/skills.test.mjs` → pass\",\"acceptanceCriteria\":[\"Each SKILL.md frontmatter `name` equals its folder name.\",\"Each derived skill has a provenance header naming source, path and the pinned commit, matching `sources.json`.\",\"No rascal skill references `mattpocock-skills:` or tells the user to install Pocock.\",\"The grilling and domain-modeling bodies are Pocock's text verbatim below the header (copy-and-edit, Q13). Only skill names change.\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Transport mirror (`sync-transport`)",
+      "status": "pending",
+      "blockedBy": [
+        1
+      ],
+      "description": "**Goal:** `scripts/sync-transport.mjs` mirrors intelligentrascal's grill transport into `plugins/rascal/skills/rascal-grilling-ui/`, rewriting only SKILL.md and openai.yaml. `--check` reports drift.\n\n**Verify:** `node --test scripts/test/sync-transport.test.mjs && node scripts/sync-transport.mjs --check` → pass, then `sync-transport: in sync`\n\n```json:metadata\n{\"files\":[\"scripts/sync-transport.mjs\",\"scripts/test/sync-transport.test.mjs\",\"plugins/rascal/skills/rascal-grilling-ui/**\"],\"verifyCommand\":\"`node --test scripts/test/sync-transport.test.mjs && node scripts/sync-transport.mjs --check` → pass, then `sync-transport: in sync`\",\"acceptanceCriteria\":[\"`hub.mjs`, `lib/*.mjs`, `page/*` and `visual-brief.md` are byte-identical to `skills/grilling-ui/`. Tests are not copied.\",\"The generated SKILL.md has `name: rascal-grilling-ui`, a rascal description, and no `Pocock`, `mattpocock` or `intelligentrascal` strings. Every backticked `grilling`, `domain-modeling` and `grilling-ui` reference is `rascal-`-prefixed.\",\"`--check` exits 0 when in sync and 1 listing drifted paths otherwise, and writes nothing.\",\"Running the script twice changes nothing on the second run.\",\"`skills/grilling-ui/` is untouched (intelligentrascal behaviour unchanged).\"]}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: rascal's browser-UI grill entry points",
+      "status": "pending",
+      "blockedBy": [
+        2,
+        3
+      ],
+      "description": "**Goal:** `rascal-grill-me-ui` and `rascal-grill-docs-ui` run rascal's grilling on the browser page.\n\n**Verify:** `node --test plugins/rascal/test/skills.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-grill-me-ui/{SKILL.md,agents/openai.yaml}\",\"plugins/rascal/skills/rascal-grill-docs-ui/{SKILL.md,agents/openai.yaml}\",\"plugins/rascal/test/skills.test.mjs\"],\"verifyCommand\":\"`node --test plugins/rascal/test/skills.test.mjs` → pass\",\"acceptanceCriteria\":[\"Both preflight rascal's skills only, and load `rascal-grilling-ui` last.\",\"Their failure messages point at installing rascal, never Pocock.\",\"Finish profiles match intelligentrascal's (`design-doc`, `docs`).\"]}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: Privacy scrub",
+      "status": "pending",
+      "blockedBy": [
+        1
+      ],
+      "description": "**Goal:** `scripts/scrub.mjs` finds personal data in files. Generic patterns always run; the local deny-list (`~/.rascal/denylist.txt`) is added when present; an allowlist suppresses known-fine hits.\n\n**Verify:** `node --test scripts/test/scrub.test.mjs && node scripts/scrub.mjs --all` → pass, then `scrub: clean`\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-retro/lib/redact.mjs\",\"scripts/scrub.mjs\",\"scripts/test/scrub.test.mjs\",\".scrub-allow\"],\"verifyCommand\":\"`node --test scripts/test/scrub.test.mjs && node scripts/scrub.mjs --all` → pass, then `scrub: clean`\",\"acceptanceCriteria\":[\"Generic patterns cover home paths with a real username (`/Users/<name>/`, `/home/<name>/`; `~` paths are fine), emails, and token shapes (`sk-`, `sk-ant-`, `ghp_`, `gho_`, `github_pat_`, `AKIA`, `xox[bp]-`, PEM private keys).\",\"The deny-list file has one case-insensitive literal per line; `#` starts a comment.\",\"`.scrub-allow` lines are `path-glob` (whole file) or `path-glob:literal` (that text in that file).\",\"Modes: `--staged` (files in the git index), `--all` (all tracked files), or explicit paths; `--generic` skips the deny-list.\",\"Exit 0 when clean, 1 with `file:line: kind` lines (never printing the matched secret), 2 on usage error.\",\"`node scripts/scrub.mjs --all` is clean on the repo after this task.\"]}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: Pre-commit hook and CI",
+      "status": "pending",
+      "blockedBy": [
+        3,
+        5
+      ],
+      "description": "**Goal:** Every commit runs the scrub on staged files (with the deny-list) and the transport `--check`. Every push and PR runs the generic scrub in CI.\n\n**Verify:** the two refusal checks in Step 3 → both refused; `git commit` of clean changes → succeeds\n\n```json:metadata\n{\"files\":[\".githooks/pre-commit\",\"scripts/setup-hooks.sh\",\".github/workflows/privacy.yml\"],\"verifyCommand\":\"the two refusal checks in Step 3 → both refused; `git commit` of clean changes → succeeds\",\"acceptanceCriteria\":[\"After `scripts/setup-hooks.sh`, `git config core.hooksPath` is `.githooks`.\",\"A staged file containing `/Users/alice/` is refused with the scrub's output.\",\"Editing `skills/grilling-ui/lib/util.mjs` without re-running sync-transport is refused.\",\"CI runs `node scripts/scrub.mjs --all --generic` only. Per Q34, the transport check is not in CI.\"]}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 7: `install-rascal.sh` for Codex, OpenCode and Pi",
+      "status": "pending",
+      "blockedBy": [
+        2,
+        4
+      ],
+      "description": "**Goal:** One command links every rascal skill into `~/.agents/skills` and creates the `~/.rascal/` scaffold. It installs no upstreams (Q20) and leaves `install-agents.sh` untouched.\n\n**Verify:** `node --test scripts/test/install-rascal.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"scripts/install-rascal.sh\",\"scripts/test/install-rascal.test.mjs\"],\"verifyCommand\":\"`node --test scripts/test/install-rascal.test.mjs` → pass\",\"acceptanceCriteria\":[\"Every folder under `plugins/rascal/skills/` is symlinked into `$AGENTS_SKILLS_DIR` (default `~/.agents/skills`) under the same name.\",\"Re-running is a no-op. A real directory in the way exits 1 and links nothing.\",\"Creates `$RASCAL_HOME` (default `~/.rascal`, mode 700) with `mining/`, a commented `denylist.txt` template and an empty `preferences.md`, and never overwrites existing files.\",\"Prints the Claude Code install line: `claude plugin marketplace add intelligentrascal/skills && claude plugin install rascal@intelligentrascal`.\"]}\n```"
+    },
+    {
+      "id": 8,
+      "subject": "Task 8: Digest record and the Claude extractor (CLI + desktop)",
+      "status": "pending",
+      "blockedBy": [
+        5
+      ],
+      "description": "**Goal:** A shared record builder, plus a parser that turns a Claude Code or Claude desktop JSONL transcript into one digest record.\n\n**Verify:** `node --test plugins/rascal/test/claude.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-retro/lib/record.mjs\",\"plugins/rascal/skills/rascal-retro/lib/claude.mjs\",\"plugins/rascal/test/claude.test.mjs\",\"plugins/rascal/test/fixtures/claude-cli.jsonl\",\"plugins/rascal/test/fixtures/claude-desktop.jsonl\"],\"verifyCommand\":\"`node --test plugins/rascal/test/claude.test.mjs` → pass\",\"acceptanceCriteria\":[\"A record is `{ v: 1, source, id, cwd, start, end, turns: [{at, text}], skills: [{at, name, via}], tools: {name: count}, assistantTurns }`.\",\"User turns exclude tool results, `isMeta`, and injected blocks (`<system-reminder>`, `<task-notification>`, `<local-command-…>`, `[SYSTEM NOTIFICATION`). A slash command becomes a skill `{via: \\\"command\\\"}` and its args become the turn text.\",\"A `Skill` tool_use becomes `{via: \\\"tool\\\", name: input.skill}`.\",\"Text is redacted (generic + deny-list) and clipped to 4000 chars per turn.\",\"Desktop `audit.jsonl` lines (`session_id`, `client_platform`) parse with the same function.\"]}\n```"
+    },
+    {
+      "id": 9,
+      "subject": "Task 9: Codex extractor",
+      "status": "pending",
+      "blockedBy": [
+        8
+      ],
+      "description": "**Goal:** Parse `~/.codex/sessions/**/rollout-*.jsonl` into a record.\n\n**Verify:** `node --test plugins/rascal/test/codex.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-retro/lib/codex.mjs\",\"plugins/rascal/test/codex.test.mjs\",\"plugins/rascal/test/fixtures/codex.jsonl\"],\"verifyCommand\":\"`node --test plugins/rascal/test/codex.test.mjs` → pass\",\"acceptanceCriteria\":[\"`session_meta.payload.session_id` gives the id and `payload.cwd` gives the cwd.\",\"User turns come from `response_item` / `message` / `role: \\\"user\\\"` `input_text` parts, minus injected blocks.\",\"`function_call` and `custom_tool_call` count as tools by `payload.name`. Any tool call whose arguments or input mention `…/<skill>/SKILL.md` adds a skill `{via: \\\"read\\\"}` named after that folder.\",\"Assistant turns count `role: \\\"assistant\\\"` messages.\"]}\n```"
+    },
+    {
+      "id": 10,
+      "subject": "Task 10: OpenCode extractor",
+      "status": "pending",
+      "blockedBy": [
+        8
+      ],
+      "description": "**Goal:** Read sessions from `~/.local/share/opencode/opencode.db` (SQLite, read-only) into records.\n\n**Verify:** `node --test plugins/rascal/test/opencode.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-retro/lib/opencode.mjs\",\"plugins/rascal/test/opencode.test.mjs\"],\"verifyCommand\":\"`node --test plugins/rascal/test/opencode.test.mjs` → pass\",\"acceptanceCriteria\":[\"Opens the DB read-only with `node:sqlite`, loaded only when the DB exists.\",\"One record per `session` row (id, `directory` → cwd, `time_created` / `time_updated` → ISO). Rows with `parent_id` (subagent sessions) are skipped.\",\"`message.data.role` decides user versus assistant. User `part` rows of `type: \\\"text\\\"` become turns.\",\"`part` rows of `type: \\\"tool\\\"` count `tool`. A tool `skill` with `state.input.name` adds `{via: \\\"tool\\\"}`.\",\"Returns `[{ id, fingerprint: time_updated, record }]`.\"]}\n```"
+    },
+    {
+      "id": 11,
+      "subject": "Task 11: Cursor extractor",
+      "status": "pending",
+      "blockedBy": [
+        8
+      ],
+      "description": "**Goal:** Parse `~/.cursor/projects/*/agent-transcripts/<id>/<id>.jsonl` into a record.\n\n**Verify:** `node --test plugins/rascal/test/cursor.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-retro/lib/cursor.mjs\",\"plugins/rascal/test/cursor.test.mjs\",\"plugins/rascal/test/fixtures/cursor/Users-alice-code-app/agent-transcripts/u1/u1.jsonl\"],\"verifyCommand\":\"`node --test plugins/rascal/test/cursor.test.mjs` → pass\",\"acceptanceCriteria\":[\"The id is the transcript folder name. The cwd is derived from the project folder name (`Users-alice-code-app` → `/Users/alice/code/app`, then redacted). A numeric project folder gives `\\\"\\\"`.\",\"User text is the inner `<user_query>…</user_query>` when present, otherwise the text minus `<timestamp>…</timestamp>`.\",\"`tool_use` blocks count as tools, and SKILL.md paths in their input add `{via: \\\"read\\\"}`.\",\"Cursor lines have no timestamps, so `start` and `end` fall back to the file mtime (ISO).\"]}\n```"
+    },
+    {
+      "id": 12,
+      "subject": "Task 12: `mine.mjs`: discovery, incremental extraction, stats",
+      "status": "pending",
+      "blockedBy": [
+        9,
+        10,
+        11
+      ],
+      "description": "**Goal:** One CLI runs every extractor over every source into `~/.rascal/mining/digest/`. It is incremental via `cursor.json`, reports expected versus actual counts, and summarizes the digest for the retro.\n\n**Verify:** `node --test plugins/rascal/test/mine.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-retro/mine.mjs\",\"plugins/rascal/skills/rascal-retro/lib/sources.mjs\",\"plugins/rascal/test/mine.test.mjs\"],\"verifyCommand\":\"`node --test plugins/rascal/test/mine.test.mjs` → pass\",\"acceptanceCriteria\":[\"Source roots default to:\",\"`extract [--all]`:\",\"`list [--since ISO]` prints digest file paths whose `extractedAt >= since`, one per line.\",\"`stats [--since ISO]` prints JSON:\",\"`mark-retro` writes `{lastRetro: now}` to `$RASCAL_HOME/state.json` (merging with existing keys). `last-retro` prints it, or an empty line.\"]}\n```"
+    },
+    {
+      "id": 13,
+      "subject": "Task 13: The `rascal-retro` skill, docs and smoke record",
+      "status": "pending",
+      "blockedBy": [
+        4,
+        12,
+        6,
+        7
+      ],
+      "description": "**Goal:** `/rascal-retro` runs the miner, analyzes the digest with subagents, writes findings locally, and ends in a grill. With `--all`, that grill is the seed grill that picks v1. README and the smoke record are updated.\n\n**Verify:** `node --test plugins/rascal/test/skills.test.mjs` → pass; then the full repo test command → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-retro/SKILL.md\",\"plugins/rascal/skills/rascal-retro/agents/openai.yaml\",\"plugins/rascal/skills/rascal-retro/analyst-brief.md\",\"docs/superpowers/verification/2026-10-02-rascal-smoke.md\",\"plugins/rascal/test/skills.test.mjs\",\"README.md\"],\"verifyCommand\":\"`node --test plugins/rascal/test/skills.test.mjs` → pass; then the full repo test command → pass\",\"acceptanceCriteria\":[\"The SKILL.md drives `mine.mjs` via `$SKILL`, never reads raw transcripts, and writes findings only under `~/.rascal/mining/`.\",\"Findings are classified `generic` or `personal` (Q14). Personal ones only ever become proposed `~/.rascal/preferences.md` entries, after the user accepts them in the grill.\",\"`--all` ends by running `rascal-grill-me-ui` with the seed topic and doc `docs/rascal-v1-design.md`. Its first round covers: v1 workflows; the canonical skill per concept (TDD, debugging, review, planning, grilling) and which upstream it derives from; the just-do-it rule; the wayfinder × playbook experiment (Q29); and each personal preference to adopt.\",\"Incremental mode (`/rascal-retro`) reads only records extracted since `last-retro`, and also ends in a grill (the topic is the proposals).\",\"After the grill's Finish, it runs `mark-retro`.\",\"README documents rascal: install (Claude Code + `install-rascal.sh`), the skills list, `setup-hooks.sh`, `~/.rascal/` and the new test command.\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-10-03T02:04:52.053Z"
+}
