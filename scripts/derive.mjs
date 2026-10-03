@@ -27,8 +27,9 @@ export const REF_MAP = [
   ["superpowers:subagent-driven-development", "rascal-orchestrate"],
   ["superpowers:dispatching-parallel-agents", "rascal-orchestrate"],
   ["superpowers:brainstorming", "rascal-grilling"],
-  ["superpowers:using-git-worktrees", "a git worktree (`git worktree add`)"],
+  ["superpowers:using-git-worktrees", "a git worktree"],
   ["superpowers:finishing-a-development-branch", "the Ship step of rascal-feature"],
+  ["the `code-review` skill", "the `rascal-review` skill"],
   ["../requesting-code-review/code-reviewer.md", "../rascal-review/code-reviewer.md"],
   ["/../../subagent-driven-development/scripts", ""],
   ["../subagent-driven-development/scripts/", "scripts/"],
@@ -71,10 +72,16 @@ function checkoutsFromEnv() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const a = process.argv.slice(2);
-  const flag = (f) => { const i = a.indexOf(f); if (i < 0) return undefined; const v = a[i + 1]; a.splice(i, 2); return v; };
+  const USAGE = "usage: derive.mjs <source> <upstream-path> <dest> [--name <skill>] [--strip-frontmatter]";
+  const flag = (f) => {
+    const i = a.indexOf(f); if (i < 0) return undefined;
+    const v = a[i + 1];
+    if (v === undefined || v.startsWith("--")) { console.error(`derive: ${f} needs a value\n${USAGE}`); process.exit(2); }
+    a.splice(i, 2); return v;
+  };
   const name = flag("--name");
   const strip = a.includes("--strip-frontmatter"); if (strip) a.splice(a.indexOf("--strip-frontmatter"), 1);
-  if (a.length !== 3) { console.error("usage: derive.mjs <source> <upstream-path> <dest> [--name <skill>] [--strip-frontmatter]"); process.exit(2); }
+  if (a.length !== 3) { console.error(USAGE); process.exit(2); }
   const pins = JSON.parse(fs.readFileSync(path.join(ROOT, "plugins/rascal/sources.json"), "utf8")).sources;
   try { console.log(derive({ source: a[0], path: a[1], dest: a[2], name, stripFrontmatter: strip, pins, checkouts: checkoutsFromEnv() })); }
   catch (e) { console.error(e.message); process.exit(1); }

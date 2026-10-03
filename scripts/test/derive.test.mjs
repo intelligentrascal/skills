@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, statSync, chmodSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { derive, REF_MAP } from "../derive.mjs";
 
 function upstream(files) {
@@ -59,4 +60,16 @@ test("REF_MAP covers every superpowers: skill name rascal replaces", () => {
   for (const s of ["test-driven-development", "systematic-debugging", "verification-before-completion", "requesting-code-review",
     "writing-plans", "executing-plans", "subagent-driven-development", "dispatching-parallel-agents", "brainstorming",
     "using-git-worktrees", "finishing-a-development-branch"]) assert.ok(from.includes(`superpowers:${s}`), s);
+});
+
+test("REF_MAP: worktrees read as a noun phrase; Pocock's code-review skill maps to rascal-review", () => {
+  const map = Object.fromEntries(REF_MAP);
+  assert.equal(map["superpowers:using-git-worktrees"], "a git worktree");
+  assert.equal(map["the `code-review` skill"], "the `rascal-review` skill");
+});
+
+test("CLI: --name as the last argument with no value exits 2 with the usage line", () => {
+  const p = spawnSync("node", [join(dirname(fileURLToPath(import.meta.url)), "..", "derive.mjs"), "pocock", "a.md", "out.md", "--name"], { encoding: "utf8" });
+  assert.equal(p.status, 2);
+  assert.match(p.stderr, /usage: derive\.mjs/);
 });
