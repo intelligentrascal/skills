@@ -68,3 +68,11 @@ test("rascal-ui: steps in order, parity gate, walkthrough with Playwright fallba
   const w = read("rascal-ui", "persona-walkthrough.md");
   for (const s of ["npm install --prefix .rascal/walkthrough playwright", "never", "screenshot"]) assert.ok(w.includes(s), s);
 });
+
+test("rascal-scheduled-runbook: ten guardrail sections in order, siblings, test run", () => {
+  if (!has("rascal-scheduled-runbook")) return;
+  const t = read("rascal-scheduled-runbook");
+  const order = ["**Purpose and output.**", "**Preconditions.**", "**Trust boundary.**", "**Watermark.**", "**Cheap exit.**", "**Work.**",
+    "**Dry run, then commit.**", "**Record before render.**", "**Render and verify.**", "**Report-only fallback.**", "## 3. Siblings", "## 4. Test"];
+  for (let k = 1; k < order.length; k++) assert.ok(t.indexOf(order[k - 1]) >= 0 && t.indexOf(order[k - 1]) < t.indexOf(order[k]), order[k]);
+});
