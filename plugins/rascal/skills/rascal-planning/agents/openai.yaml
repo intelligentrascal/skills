@@ -1,0 +1,3 @@
+interface:
+  display_name: "Planning (rascal)"
+  short_description: "Spec, task plan, then execute"

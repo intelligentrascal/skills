@@ -1,0 +1,4 @@
+- **Just do it:** if the task is a chore with no design decision in it (setup, housekeeping, a quick fix, or a run that follows its own spec), just do it.
+- **Named skills first:** when the user names a skill or slash command, invoke it before anything else. If it can't be found, say so and offer to install it; never quietly substitute another.
+- **Isolation:** when other agents or branches may be active, work in a separate git worktree; never init or overwrite shared state.
+- **Sources:** digests, reports and briefs link every item to its source and never invent one.

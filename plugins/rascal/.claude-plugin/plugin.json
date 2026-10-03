@@ -1,10 +1,10 @@
 {
   "name": "rascal",
-  "version": "0.1.0",
-  "description": "A standalone personal skills pack: grilling (terminal and browser UI) and transcript mining, built from Pocock's skills, Superpowers and pstack.",
+  "version": "0.2.0",
+  "description": "A standalone personal skills pack: plan, feature, ui, scheduled-runbook and orchestrate (experimental) workflows; canonical TDD, debugging, review, planning and grilling skills; transcript mining and retro. Built from Pocock's skills and Superpowers.",
   "author": { "name": "intelligentrascal", "url": "https://github.com/intelligentrascal" },
   "license": "MIT",
-  "keywords": ["grilling", "retro", "mining"],
+  "keywords": ["grilling", "retro", "mining", "workflows", "tdd"],
   "homepage": "https://github.com/intelligentrascal/skills",
   "repository": "https://github.com/intelligentrascal/skills"
 }

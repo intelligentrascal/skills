@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Privacy scrub (design doc Q15) and grill-transport drift check (Q34) on every commit.
+# Privacy scrub (Q15), grill-transport drift (Q34) and shared-rules drift (rascal v1 Q14) on every commit.
 set -euo pipefail
 root="$(git rev-parse --show-toplevel)"
 node "$root/scripts/scrub.mjs" --staged
 node "$root/scripts/sync-transport.mjs" --check
+node "$root/scripts/sync-rules.mjs" --check

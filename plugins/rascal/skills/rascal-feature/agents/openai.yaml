@@ -1,0 +1,3 @@
+interface:
+  display_name: "Feature (rascal)"
+  short_description: "Plan, spec, execute and ship a feature"

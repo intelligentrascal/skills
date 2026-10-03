@@ -1,0 +1,109 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+import { PLUGIN } from "./manifest.test.mjs";
+
+const SKILLS = join(PLUGIN, "skills");
+const pins = JSON.parse(readFileSync(join(PLUGIN, "sources.json"), "utf8")).sources;
+// rascal-grilling-ui is a byte-identical mirror of intelligentrascal's transport (sync-transport); it carries no provenance.
+const MIRRORED = new Set(["rascal-grilling-ui"]);
+
+function* files(dir) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) { if (!(dir === SKILLS && MIRRORED.has(e.name))) yield* files(p); }
+    else yield p;
+  }
+}
+const LINE = /^(?:<!--|#|\/\/) (provenance|graft): (\S+) (\S+) @ ([0-9a-f]{40})(?: -> (.+?))?(?: -->)?$/;
+export const provenanceOf = (text) => text.split("\n").map((l) => LINE.exec(l.trim())).filter(Boolean)
+  .map(([, kind, source, path, commit, target]) => ({ kind, source, path, commit, target }));
+
+test("every provenance/graft line names a pinned source at its pinned commit", () => {
+  for (const f of files(SKILLS)) {
+    const text = readFileSync(f, "utf8");
+    for (const p of provenanceOf(text)) {
+      const where = `${relative(SKILLS, f)}: ${p.kind} ${p.source} ${p.path}`;
+      assert.ok(pins[p.source], `${where}: source not in sources.json`);
+      assert.equal(p.commit, pins[p.source].commit, `${where}: commit is not the pin`);
+      if (p.kind === "graft") {
+        assert.ok(p.target, `${where}: graft without "-> <heading>"`);
+        assert.ok(text.split("\n").some((l) => l.trim() === p.target), `${where}: target heading "${p.target}" not in file`);
+      }
+    }
+  }
+});
+
+test("no rascal skill file references an upstream plugin namespace", () => {
+  for (const f of files(SKILLS)) {
+    // provenance/graft lines name upstream paths (e.g. .../setup-matt-pocock-skills/...), so they are not checked
+    const lines = readFileSync(f, "utf8").split("\n").filter((l) => !/^(<!--|\/\/|#) ?(provenance|graft):/.test(l));
+    const text = lines.join("\n");
+    const rel = relative(SKILLS, f);
+    assert.doesNotMatch(text, /superpowers:|mattpocock-skills:|\/setup-matt-pocock-skills|using-superpowers|docs\/superpowers\//, rel);
+    for (const l of lines) {
+      for (const sentence of l.split(/(?<=[.!?])\s+/)) {
+        const at = sentence.search(/Skill tool/i);
+        if (at < 0) continue;
+        for (const m of sentence.slice(at).matchAll(/"([^"]+)"/g)) {
+          assert.ok(m[1].startsWith("rascal-"), `${rel}: Skill tool names "${m[1]}": ${l.trim()}`);
+        }
+      }
+    }
+  }
+});
+
+// Expected provenance per file: "<kind> <source> <path>". Each later task adds its files here.
+export const EXPECT = {
+  "rascal-grilling/SKILL.md": ["provenance pocock skills/productivity/grilling/SKILL.md",
+    "graft superpowers skills/brainstorming/SKILL.md", "graft superpowers skills/brainstorming/SKILL.md",
+    "graft superpowers skills/brainstorming/SKILL.md"],
+  "rascal-wayfinder/SKILL.md": ["provenance pocock skills/engineering/wayfinder/SKILL.md"],
+  "rascal-wayfinder/trackers/github.md": ["provenance pocock skills/engineering/setup-matt-pocock-skills/issue-tracker-github.md"],
+  "rascal-wayfinder/trackers/gitlab.md": ["provenance pocock skills/engineering/setup-matt-pocock-skills/issue-tracker-gitlab.md"],
+  "rascal-wayfinder/trackers/local.md": ["provenance pocock skills/engineering/setup-matt-pocock-skills/issue-tracker-local.md"],
+  "rascal-prototype/SKILL.md": ["provenance pocock skills/engineering/prototype/SKILL.md"],
+  "rascal-prototype/UI.md": ["provenance pocock skills/engineering/prototype/UI.md"],
+  "rascal-prototype/LOGIC.md": ["provenance pocock skills/engineering/prototype/LOGIC.md"],
+  "rascal-domain-modeling/SKILL.md": ["provenance pocock skills/engineering/domain-modeling/SKILL.md"],
+  "rascal-tdd/SKILL.md": ["provenance pocock skills/engineering/tdd/SKILL.md"],
+  "rascal-tdd/mocking.md": ["provenance pocock skills/engineering/tdd/mocking.md"],
+  "rascal-tdd/tests.md": ["provenance pocock skills/engineering/tdd/tests.md"],
+  "rascal-debugging/SKILL.md": ["provenance superpowers skills/systematic-debugging/SKILL.md"],
+  "rascal-debugging/root-cause-tracing.md": ["provenance superpowers skills/systematic-debugging/root-cause-tracing.md"],
+  "rascal-debugging/defense-in-depth.md": ["provenance superpowers skills/systematic-debugging/defense-in-depth.md"],
+  "rascal-debugging/condition-based-waiting.md": ["provenance superpowers skills/systematic-debugging/condition-based-waiting.md"],
+  "rascal-debugging/condition-based-waiting-example.ts": ["provenance superpowers skills/systematic-debugging/condition-based-waiting-example.ts"],
+  "rascal-debugging/find-polluter.sh": ["provenance superpowers skills/systematic-debugging/find-polluter.sh"],
+  "rascal-review/SKILL.md": ["provenance superpowers skills/requesting-code-review/SKILL.md",
+    "graft superpowers skills/verification-before-completion/SKILL.md"],
+  "rascal-review/code-reviewer.md": ["provenance superpowers skills/requesting-code-review/code-reviewer.md"],
+  "rascal-review/verification.md": ["provenance superpowers skills/verification-before-completion/SKILL.md"],
+  "rascal-planning/SKILL.md": ["provenance pocock skills/engineering/to-spec/SKILL.md",
+    "graft superpowers skills/writing-plans/SKILL.md", "graft superpowers skills/executing-plans/SKILL.md"],
+  "rascal-planning/plan-format.md": ["provenance superpowers skills/writing-plans/SKILL.md"],
+  "rascal-planning/executing.md": ["provenance superpowers skills/executing-plans/SKILL.md"],
+  "rascal-planning/scripts/sdd-workspace": ["provenance superpowers skills/subagent-driven-development/scripts/sdd-workspace"],
+  "rascal-planning/scripts/task-brief": ["provenance superpowers skills/subagent-driven-development/scripts/task-brief"],
+  "rascal-planning/scripts/review-package": ["provenance superpowers skills/subagent-driven-development/scripts/review-package"],
+  "rascal-planning/scripts/task-start": ["provenance superpowers skills/executing-plans/scripts/task-start"],
+  "rascal-planning/scripts/task-done": ["provenance superpowers skills/executing-plans/scripts/task-done"],
+  "rascal-orchestrate/SKILL.md": ["graft superpowers skills/dispatching-parallel-agents/SKILL.md",
+    "graft superpowers skills/subagent-driven-development/SKILL.md", "graft superpowers skills/dispatching-parallel-agents/SKILL.md"],
+  "rascal-orchestrate/worker-brief.md": ["graft superpowers skills/dispatching-parallel-agents/SKILL.md"],
+  "rascal-orchestrate/review-loop.md": ["provenance superpowers skills/subagent-driven-development/SKILL.md"],
+  "rascal-orchestrate/implementer-prompt.md": ["provenance superpowers skills/subagent-driven-development/implementer-prompt.md"],
+  "rascal-orchestrate/task-reviewer-prompt.md": ["provenance superpowers skills/subagent-driven-development/task-reviewer-prompt.md"],
+  "rascal-orchestrate/re-review-prompt.md": ["provenance superpowers skills/subagent-driven-development/re-review-prompt.md"],
+  "rascal-orchestrate/scripts/sdd-workspace": ["provenance superpowers skills/subagent-driven-development/scripts/sdd-workspace"],
+  "rascal-orchestrate/scripts/task-brief": ["provenance superpowers skills/subagent-driven-development/scripts/task-brief"],
+  "rascal-orchestrate/scripts/review-package": ["provenance superpowers skills/subagent-driven-development/scripts/review-package"],
+};
+
+test("each derived file carries exactly its expected provenance", () => {
+  for (const [file, want] of Object.entries(EXPECT)) {
+    const got = provenanceOf(readFileSync(join(SKILLS, file), "utf8")).map((p) => `${p.kind} ${p.source} ${p.path}`);
+    assert.deepEqual(got.sort(), [...want].sort(), file);
+  }
+});
