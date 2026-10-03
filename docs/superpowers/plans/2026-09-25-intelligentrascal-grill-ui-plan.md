@@ -18,10 +18,10 @@ Paths below are abbreviated. The scratchpad is session-scoped; if a path is gone
 
 | Alias | Path | Fallback |
 |---|---|---|
-| `$JASON` | `/private/tmp/claude-501/-Users-rahil-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/grill-with-ui` (commit `daafa1e`) | `git clone https://github.com/jasonku09/grill-with-ui /tmp/grill-with-ui && git -C /tmp/grill-with-ui checkout daafa1e` |
-| `$POCOCK` | `/private/tmp/claude-501/-Users-rahil-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/pocock-skills` (HEAD `c55ee46`) | `git clone https://github.com/mattpocock/skills /tmp/pocock-skills` |
+| `$JASON` | `/private/tmp/claude-501/-Users-[user]-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/grill-with-ui` (commit `daafa1e`) | `git clone https://github.com/jasonku09/grill-with-ui /tmp/grill-with-ui && git -C /tmp/grill-with-ui checkout daafa1e` |
+| `$POCOCK` | `/private/tmp/claude-501/-Users-[user]-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/pocock-skills` (HEAD `c55ee46`) | `git clone https://github.com/mattpocock/skills /tmp/pocock-skills` |
 | `$POCOCK_PIN` | `~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.3` (installed; commit `3cca18b368ae95cdbdebbff572ccafa662551015`, also checked out in `~/.claude/plugins/marketplaces/mattpocock`) | `claude plugin install mattpocock-skills@mattpocock` |
-| `$RESEARCH` | `/private/tmp/claude-501/-Users-rahil-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/research` (`openai-codex`, `sst-opencode`, `badlogic-pi-mono`, `vercel-labs-skills`) | clone `openai/codex`, `sst/opencode`, `badlogic/pi-mono`, `vercel-labs/skills` |
+| `$RESEARCH` | `/private/tmp/claude-501/-Users-[user]-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/research` (`openai-codex`, `sst-opencode`, `badlogic-pi-mono`, `vercel-labs-skills`) | clone `openai/codex`, `sst/opencode`, `badlogic/pi-mono`, `vercel-labs/skills` |
 | `$TASTE` | `~/.claude/plugins/cache/codeswithroh/tastemaker/a8136a09cf3b/skills/tastemaker/references/prototype-variants.md` | n/a (guidance only) |
 
 Key port map (Jason → ours):
@@ -1109,10 +1109,10 @@ description: Grill me with ui. Runs Matt Pocock's grilling interview on a local 
 }
 ```
 - [ ] Skills are found by the default `skills/` scan (four folders).
-- [ ] `claude plugin validate /Users/rahil/code/skills` reports no errors.
+- [ ] `claude plugin validate ~/code/skills` reports no errors.
 - [ ] Test parses both files and asserts names, dependency, allowlist, and that each `skills/*/SKILL.md` has matching `name`.
 
-**Verify:** `node --test scripts/test/manifest.test.mjs` → pass; `claude plugin validate /Users/rahil/code/skills` → valid; `claude plugin marketplace add /Users/rahil/code/skills && claude plugin install intelligentrascal@intelligentrascal && claude plugin list | grep intelligentrascal` → listed, enabled.
+**Verify:** `node --test scripts/test/manifest.test.mjs` → pass; `claude plugin validate ~/code/skills` → valid; `claude plugin marketplace add ~/code/skills && claude plugin install intelligentrascal@intelligentrascal && claude plugin list | grep intelligentrascal` → listed, enabled.
 
 **Steps:** test → FAIL → write manifests → PASS → validate/install → **Commit** `git commit -m "feat(plugin): plugin and marketplace manifests"` (after `git add`).
 
@@ -1404,7 +1404,7 @@ Read `design/mockups/decision.json`. Do T30 only if `build` contains `"brief"`, 
 **Verify:**
 - `node --test skills/grilling-ui/test/*.test.mjs scripts/test/*.test.mjs` → all pass
 - `for f in skills/grilling-ui/test/*.e2e.mjs; do PLAYWRIGHT_PKG=… node "$f" || exit 1; done` → all PASS
-- `claude plugin validate /Users/rahil/code/skills` → valid
+- `claude plugin validate ~/code/skills` → valid
 
 **Steps:** write files → run all verifies → **Commit** `git add README.md LICENSES && git commit -m "docs: README and licenses"`
 

@@ -1,7 +1,7 @@
 # agent-profile: source verification (2026-09-25)
 
 Every value `skills/grilling-ui/lib/profile.mjs` prints, checked against the agent's source.
-`$RESEARCH` = `/private/tmp/claude-501/-Users-rahil-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/research`.
+`$RESEARCH` = `/private/tmp/claude-501/-Users-[user]-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/research`.
 
 | Agent | Source | Commit / version |
 |---|---|---|

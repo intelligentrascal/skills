@@ -1,0 +1,2 @@
+{"type":"user","session_id":"d1","client_platform":"desktop_app","timestamp":"2026-09-11T07:10:21Z","message":{"role":"user","content":"summarise my inbox"}}
+{"type":"assistant","session_id":"d1","timestamp":"2026-09-11T07:10:40Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Skill","input":{"skill":"anthropic-skills:morning"}}]}}

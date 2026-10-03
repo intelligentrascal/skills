@@ -141,11 +141,62 @@ model-invocable, three-way merges the vendored `skills/wayfinder-ui/upstream/way
 the tests, and bumps the pins (the agents pin only ever in `upstream.local.json`). It never commits. After resolving wayfinder conflicts by hand, run
 it again with `SYNC_WAYFINDER_DONE=1`.
 
+## rascal
+
+`rascal` is a second, standalone plugin in this marketplace (`plugins/rascal/`): a personal skills
+pack built from Pocock's skills, Superpowers and pstack, shaped by mining your own agent sessions.
+It has no dependencies; its grilling skills are its own copies of Pocock's, pinned in
+`plugins/rascal/sources.json`. Design: [docs/rj-skills-pack-design.md](docs/rj-skills-pack-design.md).
+This first slice ships grilling (terminal and browser UI) and the retro.
+
+Install in Claude Code (the marketplace line only once):
+
+```bash
+claude plugin marketplace add intelligentrascal/skills
+claude plugin install rascal@intelligentrascal
+```
+
+Commands are namespaced: `/rascal:rascal-grill-me-ui <topic>`, `/rascal:rascal-retro --all`, and so on.
+For Codex, OpenCode and Pi, run `scripts/install-rascal.sh`: it symlinks every rascal skill into
+`~/.agents/skills` (override with `AGENTS_SKILLS_DIR`), creates `~/.rascal/`, and installs no
+upstream skills. Re-running is safe. It refuses, linking nothing, if a real directory is in the way.
+
+| Skill | What it does |
+|---|---|
+| `rascal-grilling` | The grilling interview method (Pocock's text, rascal's copy). |
+| `rascal-domain-modeling` | Keeps `CONTEXT.md` and ADRs current while designing (Pocock's text, rascal's copy). |
+| `rascal-grill-me` | Grill in the terminal. |
+| `rascal-grill-with-docs` | Grill in the terminal with domain modeling. |
+| `rascal-grill-me-ui` | Grill on the local browser page; writes a design doc on Finish. |
+| `rascal-grill-docs-ui` | The same with domain modeling. |
+| `rascal-grilling-ui` | The browser transport. **Generated, never hand-edit**: a mirror of `skills/grilling-ui` made by `node scripts/sync-transport.mjs`. The code is byte-identical, so both plugins share one hub. |
+| `rascal-retro` | Mines past sessions from Claude Code, Claude desktop, Codex, OpenCode and Cursor, then grills you on what to change. `--all` is the seed pass that picks rascal's v1 workflows. |
+
+`~/.rascal/` (mode 700, never in a repo):
+
+- `denylist.txt`: one literal per line (client names, private projects), case-insensitive. The scrub
+  and the miner's redaction both use it.
+- `preferences.md`: personal preferences you accepted in a retro grill.
+- `mining/digest/<source>/<id>.json`: one redacted record per session. `mining/cursor.json` makes
+  extraction incremental. `mining/findings-<date>.md` holds each retro's findings.
+- `state.json`: when the last retro ran.
+
+### Privacy
+
+Run `scripts/setup-hooks.sh` once per clone. The pre-commit hook then runs the privacy scrub on
+staged files (generic patterns plus your deny-list) and `sync-transport --check`, so a commit that
+leaks a home path, email or token, or edits `skills/grilling-ui` without regenerating the mirror,
+is refused. Known-fine hits (synthetic test data) go in `.scrub-allow` as `glob` or
+`glob:literal`, with a comment saying why. CI runs the generic scrub on every push and PR
+(`.github/workflows/privacy.yml`). Run it by hand with `node scripts/scrub.mjs --all`.
+
 ## Development
 
 ```bash
-node --test skills/grilling-ui/test/*.test.mjs scripts/test/*.test.mjs
+node --test skills/grilling-ui/test/*.test.mjs scripts/test/*.test.mjs plugins/rascal/test/*.test.mjs
+node scripts/sync-transport.mjs --check
 claude plugin validate --strict .
+claude plugin validate --strict plugins/rascal
 ```
 
 Browser tests are opt-in and need Playwright (`PLAYWRIGHT_CHANNEL=chrome` uses your installed
@@ -169,6 +220,9 @@ records). Layout mockups and the comparison that picked Inbox are in `design/moc
   ([LICENSES/jason-ku-grill-with-ui.MIT](LICENSES/jason-ku-grill-with-ui.MIT))
 - Matt Pocock's skills are loaded, not copied, except the vendored wayfinder text.
   ([LICENSES/matt-pocock-skills.MIT](LICENSES/matt-pocock-skills.MIT))
+- rascal copies Pocock's `grilling`, `domain-modeling`, `grill-me` and `grill-with-docs` at the commit
+  pinned in `plugins/rascal/sources.json`; each copy names its source in a provenance header.
+  ([plugins/rascal/THIRD_PARTY_NOTICES.md](plugins/rascal/THIRD_PARTY_NOTICES.md))
 
 ## Not yet
 

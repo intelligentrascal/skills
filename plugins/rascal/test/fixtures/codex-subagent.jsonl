@@ -1,0 +1,2 @@
+{"timestamp":"2026-10-02T14:00:00Z","type":"session_meta","payload":{"session_id":"c1","id":"c1-guardian","source":{"subagent":{"other":"guardian"}},"cwd":"/x"}}
+{"timestamp":"2026-10-02T14:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"review this patch"}]}}

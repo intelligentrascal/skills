@@ -1,0 +1,8 @@
+{
+  "sources": {
+    "pocock": { "repo": "mattpocock/skills", "commit": "3cca18b368ae95cdbdebbff572ccafa662551015", "license": "MIT" },
+    "superpowers": { "repo": "obra/superpowers", "commit": null, "license": "MIT" },
+    "superpowers-extended-cc": { "repo": "pcvelz/superpowers", "commit": null, "license": "MIT" },
+    "pstack": { "repo": "cursor/plugins", "path": "pstack", "commit": null, "license": "MIT" }
+  }
+}

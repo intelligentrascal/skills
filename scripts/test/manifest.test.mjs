@@ -21,14 +21,12 @@ test("plugin.json: name, version, dependency on mattpocock-skills@mattpocock", (
   assert.equal(p.skills, undefined, "skills come from the default skills/ scan");
 });
 
-test("marketplace.json: one plugin at ./, cross-marketplace allowlist for mattpocock", () => {
+test("marketplace.json: intelligentrascal at ./ and rascal at ./plugins/rascal", () => {
   const m = json(".claude-plugin/marketplace.json");
   assert.equal(m.name, "intelligentrascal");
   assert.equal(typeof m.owner?.name, "string");
   assert.deepEqual(m.allowCrossMarketplaceDependenciesOn, ["mattpocock"]);
-  assert.equal(m.plugins.length, 1);
-  assert.equal(m.plugins[0].name, "intelligentrascal");
-  assert.equal(m.plugins[0].source, "./");
+  assert.deepEqual(m.plugins.map((p) => [p.name, p.source]), [["intelligentrascal", "./"], ["rascal", "./plugins/rascal"]]);
 });
 
 test("skills/: the four skill folders, each SKILL.md name matching its folder", () => {
