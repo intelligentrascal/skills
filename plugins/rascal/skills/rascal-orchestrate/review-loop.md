@@ -500,7 +500,7 @@ Use the Ship step of rascal-feature.
 ## Example Workflow
 
 ```
-You: I'm using rascal-orchestrate to run this map.
+You: I'm using rascal-orchestrate to run this plan.
 
 [Setup: worktree verified]
 [Read plan file once: docs/plans/feature-plan.md]

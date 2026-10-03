@@ -77,7 +77,7 @@ Any further notes about the feature.
 ## Plan
 <!-- graft: superpowers skills/writing-plans/SKILL.md @ 8ca22dba9a94f28898bbce59f2537ff4d87c747d -> ## Plan -->
 
-Once the spec is saved, a fresh agent writes the task plan from the spec alone. Dispatch a subagent with the spec path and [plan-format.md](plan-format.md); without a subagent tool, re-read only the spec and write it yourself. The plan goes to `docs/plans/<YYYY-MM-DD>-<slug>.md`; commit it on the current branch once it's written. Skip its Execution Handoff section: the next step is always **Execute** below, run without asking.
+Once the spec is saved, a fresh agent writes the task plan from the spec alone. Dispatch a subagent with the spec path and [plan-format.md](plan-format.md); without a subagent tool, re-read only the spec and write it yourself. The plan goes to `docs/plans/<YYYY-MM-DD>-<slug>.md`; commit it on the current branch once it's written. Then go straight to **Execute** below without asking, unless a calling workflow says otherwise.
 
 ## Execute
 <!-- graft: superpowers skills/executing-plans/SKILL.md @ 8ca22dba9a94f28898bbce59f2537ff4d87c747d -> ## Execute -->
