@@ -15,19 +15,42 @@ CLAUDE_DEST="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
 if [ "${1:-}" = "--pack" ]; then
   src="${2:?usage: install-rascal.sh --pack <dir|git-url|zip>}"
   mkdir -p "$RH/packs"
-  case "$src" in
-    https://*|git@*|file://*|*.git)
-      name="$(basename "${src%.git}")"; root="$RH/packs/$name"
-      if [ -d "$root/.git" ]; then git -C "$root" pull -q --ff-only; else git clone -q "$src" "$root"; fi ;;
+  lsrc="$(printf '%s' "$src" | tr '[:upper:]' '[:lower:]')"
+  case "$lsrc" in
     *.zip)
-      name="$(basename "$src" .zip)"; root="$RH/packs/$name"
-      rm -rf "$root"; mkdir -p "$root"; unzip -q "$src" -d "$root" ;;
+      zbase="$(basename "$src")"; name="${zbase%.[zZ][iI][pP]}"; root="$RH/packs/$name"
+      zf="$src"
+      case "$lsrc" in
+        http://*|https://*)
+          zf="$(mktemp "${TMPDIR:-/tmp}/rascal-pack.XXXXXX")"
+          curl -fsSL -o "$zf" "$src" || { rm -f "$zf"; echo "install-rascal: download failed: $src" >&2; exit 1; } ;;
+      esac
+      rm -rf "$root"; mkdir -p "$root"; unzip -q "$zf" -d "$root"
+      case "$lsrc" in http://*|https://*) rm -f "$zf" ;; esac ;;
+    https://*|http://*|git@*|file://*|*.git)
+      trimmed="${src%/}"; trimmed="${trimmed%.git}"
+      name="$(printf '%s' "$trimmed" | tr ':' '/' | awk -F/ '{n=0; for(i=1;i<=NF;i++) if($i!="") a[++n]=$i; if(n>=2) print a[n-1] "-" a[n]; else print a[n]}')"
+      root="$RH/packs/$name"
+      if [ -d "$root/.git" ]; then
+        have="$(git -C "$root" remote get-url origin 2>/dev/null || true)"
+        if [ "$have" != "$src" ]; then
+          echo "install-rascal: pack $root already holds a clone of $have, not $src (nothing was linked)" >&2; exit 1
+        fi
+        git -C "$root" pull -q --ff-only
+      else git clone -q "$src" "$root"; fi ;;
     *)
       root="$(cd "$src" && pwd)" ;;
   esac
   links=()
   while IFS= read -r f; do links+=("$(dirname "$f")"); done < <(find "$root" -maxdepth 4 -name SKILL.md -not -path '*/.git/*' | sort)
   [ ${#links[@]} -gt 0 ] || { echo "install-rascal: no SKILL.md found in $src" >&2; exit 1; }
+  for i in "${!links[@]}"; do
+    for j in "${!links[@]}"; do
+      if [ "$i" -lt "$j" ] && [ "$(basename "${links[$i]}")" = "$(basename "${links[$j]}")" ]; then
+        echo "install-rascal: two skills named $(basename "${links[$i]}") in one pack: ${links[$i]} and ${links[$j]} (nothing was linked)" >&2; exit 1
+      fi
+    done
+  done
   for d in "$DEST" "$CLAUDE_DEST"; do
     for s in "${links[@]}"; do
       t="$d/$(basename "$s")"

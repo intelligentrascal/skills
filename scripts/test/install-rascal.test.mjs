@@ -1,19 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readlinkSync, readdirSync, readFileSync, writeFileSync, statSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readlinkSync, readdirSync, readFileSync, writeFileSync, statSync, existsSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const BASH = process.platform === "darwin" ? "/bin/bash" : "bash";
 const SCRIPT = join(ROOT, "scripts", "install-rascal.sh");
 const SKILLS = readdirSync(join(ROOT, "plugins/rascal/skills"));
 function env() {
   const t = mkdtempSync(join(tmpdir(), "irascal-"));
   return { t, e: { ...process.env, HOME: t, AGENTS_SKILLS_DIR: join(t, "skills"), CLAUDE_SKILLS_DIR: join(t, "claude-skills"), RASCAL_HOME: join(t, "rascal") } };
 }
-const run = (e) => spawnSync("bash", [SCRIPT], { env: e, encoding: "utf8" });
+const run = (e) => spawnSync(BASH, [SCRIPT], { env: e, encoding: "utf8" });
 
 test("links every rascal skill and scaffolds RASCAL_HOME", () => {
   const { t, e } = env();
@@ -48,7 +49,7 @@ function pack() {
   mkdirSync(join(p, "docs")); writeFileSync(join(p, "docs", "README.md"), "not a skill\n");
   return p;
 }
-const runPack = (e, src) => spawnSync("bash", [SCRIPT, "--pack", src], { env: e, encoding: "utf8" });
+const runPack = (e, src) => spawnSync(BASH, [SCRIPT, "--pack", src], { env: e, encoding: "utf8" });
 
 test("--pack <dir>: links each skill folder into both skill dirs; idempotent", () => {
   const { t, e } = env(); const p = pack();
@@ -80,8 +81,66 @@ test("--pack <git url>: clones into RASCAL_HOME/packs/<name>", () => {
   g("init", "-q"); g("add", "."); g("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "x");
   const r = runPack(e, `file://${p}`);
   assert.equal(r.status, 0, r.stderr);
-  const name = p.split("/").pop();
+  const name = p.split("/").slice(-2).join("-");
   assert.equal(readlinkSync(join(t, "skills", "alpha")), join(t, "rascal", "packs", name, "alpha"));
+});
+
+function gitRepo(parent, repo) {
+  const p = join(parent, repo); mkdirSync(p, { recursive: true });
+  for (const s of ["alpha"]) { mkdirSync(join(p, s)); writeFileSync(join(p, s, "SKILL.md"), `---\nname: ${s}\n---\n`); }
+  const g = (...a) => execFileSync("git", ["-C", p, ...a]);
+  g("init", "-q"); g("add", "."); g("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "x");
+  return p;
+}
+
+test("--pack <git url>: same owner-repo from two origins → second exits 1, first pack untouched", () => {
+  const { t, e } = env();
+  const a = gitRepo(join(mkdtempSync(join(tmpdir(), "own-")), "alice"), "skills");
+  const b = gitRepo(join(mkdtempSync(join(tmpdir(), "own-")), "alice"), "skills");
+  assert.equal(runPack(e, `file://${a}`).status, 0);
+  const root = join(t, "rascal/packs/alice-skills");
+  assert.equal(readlinkSync(join(t, "skills", "alpha")), join(root, "alpha"));
+  const r = runPack(e, `file://${b}`);
+  assert.equal(r.status, 1);
+  assert.ok(r.stderr.includes(`file://${a}`) && r.stderr.includes(`file://${b}`), r.stderr);
+  assert.equal(readlinkSync(join(t, "skills", "alpha")), join(root, "alpha"));
+});
+
+test("--pack: URL forms map to owner-repo names", () => {
+  const { t, e } = env();
+  const mk = (url) => { // pre-seed a clone with a different origin; the mismatch message shows the derived path
+    const dir = join(t, "rascal/packs"); mkdirSync(dir, { recursive: true });
+    return spawnSync(BASH, [SCRIPT, "--pack", url], { env: e, encoding: "utf8" });
+  };
+  for (const [url, name] of [["https://github.com/alice/skills", "alice-skills"], ["https://github.com/alice/skills.git", "alice-skills"], ["git" + "@github.com:alice/skills.git", "alice-skills"], ["file:///x/alice/skills", "alice-skills"]]) {
+    const root = join(t, "rascal/packs", name);
+    rmSync(root, { recursive: true, force: true }); mkdirSync(root, { recursive: true });
+    execFileSync("git", ["-C", root, "init", "-q"]);
+    execFileSync("git", ["-C", root, "remote", "add", "origin", "https://other.invalid/z/z"]);
+    const r = mk(url);
+    assert.equal(r.status, 1, url);
+    assert.ok(r.stderr.includes(root), `${url}: ${r.stderr}`);
+  }
+});
+
+test("--pack: duplicate skill basenames in one pack → exit 1, nothing linked", () => {
+  const { t, e } = env();
+  const p = mkdtempSync(join(tmpdir(), "dup-"));
+  for (const s of ["a/foo", "b/foo"]) { mkdirSync(join(p, s), { recursive: true }); writeFileSync(join(p, s, "SKILL.md"), "---\nname: foo\n---\n"); }
+  const r = runPack(e, p);
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /a\/foo/); assert.match(r.stderr, /b\/foo/);
+  assert.equal(existsSync(join(t, "skills")), false);
+  assert.equal(existsSync(join(t, "claude-skills")), false);
+});
+
+test("--pack: .ZIP (any case) is a zip, not a git url", () => {
+  const { t, e } = env(); const p = pack();
+  const zip = join(mkdtempSync(join(tmpdir(), "zip-")), "Big.ZIP");
+  execFileSync("zip", ["-qr", zip, "."], { cwd: p });
+  const r = runPack(e, zip);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(readlinkSync(join(t, "skills", "alpha")), join(t, "rascal", "packs", "Big", "alpha"));
 });
 
 test("--pack <zip>: unzips into RASCAL_HOME/packs/<name>", () => {
