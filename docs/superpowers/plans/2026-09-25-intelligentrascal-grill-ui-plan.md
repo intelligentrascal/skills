@@ -1109,10 +1109,10 @@ description: Grill me with ui. Runs Matt Pocock's grilling interview on a local 
 }
 ```
 - [ ] Skills are found by the default `skills/` scan (four folders).
-- [ ] `claude plugin validate /Users/rahil/code/skills` reports no errors.
+- [ ] `claude plugin validate ~/code/skills` reports no errors.
 - [ ] Test parses both files and asserts names, dependency, allowlist, and that each `skills/*/SKILL.md` has matching `name`.
 
-**Verify:** `node --test scripts/test/manifest.test.mjs` → pass; `claude plugin validate /Users/rahil/code/skills` → valid; `claude plugin marketplace add /Users/rahil/code/skills && claude plugin install intelligentrascal@intelligentrascal && claude plugin list | grep intelligentrascal` → listed, enabled.
+**Verify:** `node --test scripts/test/manifest.test.mjs` → pass; `claude plugin validate ~/code/skills` → valid; `claude plugin marketplace add ~/code/skills && claude plugin install intelligentrascal@intelligentrascal && claude plugin list | grep intelligentrascal` → listed, enabled.
 
 **Steps:** test → FAIL → write manifests → PASS → validate/install → **Commit** `git commit -m "feat(plugin): plugin and marketplace manifests"` (after `git add`).
 
@@ -1404,7 +1404,7 @@ Read `design/mockups/decision.json`. Do T30 only if `build` contains `"brief"`, 
 **Verify:**
 - `node --test skills/grilling-ui/test/*.test.mjs scripts/test/*.test.mjs` → all pass
 - `for f in skills/grilling-ui/test/*.e2e.mjs; do PLAYWRIGHT_PKG=… node "$f" || exit 1; done` → all PASS
-- `claude plugin validate /Users/rahil/code/skills` → valid
+- `claude plugin validate ~/code/skills` → valid
 
 **Steps:** write files → run all verifies → **Commit** `git add README.md LICENSES && git commit -m "docs: README and licenses"`
 
