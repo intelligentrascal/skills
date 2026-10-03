@@ -4,13 +4,13 @@
     {
       "id": 0,
       "subject": "Task 1: Pin obra/superpowers, licence, provenance test",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** `sources.json` pins obra at `8ca22db…`, the licence and notices cover it, and a test enforces every provenance and graft line in the plugin.\n\n**Files:**\n- Modify: `plugins/rascal/sources.json`, `plugins/rascal/THIRD_PARTY_NOTICES.md`\n- Create: `LICENSES/obra-superpowers.MIT`, `plugins/rascal/test/provenance.test.mjs`\n\n**Acceptance Criteria:**\n- [ ] `sources.superpowers.commit` is `8ca22dba9a94f28898bbce59f2537ff4d87c747d`.\n- [ ] `LICENSES/obra-superpowers.MIT` is obra's LICENSE verbatim, and THIRD_PARTY_NOTICES has an `## obra/superpowers (MIT)` section with it.\n- [ ] `provenance.test.mjs` fails on a provenance or graft line whose source isn't pinned, whose commit isn't the pin, or (for grafts) whose target heading isn't in the file.\n- [ ] It fails if any rascal skill file still contains `superpowers:` or `mattpocock-skills:`.\n\n**Verify:** `node --test plugins/rascal/test/provenance.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/sources.json\",\"plugins/rascal/THIRD_PARTY_NOTICES.md\",\"LICENSES/obra-superpowers.MIT\",\"plugins/rascal/test/provenance.test.mjs\"],\"verifyCommand\":\"node --test plugins/rascal/test/provenance.test.mjs\",\"acceptanceCriteria\":[\"`sources.superpowers.commit` is `8ca22dba9a94f28898bbce59f2537ff4d87c747d`.\",\"`LICENSES/obra-superpowers.MIT` is obra's LICENSE verbatim, and THIRD_PARTY_NOTICES has an `## obra/superpowers (MIT)` section with it.\",\"`provenance.test.mjs` fails on a provenance or graft line whose source isn't pinned, whose commit isn't the pin, or (for grafts) whose target heading isn't in the file.\",\"It fails if any rascal skill file still contains `superpowers:` or `mattpocock-skills:`.\"]}\n```"
     },
     {
       "id": 1,
       "subject": "Task 2: `derive.mjs`, copying from a pinned upstream",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0
       ],
@@ -19,13 +19,13 @@
     {
       "id": 2,
       "subject": "Task 3: Shared rules and `sync-rules.mjs`",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** The mined rules exist once in `plugins/rascal/rules/` and are expanded into skills between markers. Pre-commit fails when a copy drifts.\n\n**Files:**\n- Create: `plugins/rascal/rules/{handoff,autonomy,recommend,questions,three-variants,sources,routing}.md`, `scripts/sync-rules.mjs`, `scripts/test/sync-rules.test.mjs`\n- Modify: `.githooks/pre-commit`\n\n**Acceptance Criteria:**\n- [ ] `node scripts/sync-rules.mjs` replaces the text between `<!-- rule:NAME -->` and `<!-- /rule:NAME -->` in every `plugins/rascal/skills/*/SKILL.md` with `rules/NAME.md`.\n- [ ] `--check` exits 1 and names the stale skills when any copy differs, and exits 0 with `sync-rules: in sync` otherwise.\n- [ ] An unknown rule name exits 2.\n- [ ] The pre-commit hook runs `sync-rules.mjs --check`.\n\n**Verify:** `node --test scripts/test/sync-rules.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/rules/{handoff,autonomy,recommend,questions,three-variants,sources,routing}.md\",\"scripts/sync-rules.mjs\",\"scripts/test/sync-rules.test.mjs\",\".githooks/pre-commit\"],\"verifyCommand\":\"node --test scripts/test/sync-rules.test.mjs\",\"acceptanceCriteria\":[\"`node scripts/sync-rules.mjs` replaces the text between `<!-- rule:NAME -->` and `<!-- /rule:NAME -->` in every `plugins/rascal/skills/*/SKILL.md` with `rules/NAME.md`.\",\"`--check` exits 1 and names the stale skills when any copy differs, and exits 0 with `sync-rules: in sync` otherwise.\",\"An unknown rule name exits 2.\",\"The pre-commit hook runs `sync-rules.mjs --check`.\"]}\n```"
     },
     {
       "id": 3,
       "subject": "Task 4: `rascal-tdd` (Pocock base)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0,
         1
@@ -35,7 +35,7 @@
     {
       "id": 4,
       "subject": "Task 5: `rascal-debugging` (obra base)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0,
         1
@@ -45,7 +45,7 @@
     {
       "id": 5,
       "subject": "Task 6: `rascal-review` (obra base + verification graft)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0,
         1
@@ -55,7 +55,7 @@
     {
       "id": 6,
       "subject": "Task 7: `rascal-planning` (Pocock to-spec base + obra plan/execute grafts)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0,
         1
@@ -65,7 +65,7 @@
     {
       "id": 7,
       "subject": "Task 8: `rascal-grilling` gains the brainstorming grafts and rules",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0,
         1,
@@ -76,7 +76,7 @@
     {
       "id": 8,
       "subject": "Task 9: `rascal-wayfinder` and `rascal-prototype` (Pocock, verbatim)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         0,
         1
@@ -86,7 +86,7 @@
     {
       "id": 9,
       "subject": "Task 10: Workflow test, then `rascal-plan`",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         2,
         8
@@ -96,7 +96,7 @@
     {
       "id": 10,
       "subject": "Task 11: `rascal-feature`",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         6,
         9
@@ -106,7 +106,7 @@
     {
       "id": 11,
       "subject": "Task 12: `rascal-ui` and the persona walkthrough",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         8,
         9
@@ -116,7 +116,7 @@
     {
       "id": 12,
       "subject": "Task 13: `rascal-scheduled-runbook`",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         2,
         9
@@ -126,7 +126,7 @@
     {
       "id": 13,
       "subject": "Task 14: `rascal-orchestrate` (experimental)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         1,
         2,
@@ -138,19 +138,19 @@
     {
       "id": 14,
       "subject": "Task 15: `smoke-agents.sh`, the cross-agent smoke test",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** A maintainer script runs one fixed prompt in each installed agent CLI from a scratch directory and flags any agent that gave no reply.\n\n**Files:**\n- Create: `scripts/smoke-agents.sh`, `scripts/test/smoke-agents.test.mjs`\n\n**Acceptance Criteria:**\n- [ ] Usage is `scripts/smoke-agents.sh [--prompt <text>] [--agents \"<list>\"] [--timeout <s>]`. The defaults are a PONG prompt, `claude codex opencode pi`, and 180 s.\n- [ ] Each agent prints one line: `replied`, `NO REPLY (exit N)`, or `skipped (not installed)`. Logs go to a printed scratch directory.\n- [ ] It exits 0 when every installed agent replied, 1 when any gave no reply, and 2 on bad usage.\n\n**Verify:** `node --test scripts/test/smoke-agents.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"scripts/smoke-agents.sh\",\"scripts/test/smoke-agents.test.mjs\"],\"verifyCommand\":\"node --test scripts/test/smoke-agents.test.mjs\",\"acceptanceCriteria\":[\"Usage is `scripts/smoke-agents.sh [--prompt <text>] [--agents \\\"<list>\\\"] [--timeout <s>]`. The defaults are a PONG prompt, `claude codex opencode pi`, and 180 s.\",\"Each agent prints one line: `replied`, `NO REPLY (exit N)`, or `skipped (not installed)`. Logs go to a printed scratch directory.\",\"It exits 0 when every installed agent replied, 1 when any gave no reply, and 2 on bad usage.\"]}\n```"
     },
     {
       "id": 15,
       "subject": "Task 16: `install-rascal.sh --pack`",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Install any third-party skill pack (local folder, git URL or zip) by symlinking its skills into `~/.agents/skills` and `~/.claude/skills`. It reuses the script's rule of never clobbering what's there.\n\n**Files:**\n- Modify: `scripts/install-rascal.sh`, `scripts/test/install-rascal.test.mjs`\n\n**Acceptance Criteria:**\n- [ ] `install-rascal.sh --pack <dir|git-url|zip>` links every folder in the pack that contains `SKILL.md` (up to 4 levels deep). Links go into `$AGENTS_SKILLS_DIR` (default `~/.agents/skills`) and `$CLAUDE_SKILLS_DIR` (default `~/.claude/skills`).\n- [ ] Git URLs (`https://`, `git@`, `file://`, or ending in `.git`) clone into `$RASCAL_HOME/packs/<name>`, or pull if already there. Zips unzip there.\n- [ ] It exits 1 with nothing linked when a destination is a real directory, or a symlink pointing at a different pack.\n- [ ] Re-running it is a no-op. It prints `install-rascal: linked N skills from <pack>: a, b`.\n- [ ] Without `--pack`, the behavior is unchanged.\n\n**Verify:** `node --test scripts/test/install-rascal.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"scripts/install-rascal.sh\",\"scripts/test/install-rascal.test.mjs\"],\"verifyCommand\":\"node --test scripts/test/install-rascal.test.mjs\",\"acceptanceCriteria\":[\"`install-rascal.sh --pack <dir|git-url|zip>` links every folder in the pack that contains `SKILL.md` (up to 4 levels deep). Links go into `$AGENTS_SKILLS_DIR` (default `~/.agents/skills`) and `$CLAUDE_SKILLS_DIR` (default `~/.claude/skills`).\",\"Git URLs (`https://`, `git@`, `file://`, or ending in `.git`) clone into `$RASCAL_HOME/packs/<name>`, or pull if already there. Zips unzip there.\",\"It exits 1 with nothing linked when a destination is a real directory, or a symlink pointing at a different pack.\",\"Re-running it is a no-op. It prints `install-rascal: linked N skills from <pack>: a, b`.\",\"Without `--pack`, the behavior is unchanged.\"]}\n```"
     },
     {
       "id": 16,
       "subject": "Task 17: Docs, version and full verification",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         3,
         4,
@@ -169,5 +169,5 @@
       "description": "**Goal:** The README, plugin manifest and design doc describe what shipped, and the whole suite and the hooks pass.\n\n**Files:**\n- Modify: `README.md`, `plugins/rascal/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `docs/rascal-v1-design.md`, `.gitignore`\n\n**Acceptance Criteria:**\n- [ ] plugin.json is at version `0.2.0`, with a description naming workflows and canonical skills.\n- [ ] The README's rascal section lists every skill with a one-line purpose. It covers `derive.mjs`, `sync-rules.mjs`, `smoke-agents.sh` and `--pack`, and says the routing note is step 6.\n- [ ] Design doc Q37 says \"one task reviewer with spec-compliance and quality verdicts\".\n- [ ] `.gitignore` contains `.rascal/`.\n- [ ] The full test command, `scrub.mjs`, `sync-transport.mjs --check` and `sync-rules.mjs --check` all pass.\n\n**Verify:** the repo test command, then `node scripts/scrub.mjs --all && node scripts/sync-transport.mjs --check && node scripts/sync-rules.mjs --check` → all pass\n\n```json:metadata\n{\"files\":[\"README.md\",\"plugins/rascal/.claude-plugin/plugin.json\",\".claude-plugin/marketplace.json\",\"docs/rascal-v1-design.md\",\".gitignore\"],\"verifyCommand\":\"node scripts/scrub.mjs --all && node scripts/sync-transport.mjs --check && node scripts/sync-rules.mjs --check\",\"acceptanceCriteria\":[\"plugin.json is at version `0.2.0`, with a description naming workflows and canonical skills.\",\"The README's rascal section lists every skill with a one-line purpose. It covers `derive.mjs`, `sync-rules.mjs`, `smoke-agents.sh` and `--pack`, and says the routing note is step 6.\",\"Design doc Q37 says \\\"one task reviewer with spec-compliance and quality verdicts\\\".\",\"`.gitignore` contains `.rascal/`.\",\"The full test command, `scrub.mjs`, `sync-transport.mjs --check` and `sync-rules.mjs --check` all pass.\"]}\n```"
     }
   ],
-  "lastUpdated": "2026-10-03T04:11:56.024Z"
+  "lastUpdated": "2026-10-03T04:57:34.369Z"
 }
