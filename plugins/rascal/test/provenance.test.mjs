@@ -55,6 +55,10 @@ export const EXPECT = {
   "rascal-debugging/condition-based-waiting.md": ["provenance superpowers skills/systematic-debugging/condition-based-waiting.md"],
   "rascal-debugging/condition-based-waiting-example.ts": ["provenance superpowers skills/systematic-debugging/condition-based-waiting-example.ts"],
   "rascal-debugging/find-polluter.sh": ["provenance superpowers skills/systematic-debugging/find-polluter.sh"],
+  "rascal-review/SKILL.md": ["provenance superpowers skills/requesting-code-review/SKILL.md",
+    "graft superpowers skills/verification-before-completion/SKILL.md"],
+  "rascal-review/code-reviewer.md": ["provenance superpowers skills/requesting-code-review/code-reviewer.md"],
+  "rascal-review/verification.md": ["provenance superpowers skills/verification-before-completion/SKILL.md"],
 };
 
 test("each derived file carries exactly its expected provenance", () => {
