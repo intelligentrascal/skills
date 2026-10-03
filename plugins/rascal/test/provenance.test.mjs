@@ -59,6 +59,15 @@ export const EXPECT = {
     "graft superpowers skills/verification-before-completion/SKILL.md"],
   "rascal-review/code-reviewer.md": ["provenance superpowers skills/requesting-code-review/code-reviewer.md"],
   "rascal-review/verification.md": ["provenance superpowers skills/verification-before-completion/SKILL.md"],
+  "rascal-planning/SKILL.md": ["provenance pocock skills/engineering/to-spec/SKILL.md",
+    "graft superpowers skills/writing-plans/SKILL.md", "graft superpowers skills/executing-plans/SKILL.md"],
+  "rascal-planning/plan-format.md": ["provenance superpowers skills/writing-plans/SKILL.md"],
+  "rascal-planning/executing.md": ["provenance superpowers skills/executing-plans/SKILL.md"],
+  "rascal-planning/scripts/sdd-workspace": ["provenance superpowers skills/subagent-driven-development/scripts/sdd-workspace"],
+  "rascal-planning/scripts/task-brief": ["provenance superpowers skills/subagent-driven-development/scripts/task-brief"],
+  "rascal-planning/scripts/review-package": ["provenance superpowers skills/subagent-driven-development/scripts/review-package"],
+  "rascal-planning/scripts/task-start": ["provenance superpowers skills/executing-plans/scripts/task-start"],
+  "rascal-planning/scripts/task-done": ["provenance superpowers skills/executing-plans/scripts/task-done"],
 };
 
 test("each derived file carries exactly its expected provenance", () => {
