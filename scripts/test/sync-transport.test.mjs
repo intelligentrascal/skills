@@ -57,3 +57,12 @@ test("a stale extra file in the mirror is drift and is removed on sync", () => {
   run(r);
   assert.equal(existsSync(join(DEST(r), "lib", "old.mjs")), false);
 });
+
+test("a new file upstream is drift and gets mirrored", () => {
+  const r = fixture();
+  run(r);
+  writeFileSync(join(r, "skills/grilling-ui/NEW.md"), "new\n");
+  assert.equal(run(r, "--check").status, 1);
+  run(r);
+  assert.equal(readFileSync(join(DEST(r), "NEW.md"), "utf8"), "new\n");
+});

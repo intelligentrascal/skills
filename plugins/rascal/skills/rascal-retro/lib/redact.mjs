@@ -5,14 +5,24 @@ import { readFileSync } from "node:fs";
 const SAFE_USERS = new Set(["Shared", "runner", "user", "you", "me", "name", "[user]"]);
 const SAFE_EMAILS = /^(noreply@anthropic\.com|.+@users\.noreply\.github\.com)$/i;
 
+// Each home-path alternative captures (prefix)(name); the substitution keeps the prefix, so a name
+// that is a substring of "Users" or "home" can't leak.
+//   /Users/<name>/… and /home/<name>/…
+//   a bare macOS home dir, /Users/<name> (e.g. a cwd); a bare /home/<name> is not matched, because
+//     prose like "hub/home/write" would be a false positive
+//   the dashed project slug Claude Code and Cursor use, -Users-<name>-… (not -home-: kebab-case prose)
+//   C:\Users\<name>\…
+const HOME = /(\/(?:Users|home)\/)([A-Za-z0-9._-]+)(?=\/)|(\/Users\/)([A-Za-z0-9._-]+)(?![A-Za-z0-9._\/-])|(?<![A-Za-z0-9])(-?Users-)([A-Za-z0-9._]+)(?=-)|([A-Za-z]:\\Users\\)([A-Za-z0-9._-]+)(?=\\)/g;
+const homeName = (m) => m[2] ?? m[4] ?? m[6] ?? m[8];
+const homePrefix = (m) => m[1] ?? m[3] ?? m[5] ?? m[7];
+
 export const GENERIC = [
-  // /Users/<name>/… or /home/<name>/…, plus a bare macOS home dir (/Users/<name>, e.g. a cwd). A bare
-  // /home/<name> is not matched: prose like "hub/home/write" would be a false positive.
-  { kind: "home-path", re: /\/(?:Users|home)\/([A-Za-z0-9._-]+)(?=\/)|\/Users\/([A-Za-z0-9._-]+)(?![A-Za-z0-9._/-])/g,
-    keep: (m) => SAFE_USERS.has(m[1] ?? m[2]), sub: (m) => m[0].replace(m[1] ?? m[2], "[user]") },
+  { kind: "home-path", re: HOME, keep: (m) => SAFE_USERS.has(homeName(m)), sub: (m) => homePrefix(m) + "[user]" },
   { kind: "email", re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, keep: (m) => SAFE_EMAILS.test(m[0]), sub: () => "[email]" },
-  { kind: "token", re: /\b(?:sk-ant-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{32,}|gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,}|AKIA[0-9A-Z]{16}|xox[bp]-[A-Za-z0-9-]{20,})/g, sub: () => "[token]" },
-  { kind: "private-key", re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/g, sub: () => "[private-key]" },
+  { kind: "token", re: /\b(?:sk-ant-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{32,}|gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{35}|xox[a-z]-[A-Za-z0-9-]{20,})/g, sub: () => "[token]" },
+  // The scrub works line by line, so it flags the BEGIN line; redaction removes the whole block.
+  { kind: "private-key", re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/g,
+    redactRe: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g, sub: () => "[private-key]" },
 ];
 
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -28,7 +38,7 @@ export function scanText(text, deny = []) {
 // The text with every hit replaced by its marker ([user] inside paths, [email], [token], [private-key], [redacted]).
 export function redact(text, deny = []) {
   let out = text;
-  for (const p of GENERIC) out = out.replace(p.re, (...args) => {
+  for (const p of GENERIC) out = out.replace(p.redactRe || p.re, (...args) => {
     const m = args.slice(0, -2);            // [match, ...groups]; the last two args are offset and input
     return p.keep?.(m) ? m[0] : p.sub(m);
   });

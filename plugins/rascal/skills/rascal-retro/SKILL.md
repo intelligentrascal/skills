@@ -15,7 +15,7 @@ Run `node "$SKILL/mine.mjs" extract` (add `--all` for the seed pass). It prints 
 ## 2. Scope
 
 - Seed pass (`--all`): every record. Run `node "$SKILL/mine.mjs" stats` and `node "$SKILL/mine.mjs" list`.
-- Incremental: `since="$(node "$SKILL/mine.mjs" last-retro)"`, then `node "$SKILL/mine.mjs" stats --since "$since"` and `node "$SKILL/mine.mjs" list --since "$since"`. If `list` prints nothing, say there is nothing new since `$since` and stop.
+- Incremental: `since="$(node "$SKILL/mine.mjs" last-retro)"`. If `since` is empty, no retro has run yet: tell the user to start with `/rascal-retro --all` (the seed pass) and stop. Otherwise run `node "$SKILL/mine.mjs" stats --since "$since"` and `node "$SKILL/mine.mjs" list --since "$since"`. If `list` prints nothing, say there is nothing new since `$since` and stop.
 
 ## 3. Analyze
 

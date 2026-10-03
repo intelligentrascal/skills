@@ -89,3 +89,35 @@ test("two files with one session id: the one with more turns wins", () => {
   assert.deepEqual([r.found, r.written, r.unchanged], [2, 1, 1]);
   assert.equal(JSON.parse(readFileSync(join(w, "home", "mining", "digest", "claude-cli", "s1.json"), "utf8")).turns.length, 2);
 });
+
+test("a format change the parser no longer recognizes exits 3 and leaves the session to retry", () => {
+  const { w, env } = world();
+  const f = join(w, "claude", "proj", "s1.jsonl");
+  writeFileSync(f, readFileSync(f, "utf8").replaceAll('"type":"user"', '"type":"human"'));
+  const p = run(env, "extract");
+  assert.equal(p.status, 3);
+  assert.match(p.stderr, /claude-cli/);
+  assert.equal(JSON.parse(readFileSync(join(w, "home", "mining", "cursor.json"), "utf8"))[f], undefined);
+});
+
+test("dedupe across runs: a later, smaller copy never replaces the larger record", () => {
+  const { w, env } = world();
+  run(env, "extract");
+  mkdirSync(join(w, "claude", "zzz"));
+  writeFileSync(join(w, "claude", "zzz", "copy.jsonl"), readFileSync(join(FX, "claude-cli.jsonl"), "utf8").split("\n")[0] + "\n");
+  run(env, "extract");
+  assert.equal(JSON.parse(readFileSync(join(w, "home", "mining", "digest", "claude-cli", "s1.json"), "utf8")).turns.length, 2);
+});
+
+test("extract --all keeps extractedAt for unchanged records; list/stats ignore stray files", () => {
+  const { w, env } = world();
+  run(env, "extract");
+  const rec = join(w, "home", "mining", "digest", "claude-cli", "s1.json");
+  const before = JSON.parse(readFileSync(rec, "utf8")).extractedAt;
+  run(env, "extract", "--all");
+  assert.equal(JSON.parse(readFileSync(rec, "utf8")).extractedAt, before);
+  writeFileSync(join(w, "home", "mining", "digest", ".DS_Store"), "x");
+  writeFileSync(join(w, "home", "mining", "digest", "claude-cli", ".DS_Store"), "x");
+  assert.equal(run(env, "list").status, 0);
+  assert.equal(JSON.parse(run(env, "stats").stdout).sessions.total, 4);
+});

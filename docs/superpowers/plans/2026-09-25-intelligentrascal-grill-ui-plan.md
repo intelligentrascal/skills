@@ -18,10 +18,10 @@ Paths below are abbreviated. The scratchpad is session-scoped; if a path is gone
 
 | Alias | Path | Fallback |
 |---|---|---|
-| `$JASON` | `/private/tmp/claude-501/-Users-rahil-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/grill-with-ui` (commit `daafa1e`) | `git clone https://github.com/jasonku09/grill-with-ui /tmp/grill-with-ui && git -C /tmp/grill-with-ui checkout daafa1e` |
-| `$POCOCK` | `/private/tmp/claude-501/-Users-rahil-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/pocock-skills` (HEAD `c55ee46`) | `git clone https://github.com/mattpocock/skills /tmp/pocock-skills` |
+| `$JASON` | `/private/tmp/claude-501/-Users-[user]-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/grill-with-ui` (commit `daafa1e`) | `git clone https://github.com/jasonku09/grill-with-ui /tmp/grill-with-ui && git -C /tmp/grill-with-ui checkout daafa1e` |
+| `$POCOCK` | `/private/tmp/claude-501/-Users-[user]-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/pocock-skills` (HEAD `c55ee46`) | `git clone https://github.com/mattpocock/skills /tmp/pocock-skills` |
 | `$POCOCK_PIN` | `~/.claude/plugins/cache/mattpocock/mattpocock-skills/1.2.3` (installed; commit `3cca18b368ae95cdbdebbff572ccafa662551015`, also checked out in `~/.claude/plugins/marketplaces/mattpocock`) | `claude plugin install mattpocock-skills@mattpocock` |
-| `$RESEARCH` | `/private/tmp/claude-501/-Users-rahil-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/research` (`openai-codex`, `sst-opencode`, `badlogic-pi-mono`, `vercel-labs-skills`) | clone `openai/codex`, `sst/opencode`, `badlogic/pi-mono`, `vercel-labs/skills` |
+| `$RESEARCH` | `/private/tmp/claude-501/-Users-[user]-code-skills/c42446c8-6414-4d2e-ad03-e25f9cb2e308/scratchpad/research` (`openai-codex`, `sst-opencode`, `badlogic-pi-mono`, `vercel-labs-skills`) | clone `openai/codex`, `sst/opencode`, `badlogic/pi-mono`, `vercel-labs/skills` |
 | `$TASTE` | `~/.claude/plugins/cache/codeswithroh/tastemaker/a8136a09cf3b/skills/tastemaker/references/prototype-variants.md` | n/a (guidance only) |
 
 Key port map (Jason → ours):

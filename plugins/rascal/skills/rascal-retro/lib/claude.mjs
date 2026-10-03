@@ -22,7 +22,8 @@ export function parseClaude(file, { source, deny = [] }) {
       }
       continue;
     }
-    if (o.isMeta || o.isSidechain) continue;
+    // isCompactSummary: the agent-written summary that opens a continued session, not the user's words.
+    if (o.isMeta || o.isSidechain || o.isCompactSummary) continue;
     const text = typeof c === "string" ? c : (Array.isArray(c) ? c.filter((b) => b.type === "text").map((b) => b.text).join("\n") : "");
     const cmd = slashCommand(text);
     if (cmd) { addSkill(r, at, cmd.name, "command"); addTurn(r, at, cmd.args, deny); }

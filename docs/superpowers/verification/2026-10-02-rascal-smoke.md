@@ -57,3 +57,44 @@ Defects found during execution and fixed in the same task (the plan's code had t
    `rascal:rascal-grilling-ui`. The test now matches the closing backtick.
 8. `rascal-grill-docs-ui` kept intelligentrascal's "patch the page `terms` after every
    `CONTEXT.md` edit" paragraph, which the plan's text had dropped.
+
+## Code review (after the smoke runs)
+
+A reviewer subagent read `cea26cb..HEAD` against the plan. Fixed, each with a regression test:
+
+- **Privacy (critical).** Redaction and the scrub missed the dashed project slug
+  (`-Users-<name>-…`, all over Claude and Cursor paths) and `C:\Users\<name>\`. Adding the slug
+  pattern turned up two real leaks in older docs (`/private/tmp/…/-Users-<name>-…`), which are now
+  redacted. Redaction also left a private key's body and END line in the digest; it now removes
+  the whole block.
+- **`[user]` substitution.** It replaced the first occurrence of the name anywhere in the match, so a
+  name inside `Users` or `home` leaked. It now rebuilds the result as prefix + `[user]`.
+- **Tokens.** Now also caught: `sk-proj-…`/`sk-svcacct-…` keys, Google `AIza…` keys and every
+  `xox?-` Slack token.
+- **`.scrub-allow`.** A literal no longer allows a shorter hit inside it (an allowed email literal
+  used to allow a deny-listed name). An empty literal is an error. Explicit paths now resolve
+  against the repo root, so globs match when the scrub runs from a subdirectory.
+- **Parser-break detection.**
+  - A renamed user-line type produced turn-less "empty" records with exit 0, and the cursor then
+    marked them done for good. Turn-less records that have assistant turns (and no slash command)
+    now count as suspect.
+  - The 10% threshold is now taken over the sessions attempted this run, not over all found.
+  - Empty sessions are only written to the cursor when the source looks healthy.
+- **Dedupe across runs.** A later, smaller copy never replaces a larger digest record.
+- **`extract --all`** keeps `extractedAt` for unchanged records, so the next incremental retro
+  doesn't re-read everything.
+- **`list`/`stats`** no longer crash on stray files such as `.DS_Store`.
+- **`stats`** counts distinct skills per session, not invocations.
+- **Compaction summaries** (`isCompactSummary`, "This session is being continued…") are not user turns.
+- **`sync-transport`** mirrors every file in `skills/grilling-ui` except `test/`, `SKILL.md`,
+  `agents/` and dotfiles. A new upstream file is now drift instead of being silently skipped.
+- **`rascal-retro`**: an incremental run with no earlier retro stops and points at `--all`.
+
+Not changed:
+- **Seeding the deny-list with the login name.** The marketplace description names Rahil on
+  purpose, so this stays the user's choice.
+- **The scrub skipping UTF-16 files, and file modes in the drift check.** Low value.
+- **The hook's `--check` reading the working tree rather than the index.** This is by design (Q34).
+
+After the fixes, `mine.mjs extract` on this machine still exits 0 with `failed: 0`, no false
+suspects, and no home paths or slugs in the digest.

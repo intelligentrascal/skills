@@ -2,7 +2,7 @@
 import { redact } from "./redact.mjs";
 
 export const MAX_TURN = 4000;
-export const INJECTED = /^\s*(<system-reminder>|<task-notification>|<local-command-|<user-prompt-submit-hook>|\[SYSTEM NOTIFICATION|<environment_context>|<recommended_plugins>|<permissions instructions>|# AGENTS\.md instructions|Caveat: The messages below)/;
+export const INJECTED = /^\s*(<system-reminder>|<task-notification>|<local-command-|<user-prompt-submit-hook>|\[SYSTEM NOTIFICATION|<environment_context>|<recommended_plugins>|<permissions instructions>|# AGENTS\.md instructions|Caveat: The messages below|This session is being continued from a previous conversation)/;
 
 export function newRecord(source, id) {
   return { v: 1, source, id, cwd: "", start: "", end: "", turns: [], skills: [], tools: {}, assistantTurns: 0 };

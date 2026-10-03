@@ -21,6 +21,15 @@ test("scanText: generic kinds", () => {
   assert.deepEqual(kinds("noreply@anthropic.com"), [], "the commit trailer address is allowed");
 });
 
+test("redact: project slugs, Windows paths, short names, whole key blocks, newer tokens", () => {
+  assert.equal(redact("~/.claude/projects/-Users-alice-code-app/memory"), "~/.claude/projects/-Users-[user]-code-app/memory");
+  assert.equal(redact("C:\\Users\\alice\\x"), "C:\\Users\\[user]\\x");
+  assert.equal(redact("/home/e/x and /Users/U"), "/home/[user]/x and /Users/[user]", "a name inside 'home'/'Users' still redacts the name");
+  assert.equal(redact("a\n-----BEGIN RSA PRIVATE KEY-----\nMIIB\n-----END RSA PRIVATE KEY-----\nb"), "a\n[private-key]\nb");
+  assert.equal(redact("sk-proj-" + "a_b-".repeat(10)), "[token]");
+  for (const t of ["my-home-page-thing", "task-" + "a".repeat(40), "hub/home/write", "/Users/Shared/x"]) assert.equal(redact(t), t, t);
+});
+
 test("scanText: deny-list literals, case-insensitive", () => {
   assert.deepEqual(scanText("Meeting with ACME corp", ["acme"]).map((h) => h.kind), ["deny-list"]);
 });
@@ -66,6 +75,25 @@ test(".scrub-allow: whole file and file:literal", () => {
   assert.equal(p.status, 1);
   assert.match(p.stdout, /d\.md:2: email/);
   assert.doesNotMatch(p.stdout, /c\.md|d\.md:1/);
+});
+
+test(".scrub-allow: a literal never allows a shorter hit inside it; empty literal is an error", () => {
+  const r = repo();
+  mkdirSync(join(r, ".rh"));
+  writeFileSync(join(r, ".rh", "denylist.txt"), "acme\n");
+  writeFileSync(join(r, "e.md"), "acme\n");
+  writeFileSync(join(r, ".scrub-allow"), "e.md:ops@acme.example\n");
+  assert.equal(run(r, ["e.md"]).status, 1);
+  writeFileSync(join(r, ".scrub-allow"), "e.md:\n");
+  assert.equal(run(r, ["e.md"]).status, 2);
+});
+
+test("explicit paths match .scrub-allow globs from a subdirectory", () => {
+  const r = repo();
+  mkdirSync(join(r, "sub"));
+  writeFileSync(join(r, "sub", "f.md"), "x@y.co\n");
+  writeFileSync(join(r, ".scrub-allow"), "sub/f.md\n");
+  assert.equal(run(join(r, "sub"), ["f.md"], { RASCAL_HOME: join(r, ".rh") }).status, 0);
 });
 
 test("no paths and no mode is a usage error (exit 2)", () => {

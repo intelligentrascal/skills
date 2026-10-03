@@ -12,7 +12,9 @@ import { fileURLToPath } from "node:url";
 const ROOT = process.env.REPO_ROOT || path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(ROOT, "skills", "grilling-ui");
 const DEST = path.join(ROOT, "plugins", "rascal", "skills", "rascal-grilling-ui");
-const COPY = ["hub.mjs", "lib", "page", "visual-brief.md"];
+// Everything in skills/grilling-ui is mirrored byte for byte except these: tests are not copied, and
+// SKILL.md and agents/openai.yaml are rewritten. A new file upstream is therefore drift, not ignored.
+const SKIP = new Set(["test", "SKILL.md", "agents"]);
 
 const DESCRIPTION = "Browser transport for rascal's -ui grill skills: publishes rounds to a local page and listens for Sends. Loaded by rascal-grill-me-ui and rascal-grill-docs-ui.";
 
@@ -46,10 +48,9 @@ function walk(dir, base = dir, out = []) {
 // Map of relative dest path → expected contents (Buffer or string).
 export function expected() {
   const want = new Map();
-  for (const c of COPY) {
-    const p = path.join(SRC, c);
-    if (fs.statSync(p).isDirectory()) for (const f of walk(p)) want.set(path.join(c, f), fs.readFileSync(path.join(p, f)));
-    else want.set(c, fs.readFileSync(p));
+  for (const f of walk(SRC)) {
+    const parts = f.split(path.sep);
+    if (!SKIP.has(parts[0]) && !parts.some((x) => x.startsWith("."))) want.set(f, fs.readFileSync(path.join(SRC, f))); // no dotfiles (.DS_Store)
   }
   want.set("SKILL.md", transformSkill(fs.readFileSync(path.join(SRC, "SKILL.md"), "utf8")));
   want.set(path.join("agents", "openai.yaml"), transformYaml(fs.readFileSync(path.join(SRC, "agents", "openai.yaml"), "utf8")));
