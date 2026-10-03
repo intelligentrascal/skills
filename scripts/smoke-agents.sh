@@ -8,6 +8,7 @@ prompt='Reply with exactly the word PONG and nothing else.'
 agents="claude codex opencode pi"
 timeout_s=180
 while [ $# -gt 0 ]; do
+  case "$1" in --prompt|--agents|--timeout) [ $# -ge 2 ] || { echo "smoke-agents: $1 needs a value" >&2; exit 2; } ;; esac
   case "$1" in
     --prompt) prompt="$2"; shift 2 ;;
     --agents) agents="$2"; shift 2 ;;

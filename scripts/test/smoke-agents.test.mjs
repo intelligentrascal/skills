@@ -39,3 +39,5 @@ test("timeout counts as no reply", () => {
 });
 
 test("bad option: exit 2", () => assert.equal(run(fakeBin({}), ["--nope"]).status, 2));
+
+test("option without a value: exit 2", () => assert.equal(run(fakeBin({}), ["--prompt"]).status, 2));
