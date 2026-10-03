@@ -7,7 +7,7 @@ description: Design and ship a user interface. Real-data mockups in three radica
 
 ## 1. Branch
 
-Create a git worktree on a new branch: `git worktree add ../<repo>-<slug> -b <slug>`. If it already exists (a resumed run), reuse it. Every later step runs there.
+Create a git worktree on a new branch: `git worktree add ../<repo>-<slug> -b <slug>`. If it already exists (a resumed run), reuse it. Every later step runs there. Make sure `.rascal/` is ignored: if `.rascal/.gitignore` doesn't exist, write it with the single line `*`.
 
 ## 2. Mock up with real data
 

@@ -151,3 +151,23 @@ test("--pack <zip>: unzips into RASCAL_HOME/packs/<name>", () => {
   assert.equal(r.status, 0, r.stderr);
   assert.equal(readlinkSync(join(t, "skills", "beta")), join(t, "rascal", "packs", "mypack", "group/beta"));
 });
+
+test("--pack <zip>: a different zip with the same name → exit 1, first pack kept; same zip again → ok", () => {
+  const { t, e } = env();
+  const mk = () => { const p = pack(); const z = join(mkdtempSync(join(tmpdir(), "zip-")), "main.zip"); execFileSync("zip", ["-qr", z, "."], { cwd: p }); return z; };
+  const z1 = mk(), z2 = mk();
+  assert.equal(runPack(e, z1).status, 0);
+  assert.equal(runPack(e, z1).status, 0);
+  const r = runPack(e, z2);
+  assert.equal(r.status, 1);
+  assert.ok(r.stderr.includes(z1), r.stderr);
+  assert.ok(existsSync(join(t, "rascal/packs/main/alpha/SKILL.md")));
+});
+
+test("--pack <git url>: the same repo spelled with .git re-runs cleanly", () => {
+  const { e } = env();
+  const a = gitRepo(join(mkdtempSync(join(tmpdir(), "own-")), "carol"), "skills");
+  assert.equal(runPack(e, `file://${a}`).status, 0);
+  const r = runPack(e, `file://${a}.git`);
+  assert.equal(r.status, 0, r.stderr);
+});

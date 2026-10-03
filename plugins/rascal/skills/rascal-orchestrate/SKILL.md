@@ -10,10 +10,10 @@ This session is the **coordinator**. It writes no product code. It plans, dispat
 ## 1. Get the plan
 
 If the user names a plan in `docs/plans/`, use it. Otherwise:
-- **Foggy goal** (too big for one session, or the route isn't visible yet): call the Skill tool with "rascal-plan" (in Claude Code: `rascal:rascal-plan`). It charts and resolves the decisions across sessions, so this session ends with its handoff, whose **Next** continues rascal-plan on the map. Add one line to **Next**: once the map has no open tickets, `/rascal:rascal-orchestrate <map>` (elsewhere `use rascal-orchestrate on <map>`) resumes here.
+- **Foggy goal** (too big for one session, or the route isn't visible yet): call the Skill tool with "rascal-plan" (in Claude Code: `rascal:rascal-plan`). It charts and resolves the decisions across sessions, so this session ends with its handoff, whose **Next** continues rascal-plan on the map. Once the map has no open tickets, rascal-plan's **Next** names the build; for this run that is `/rascal:rascal-orchestrate <map>` (elsewhere `use rascal-orchestrate on <map>`).
 - **Decisions settled** (with a map, read its Decisions so far first): create the integration worktree (below) first, then call the Skill tool with "rascal-planning" (in Claude Code: `rascal:rascal-planning`) and run its spec step and its **Plan** section, not **Execute**.
 
-The integration worktree, also for a plan the user named, from the default branch: `git worktree add ../<repo>-orchestrate-<slug> -b orchestrate/<slug>` (reuse it if it exists). Work from there for the rest of the run, and run every script from it. Commit the spec and the plan there unless they're already committed.
+The integration worktree, also for a plan the user named, branched from rascal-plan's `plan/<slug>` branch when there is one (it holds the map's decisions and the CONTEXT.md and ADR updates), otherwise from the default branch: `git worktree add ../<repo>-orchestrate-<slug> -b orchestrate/<slug>` (reuse it if it exists). Work from there for the rest of the run, and run every script from it. Commit the spec and the plan there unless they're already committed.
 
 Then ask once for a go, with a one-line recommendation (how many tasks, how many can run in parallel). That go approves the whole run through the merge. Then set up the plan's workspace, ledger and pre-flight scan as review-loop.md's **Setup** describes; the integration worktree is the isolated workspace it asks for.
 
@@ -27,8 +27,8 @@ A task is dispatchable when every task it must follow has merged **and** it is i
 For each task `<N>`:
 1. In the integration worktree, record `BASE=$(git rev-parse HEAD)`.
 2. Create its worktree: `git worktree add ../<repo>-<slug>-t<N> -b ticket/<slug>-t<N> $BASE`.
-3. Run `bash scripts/task-brief <plan> <N>` (from this skill's directory) for the task's text.
-4. Write the worker's brief from [worker-brief.md](worker-brief.md) to `.rascal/sdd/<plan-basename>/task-<N>-dispatch.md`, then dispatch one worker with that path. Choose its model per review-loop.md's **Model Selection**.
+3. With the integration worktree as the working directory, run `bash <this skill's folder>/scripts/task-brief <plan> <N>` for the task's text.
+4. Write the worker's brief from [worker-brief.md](worker-brief.md) to `<workspace>/task-<N>-dispatch.md` (`<workspace>` is the directory `sdd-workspace` printed at Setup), then dispatch one worker with that path. Choose its model per review-loop.md's **Model Selection**.
 5. Record the worker's agent id in the ledger: fix rounds resume it.
 
 Never let a worker dispatch agents of its own. A prototype task (one whose goal is a UI prototype) carries the three-variants rule word for word in its brief, and its worker loads "rascal-prototype" (in Claude Code: `rascal:rascal-prototype`) plus whichever design skills are installed.
@@ -49,12 +49,12 @@ A UI prototype shows three radically different variants, with an on-page picker,
 <!-- graft: superpowers skills/dispatching-parallel-agents/SKILL.md @ 8ca22dba9a94f28898bbce59f2537ff4d87c747d -> ## 5. Integrate -->
 
 When a task passes:
-1. Ask its worker to rebase `ticket/<slug>-t<N>` onto `orchestrate/<slug>` and resolve any conflicts. The worker does this, not you.
+1. Ask the task's latest implementer to rebase `ticket/<slug>-t<N>` onto `orchestrate/<slug>` and resolve any conflicts. The worker does this, not you. Conflict resolutions get the test run below here and the whole-branch review in step 6.
 2. Run the full test suite in the ticket worktree.
 3. From the integration worktree, `git merge --no-ff ticket/<slug>-t<N>`.
 4. Append `Task <N>: merged` to the ledger and remove its worktree (`git worktree remove ../<repo>-<slug>-t<N>`).
 
-Newly unblocked tasks join the next batch (step 2).
+Newly unblocked tasks join the next batch (step 2). On resume, integrate any task the ledger shows `complete` but not yet `merged` before dispatching more.
 
 ## 6. Finish
 

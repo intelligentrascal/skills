@@ -286,10 +286,9 @@ in the rulings list. There is no second fix pass.
 ## Finish
 
 Before you delete anything, collect every ledger line containing
-`Ruling:` into your final message under "Rulings I made", in the order you
+`Ruling:` into the handoff's **Decisions** field (the calling workflow's handoff when one called you) under "Rulings I made", in the order you
 made them, each with what it costs if wrong, and every `minor (deferred)`
-line under "Deferred minors". Both lists are exhaustive. Your final
-message is the only place the decisions you took on your human partner's
+line under "Deferred minors". Both lists are exhaustive. That field is the only place the decisions you took on your human partner's
 behalf — and the findings you chose not to act on — reach them.
 
 When the final review is clean and its fixes are committed, delete this

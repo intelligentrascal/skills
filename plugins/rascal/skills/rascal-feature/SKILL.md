@@ -5,11 +5,11 @@ description: Build a feature end to end. Plan it, spec it, write a task plan, ex
 
 # Feature
 
-A workflow: branch → plan → spec → task plan → execute → ship. Invoked as `execute <plan path>`, work in the worktree that holds that plan (step 1) and start at step 4.
+A workflow: branch → plan → spec → task plan → execute → ship. Invoked as `execute <plan path>`, work in the worktree that holds that plan (step 1) and start at step 4. Invoked with a map whose tickets are all resolved, branch from its `plan/<slug>` branch (step 1), read the map's decisions, and start at step 3.
 
 ## 1. Branch
 
-Create a git worktree on a new branch: `git worktree add ../<repo>-<slug> -b <slug>`. If it already exists (a resumed run), reuse it. Every later step runs there.
+Create a git worktree on a new branch: `git worktree add ../<repo>-<slug> -b <slug>`, branched from `plan/<slug>` when rascal-plan made one. If it already exists (a resumed run), reuse it. Every later step runs there.
 
 ## 2. Plan
 

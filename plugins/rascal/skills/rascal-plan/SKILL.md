@@ -11,9 +11,9 @@ A workflow: wayfinder → grill → domain model. It ends in decisions written d
 
 If the work is bigger than one agent session can hold, or the route to it isn't visible yet, call the Skill tool with "rascal-wayfinder" (in Claude Code: `rascal:rascal-wayfinder`) and chart the map. If the user named an issue, start from it. Skip this step when the work is one clear decision.
 
-Charting is one session's work: after it, stop and end with the handoff (even when another workflow called this one), its **Next** `/rascal:rascal-plan <map>` (elsewhere `use rascal-plan on <map>`). Invoked with a map, resolve exactly one ticket (rascal-wayfinder's **Work through the map**; a grilling ticket goes through step 2), record it as step 3 says, then end with the handoff; **Next** is the same command while the map has open tickets, and the build (rascal-feature, or rascal-orchestrate for a large parallel build) once it is.
+Charting is one session's work: after it, stop and end with the handoff (even when another workflow called this one), its **Next** `/rascal:rascal-plan <map>` (elsewhere `use rascal-plan on <map>`). Invoked with a map, resolve exactly one ticket (rascal-wayfinder's **Work through the map**; a grilling ticket goes through step 2), record it as step 3 says, then end with the handoff; **Next** is the same command while the map has open tickets, and the build once it has none: `/rascal:rascal-feature <map>`, or `/rascal:rascal-orchestrate <map>` for a large parallel build (elsewhere `use rascal-feature on <map>`).
 
-When other agents may be active in this checkout, run in a fresh worktree.
+With a map, work on a `plan/<slug>` branch (create it from the default branch the first time): its decisions, CONTEXT.md and ADR updates and any local map files live there between sessions. When other agents may be active in this checkout, give that branch its own worktree (`git worktree add ../<repo>-plan-<slug> plan/<slug>`).
 
 ## 2. Grill with docs
 
@@ -22,7 +22,7 @@ Call the Skill tool twice, for "rascal-grilling" and "rascal-domain-modeling" (i
 ## 3. Write it down
 
 When the user confirms the shared understanding:
-- with a map: resolve the ticket as rascal-wayfinder describes (record the decision, close the ticket, update the map);
+- with a map: resolve the ticket as rascal-wayfinder describes (record the decision, close the ticket, update the map), then commit CONTEXT.md, the ADRs and any local map files on `plan/<slug>`;
 - without one: write the design doc to `docs/<slug>-design.md`, then commit it: on a new `plan/<slug>` branch when the checkout is on the default branch, otherwise on the current branch.
 
 <!-- rule:questions -->

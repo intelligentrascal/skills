@@ -63,6 +63,7 @@ Derived files not listed here have no hand edits.
 - When to Use: "chose inline execution at the handoff" → "are running it in this session"; dropped the `../using-superpowers/references/` pointer.
 - Diagram node "systematic-debugging" → "rascal-debugging".
 - Final review without a subagent tool: the self-review goes in the handoff's **Decisions** field and the run continues (was: the partner decides before merge).
+- Finish: rulings and deferred minors go in the handoff's **Decisions** field (was: "your final message").
 - Example: "the executing-plans skill" → "the rascal-planning skill"; `docs/superpowers/plans/` → `docs/plans/`.
 
 ## rascal-planning/scripts/task-start (obra)
@@ -73,6 +74,7 @@ Derived files not listed here have no hand edits.
 
 - Line 2: a note mapping the file onto rascal-orchestrate (tasks, PLAN_FILE, HEAD/BASE, integration worktree, worker resumed in fix rounds 1-3, dispatch file as task brief, Ship step → orchestrate step 6).
 - Stop list: same edit as executing.md.
+- DONE status: review-package runs as `bash <this skill's folder>/scripts/review-package …` with the integration worktree as the working directory (was: "from this skill's directory").
 - When-to-use diagram nodes: "subagent-driven-development" → "rascal-orchestrate", "executing-plans" → "rascal-planning (inline)".
 - "Never dispatch multiple implementation subagents in parallel" → parallel implementers only on independent tickets, each in its own worktree.
 - Final Review: residual load-bearing findings go in the handoff's **Decisions** field (was: when finishing-a-development-branch presents the options).
