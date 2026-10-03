@@ -59,3 +59,12 @@ test("rascal-feature: plan → planning → review, resumable at execute, ships"
   assert.ok(i('"rascal-plan"') > 0 && i('"rascal-plan"') < i('"rascal-planning"') && i('"rascal-planning"') < i('"rascal-review"'));
   for (const s of ["execute <plan path>", "gh pr create", "git worktree remove", "README"]) assert.ok(t.includes(s), s);
 });
+
+test("rascal-ui: steps in order, parity gate, walkthrough with Playwright fallback", () => {
+  if (!has("rascal-ui")) return;
+  const t = read("rascal-ui");
+  const order = ['"rascal-prototype"', "## 2. Review in parallel", "## 3. Design language", "## 4. Feedback loop", "## 5. Parity gate", "## 6. Persona walkthrough", "## 7. Ship"];
+  for (let k = 1; k < order.length; k++) assert.ok(t.indexOf(order[k - 1]) < t.indexOf(order[k]) && t.indexOf(order[k - 1]) >= 0, order[k]);
+  const w = read("rascal-ui", "persona-walkthrough.md");
+  for (const s of ["npm install --prefix .rascal/walkthrough playwright", "never", "screenshot"]) assert.ok(w.includes(s), s);
+});
