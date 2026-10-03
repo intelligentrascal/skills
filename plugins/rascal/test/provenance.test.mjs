@@ -46,6 +46,9 @@ test("no rascal skill file references an upstream plugin namespace", () => {
 export const EXPECT = {
   "rascal-grilling/SKILL.md": ["provenance pocock skills/productivity/grilling/SKILL.md"],
   "rascal-domain-modeling/SKILL.md": ["provenance pocock skills/engineering/domain-modeling/SKILL.md"],
+  "rascal-tdd/SKILL.md": ["provenance pocock skills/engineering/tdd/SKILL.md"],
+  "rascal-tdd/mocking.md": ["provenance pocock skills/engineering/tdd/mocking.md"],
+  "rascal-tdd/tests.md": ["provenance pocock skills/engineering/tdd/tests.md"],
 };
 
 test("each derived file carries exactly its expected provenance", () => {
