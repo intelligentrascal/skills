@@ -1,0 +1,3 @@
+interface:
+  display_name: "Orchestrate (rascal, experimental)"
+  short_description: "Parallel workers per ticket, reviewed and merged"

@@ -78,6 +78,16 @@ export const EXPECT = {
   "rascal-planning/scripts/review-package": ["provenance superpowers skills/subagent-driven-development/scripts/review-package"],
   "rascal-planning/scripts/task-start": ["provenance superpowers skills/executing-plans/scripts/task-start"],
   "rascal-planning/scripts/task-done": ["provenance superpowers skills/executing-plans/scripts/task-done"],
+  "rascal-orchestrate/SKILL.md": ["graft superpowers skills/dispatching-parallel-agents/SKILL.md",
+    "graft superpowers skills/subagent-driven-development/SKILL.md", "graft superpowers skills/dispatching-parallel-agents/SKILL.md"],
+  "rascal-orchestrate/worker-brief.md": ["graft superpowers skills/dispatching-parallel-agents/SKILL.md"],
+  "rascal-orchestrate/review-loop.md": ["provenance superpowers skills/subagent-driven-development/SKILL.md"],
+  "rascal-orchestrate/implementer-prompt.md": ["provenance superpowers skills/subagent-driven-development/implementer-prompt.md"],
+  "rascal-orchestrate/task-reviewer-prompt.md": ["provenance superpowers skills/subagent-driven-development/task-reviewer-prompt.md"],
+  "rascal-orchestrate/re-review-prompt.md": ["provenance superpowers skills/subagent-driven-development/re-review-prompt.md"],
+  "rascal-orchestrate/scripts/sdd-workspace": ["provenance superpowers skills/subagent-driven-development/scripts/sdd-workspace"],
+  "rascal-orchestrate/scripts/task-brief": ["provenance superpowers skills/subagent-driven-development/scripts/task-brief"],
+  "rascal-orchestrate/scripts/review-package": ["provenance superpowers skills/subagent-driven-development/scripts/review-package"],
 };
 
 test("each derived file carries exactly its expected provenance", () => {

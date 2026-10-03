@@ -76,3 +76,11 @@ test("rascal-scheduled-runbook: ten guardrail sections in order, siblings, test 
     "**Dry run, then commit.**", "**Record before render.**", "**Render and verify.**", "**Report-only fallback.**", "## 3. Siblings", "## 4. Test"];
   for (let k = 1; k < order.length; k++) assert.ok(t.indexOf(order[k - 1]) >= 0 && t.indexOf(order[k - 1]) < t.indexOf(order[k]), order[k]);
 });
+
+test("rascal-orchestrate: experimental, cap 2, independence, two review paths", () => {
+  if (!has("rascal-orchestrate")) return;
+  const t = read("rascal-orchestrate");
+  assert.match(t, /^description: "Experimental\./m);
+  for (const s of ['"rascal-wayfinder"', "at most **2**", "independent", "[worker-brief.md](worker-brief.md)", "[review-loop.md](review-loop.md)",
+    '"rascal-review"', "Never let a worker dispatch"]) assert.ok(t.includes(s), s);
+});
