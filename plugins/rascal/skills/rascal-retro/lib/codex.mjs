@@ -11,7 +11,13 @@ export function parseCodex(file, { deny = [] }) {
     let o; try { o = JSON.parse(line); } catch { continue; }
     const p = o.payload || {}, at = o.timestamp || "";
     stamp(r, at);
-    if (o.type === "session_meta") { r.id = p.session_id || p.id || r.id; r.cwd = p.cwd || r.cwd; continue; }
+    if (o.type === "session_meta") {
+      r.id = p.session_id || p.id || r.id; r.cwd = p.cwd || r.cwd;
+      // Subagent rollouts (e.g. guardian reviews) share the parent's session_id and their "user" turns are
+      // agent prompts: return them turn-less so the miner counts them as empty.
+      if (p.source?.subagent) return finish(newRecord("codex", p.id || r.id), deny);
+      continue;
+    }
     if (o.type !== "response_item") continue;
     if (p.type === "message" && p.role === "user") for (const c of p.content || []) { if (c.type === "input_text") addTurn(r, at, c.text, deny); }
     else if (p.type === "message" && p.role === "assistant") r.assistantTurns++;

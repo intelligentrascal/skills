@@ -6,7 +6,10 @@ const SAFE_USERS = new Set(["Shared", "runner", "user", "you", "me", "name", "[u
 const SAFE_EMAILS = /^(noreply@anthropic\.com|.+@users\.noreply\.github\.com)$/i;
 
 export const GENERIC = [
-  { kind: "home-path", re: /\/(?:Users|home)\/([A-Za-z0-9._-]+)\//g, keep: (m) => SAFE_USERS.has(m[1]), sub: (m) => m[0].replace(m[1], "[user]") },
+  // /Users/<name>/… or /home/<name>/…, plus a bare macOS home dir (/Users/<name>, e.g. a cwd). A bare
+  // /home/<name> is not matched: prose like "hub/home/write" would be a false positive.
+  { kind: "home-path", re: /\/(?:Users|home)\/([A-Za-z0-9._-]+)(?=\/)|\/Users\/([A-Za-z0-9._-]+)(?![A-Za-z0-9._/-])/g,
+    keep: (m) => SAFE_USERS.has(m[1] ?? m[2]), sub: (m) => m[0].replace(m[1] ?? m[2], "[user]") },
   { kind: "email", re: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, keep: (m) => SAFE_EMAILS.test(m[0]), sub: () => "[email]" },
   { kind: "token", re: /\b(?:sk-ant-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{32,}|gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,}|AKIA[0-9A-Z]{16}|xox[bp]-[A-Za-z0-9-]{20,})/g, sub: () => "[token]" },
   { kind: "private-key", re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/g, sub: () => "[private-key]" },

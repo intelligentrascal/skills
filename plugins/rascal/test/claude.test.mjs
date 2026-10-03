@@ -35,3 +35,9 @@ test("deny-list redacts and long turns clip", () => {
   assert.equal(long.turns[0].text.length, MAX_TURN);
   assert.equal(MAX_TURN, 4000);
 });
+
+test("a metadata-only stub is an empty session, not a failure", () => {
+  const r = parseClaude(join(FX, "claude-stub.jsonl"), { source: "claude-cli" });
+  assert.equal(r.id, "claude-stub");
+  assert.deepEqual(r.turns, []);
+});

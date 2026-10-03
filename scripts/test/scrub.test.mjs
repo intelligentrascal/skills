@@ -12,6 +12,7 @@ const SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "..", "scrub.mjs");
 test("scanText: generic kinds", () => {
   const kinds = (t) => scanText(t).map((h) => h.kind);
   assert.deepEqual(kinds("see /Users/alice/code/x"), ["home-path"]);
+  assert.deepEqual(kinds('"cwd": "/Users/alice",'), ["home-path"], "a bare home dir, no trailing slash");
   assert.deepEqual(kinds("see ~/code/x and /Users/Shared/x"), []);
   assert.deepEqual(kinds("mail bob@example.org"), ["email"]);
   assert.deepEqual(kinds("key sk-ant-api03-" + "a".repeat(40)), ["token"]);
@@ -26,6 +27,8 @@ test("scanText: deny-list literals, case-insensitive", () => {
 
 test("redact replaces hits with a marker", () => {
   assert.equal(redact("at /Users/alice/x mail a@b.co"), "at /Users/[user]/x mail [email]");
+  assert.equal(redact("cwd /Users/alice"), "cwd /Users/[user]");
+  assert.equal(redact("exit 1 on hub/home/write failure"), "exit 1 on hub/home/write failure");
 });
 
 function repo() {

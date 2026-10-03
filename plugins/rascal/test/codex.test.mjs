@@ -17,3 +17,9 @@ test("Codex rollout → record", () => {
   assert.equal(r.assistantTurns, 1);
   assert.equal(r.start, "2026-10-02T13:49:59Z");
 });
+
+test("a subagent rollout (shares the parent's session_id) has no turns", () => {
+  const r = parseCodex(join(FX, "codex-subagent.jsonl"), {});
+  assert.equal(r.id, "c1-guardian");
+  assert.deepEqual(r.turns, []);
+});
