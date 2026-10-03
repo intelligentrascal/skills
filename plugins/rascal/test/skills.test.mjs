@@ -51,3 +51,11 @@ test("ui entry points load rascal's grilling then rascal-grilling-ui", () => {
     assert.ok(existsSync(join(SKILLS, d, "agents", "openai.yaml")));
   }
 });
+
+test("rascal-retro drives mine.mjs, keeps findings local, ends in the seed grill", () => {
+  const t = read("rascal-retro", "SKILL.md");
+  for (const s of ['node "$SKILL/mine.mjs" extract', "mine.mjs\" stats", "mine.mjs\" list", "mine.mjs\" mark-retro", "rascal-grill-me-ui",
+    "docs/rascal-v1-design.md", "~/.rascal/mining/", "analyst-brief.md", "generic", "personal"]) assert.ok(t.includes(s), s);
+  assert.doesNotMatch(t, /~\/\.claude\/projects|\.codex\/sessions/, "the skill never reads raw transcripts");
+  assert.ok(existsSync(join(SKILLS, "rascal-retro", "analyst-brief.md")));
+});
