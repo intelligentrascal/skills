@@ -51,3 +51,11 @@ test("rascal-plan: fog → wayfinder, grill with docs, write it down", () => {
   const t = read("rascal-plan");
   for (const s of ['"rascal-wayfinder"', '"rascal-grilling"', '"rascal-domain-modeling"', '"rascal-grill-docs-ui"', "docs/<slug>-design.md"]) assert.ok(t.includes(s), s);
 });
+
+test("rascal-feature: plan → planning → review, resumable at execute, ships", () => {
+  if (!has("rascal-feature")) return;
+  const t = read("rascal-feature");
+  const i = (s) => t.indexOf(s);
+  assert.ok(i('"rascal-plan"') > 0 && i('"rascal-plan"') < i('"rascal-planning"') && i('"rascal-planning"') < i('"rascal-review"'));
+  for (const s of ["execute <plan path>", "gh pr create", "git worktree remove", "README"]) assert.ok(t.includes(s), s);
+});
