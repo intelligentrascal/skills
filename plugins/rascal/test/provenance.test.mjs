@@ -44,7 +44,9 @@ test("no rascal skill file references an upstream plugin namespace", () => {
 
 // Expected provenance per file: "<kind> <source> <path>". Each later task adds its files here.
 export const EXPECT = {
-  "rascal-grilling/SKILL.md": ["provenance pocock skills/productivity/grilling/SKILL.md"],
+  "rascal-grilling/SKILL.md": ["provenance pocock skills/productivity/grilling/SKILL.md",
+    "graft superpowers skills/brainstorming/SKILL.md", "graft superpowers skills/brainstorming/SKILL.md",
+    "graft superpowers skills/brainstorming/SKILL.md"],
   "rascal-domain-modeling/SKILL.md": ["provenance pocock skills/engineering/domain-modeling/SKILL.md"],
   "rascal-tdd/SKILL.md": ["provenance pocock skills/engineering/tdd/SKILL.md"],
   "rascal-tdd/mocking.md": ["provenance pocock skills/engineering/tdd/mocking.md"],
