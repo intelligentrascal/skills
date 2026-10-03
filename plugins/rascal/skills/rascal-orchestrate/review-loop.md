@@ -1,5 +1,5 @@
 <!-- provenance: superpowers skills/subagent-driven-development/SKILL.md @ 8ca22dba9a94f28898bbce59f2537ff4d87c747d -->
-> Used by rascal-orchestrate step 4 for build tickets. "Task" means the ticket; the task brief is the worker brief written in step 3, and PLAN_FILE is the map snapshot at `.rascal/maps/<map>.md`.
+> Used by rascal-orchestrate step 4 for build tasks. Tasks are the plan's tasks and PLAN_FILE is the plan. HEAD is the task's branch `ticket/<slug>-t<N>`, BASE is the commit recorded at dispatch, and every script runs from the integration worktree. The implementer is the task's worker: fix rounds 1-3 resume its agent id. The task brief is the dispatch file from step 3 (`task-<N>-dispatch.md`). Where this file says the Ship step of rascal-feature, read rascal-orchestrate step 6.
 
 # Subagent-Driven Development
 
@@ -24,8 +24,8 @@ session parked on a question costs their whole day and buys nothing.
 
 Four things stop you, and only these: an irreversible or destructive
 operation; a security-sensitive action; a side effect outside this worktree
-that norms say you ask about first (a merge, a push to a shared branch, a
-publish); and a plan so broken that every path forward is a guess. For those,
+that the user hasn't approved (a push or merge is approved once the user
+approved the plan; a publish to anything public is not); and a plan so broken that every path forward is a guess. For those,
 stop and ask.
 
 ## When to Use
@@ -463,8 +463,7 @@ Then run exactly one scoped re-review of the fix wave
 Adjudicate any residual findings as in the task loop's breaker: park with
 rulings, or rule on the load-bearing ones and ledger what you decided. Only
 the four classes above stop you here. There is no second fix wave —
-residual load-bearing findings surface to your human partner when
-the Ship step of rascal-feature presents the options.
+residual load-bearing findings go in the handoff's **Decisions** field.
 
 ## Finish
 

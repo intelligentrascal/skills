@@ -5,23 +5,27 @@ description: Build a feature end to end. Plan it, spec it, write a task plan, ex
 
 # Feature
 
-A workflow: plan → spec → task plan → execute → ship. Invoked as `execute <plan path>`, start at step 3 with that plan.
+A workflow: branch → plan → spec → task plan → execute → ship. Invoked as `execute <plan path>`, work in the worktree that holds that plan (step 1) and start at step 4.
 
-## 1. Plan
+## 1. Branch
 
-Call the Skill tool with "rascal-plan" (in Claude Code: `rascal:rascal-plan`) and run it to a shared understanding. Skip it when the user arrives with a design doc or spec already agreed; read that instead.
+Create a git worktree on a new branch: `git worktree add ../<repo>-<slug> -b <slug>`. If it already exists (a resumed run), reuse it. Every later step runs there.
 
-## 2. Spec and task plan
+## 2. Plan
 
-Call the Skill tool with "rascal-planning" (in Claude Code: `rascal:rascal-planning`). Write the spec from the grill, then have a fresh agent write the task plan from the spec (rascal-planning's **Plan** section).
+Call the Skill tool with "rascal-plan" (in Claude Code: `rascal:rascal-plan`) and run it to a shared understanding. Skip it when the user arrives with a design doc or spec already agreed; read that instead. The user confirming the shared understanding (or approving the spec they brought) approves the whole run through the merge; tell them in one line: "From here I run to the merge."
 
-## 3. Execute
+## 3. Spec and task plan
 
-Create a git worktree on a new branch (`git worktree add ../<repo>-<slug> -b <slug>`) and execute the task plan there with rascal-planning's **Execute** section. If this session's context is already heavy (a long grill), stop here with the handoff instead. Make **Next** the command that resumes in a fresh session: `/rascal:rascal-feature execute <plan path>` in Claude Code, `use rascal-feature to execute <plan path>` elsewhere.
+Call the Skill tool with "rascal-planning" (in Claude Code: `rascal:rascal-planning`). Write the spec from the grill, then have a fresh agent write the task plan from the spec (rascal-planning's **Plan** section). Commit each on the branch once it's written.
 
-## 4. Ship
+## 4. Execute
 
-Call the Skill tool with "rascal-review" (in Claude Code: `rascal:rascal-review`). Review the branch and pass its **Before claiming done** gate. Then:
+Execute the task plan with rascal-planning's **Execute** section, in this worktree. If this session's context is already heavy (a long grill), stop here with the handoff instead. Make **Next** the command that resumes in a fresh session, with the plan's absolute path in the worktree: `/rascal:rascal-feature execute <plan path>` in Claude Code, `use rascal-feature to execute <plan path>` elsewhere.
+
+## 5. Ship
+
+Call the Skill tool with "rascal-review" (in Claude Code: `rascal:rascal-review`). Review the branch and pass its **Before claiming done** gate. If executing.md's final whole-branch review already ran, reuse its review package and verdict and run only the gate. Then:
 1. Update the README and docs for what changed.
 2. Push the branch and open a PR with `gh pr create`, its body linking the spec and the plan.
 3. Merge when checks pass (the user approved the plan; see Autonomy). If you can't, leave the PR open and say why in the handoff.
@@ -49,6 +53,7 @@ End with this block, filled in, and nothing after it:
 **Where:** <full, untruncated path or URL of every artifact>
 **Try it:** <exact command to launch or test it, with the seed data the user needs>
 **Docs:** <README and docs updated (which files), or "none needed" and why>
+**Decisions:** <every ruling you made on the user's behalf and every deferred minor finding, or "none">
 **Needs you:** <only what the user must do themselves (credentials, settings you can't reach); "nothing" otherwise>
 **Next:** <one recommended next step, its reason, and the exact command to start it>
 

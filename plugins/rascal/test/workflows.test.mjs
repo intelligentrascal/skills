@@ -63,7 +63,7 @@ test("rascal-feature: plan → planning → review, resumable at execute, ships"
 test("rascal-ui: steps in order, parity gate, walkthrough with Playwright fallback", () => {
   if (!has("rascal-ui")) return;
   const t = read("rascal-ui");
-  const order = ['"rascal-prototype"', "## 2. Review in parallel", "## 3. Design language", "## 4. Feedback loop", "## 5. Parity gate", "## 6. Persona walkthrough", "## 7. Ship"];
+  const order = ['"rascal-prototype"', "## 3. Review in parallel", "## 4. Design language", "## 5. Feedback loop", "## 6. Parity gate", "## 7. Persona walkthrough", "## 8. Ship"];
   for (let k = 1; k < order.length; k++) assert.ok(t.indexOf(order[k - 1]) < t.indexOf(order[k]) && t.indexOf(order[k - 1]) >= 0, order[k]);
   const w = read("rascal-ui", "persona-walkthrough.md");
   for (const s of ["npm install --prefix .rascal/walkthrough playwright", "never", "screenshot"]) assert.ok(w.includes(s), s);
@@ -81,6 +81,6 @@ test("rascal-orchestrate: experimental, cap 2, independence, two review paths", 
   if (!has("rascal-orchestrate")) return;
   const t = read("rascal-orchestrate");
   assert.match(t, /^description: "Experimental\./m);
-  for (const s of ['"rascal-wayfinder"', "at most **2**", "independent", "[worker-brief.md](worker-brief.md)", "[review-loop.md](review-loop.md)",
+  for (const s of ['"rascal-planning"', '"rascal-plan"', "at most **2**", "independent", "[worker-brief.md](worker-brief.md)", "[review-loop.md](review-loop.md)",
     '"rascal-review"', "Never let a worker dispatch"]) assert.ok(t.includes(s), s);
 });

@@ -123,6 +123,7 @@ Why each won:
    - **Wrap-up:** close the tickets, merge, push, remove the worktrees, then the handoff block.
    - The coordinator brings sub-agent questions up to the main session; they never stay buried inside a worker.
    - It is flagged experimental and built last, because it runs the other workflows.
+   - **Ruling (implementation):** orchestrate runs on a task plan, not on a wayfinder map: its tickets are the plan's tasks. Wayfinder charting and the decisions happen in rascal-plan before it; rascal-planning then writes the spec and the plan. The run works on an integration branch, `orchestrate/<slug>`, in its own worktree: tickets branch from it and merge back into it, and the end is one PR into the default branch.
 
 *Rejected for v1:*
 
