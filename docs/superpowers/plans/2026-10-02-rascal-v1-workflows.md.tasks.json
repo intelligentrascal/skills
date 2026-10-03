@@ -1,0 +1,173 @@
+{
+  "planPath": "docs/superpowers/plans/2026-10-02-rascal-v1-workflows.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Task 1: Pin obra/superpowers, licence, provenance test",
+      "status": "pending",
+      "description": "**Goal:** `sources.json` pins obra at `8ca22db…`, the licence and notices cover it, and a test enforces every provenance and graft line in the plugin.\n\n**Files:**\n- Modify: `plugins/rascal/sources.json`, `plugins/rascal/THIRD_PARTY_NOTICES.md`\n- Create: `LICENSES/obra-superpowers.MIT`, `plugins/rascal/test/provenance.test.mjs`\n\n**Acceptance Criteria:**\n- [ ] `sources.superpowers.commit` is `8ca22dba9a94f28898bbce59f2537ff4d87c747d`.\n- [ ] `LICENSES/obra-superpowers.MIT` is obra's LICENSE verbatim, and THIRD_PARTY_NOTICES has an `## obra/superpowers (MIT)` section with it.\n- [ ] `provenance.test.mjs` fails on a provenance or graft line whose source isn't pinned, whose commit isn't the pin, or (for grafts) whose target heading isn't in the file.\n- [ ] It fails if any rascal skill file still contains `superpowers:` or `mattpocock-skills:`.\n\n**Verify:** `node --test plugins/rascal/test/provenance.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/sources.json\",\"plugins/rascal/THIRD_PARTY_NOTICES.md\",\"LICENSES/obra-superpowers.MIT\",\"plugins/rascal/test/provenance.test.mjs\"],\"verifyCommand\":\"node --test plugins/rascal/test/provenance.test.mjs\",\"acceptanceCriteria\":[\"`sources.superpowers.commit` is `8ca22dba9a94f28898bbce59f2537ff4d87c747d`.\",\"`LICENSES/obra-superpowers.MIT` is obra's LICENSE verbatim, and THIRD_PARTY_NOTICES has an `## obra/superpowers (MIT)` section with it.\",\"`provenance.test.mjs` fails on a provenance or graft line whose source isn't pinned, whose commit isn't the pin, or (for grafts) whose target heading isn't in the file.\",\"It fails if any rascal skill file still contains `superpowers:` or `mattpocock-skills:`.\"]}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Task 2: `derive.mjs`, copying from a pinned upstream",
+      "status": "pending",
+      "blockedBy": [
+        0
+      ],
+      "description": "**Goal:** One command copies an upstream file into a rascal skill, rewrites cross-skill references and stamps provenance. It refuses when the local checkout isn't at the pin.\n\n**Files:**\n- Create: `scripts/derive.mjs`, `scripts/test/derive.test.mjs`\n\n**Acceptance Criteria:**\n- [ ] `node scripts/derive.mjs <source> <upstream-path> <dest> [--name <skill>] [--strip-frontmatter]` writes `dest` and prints `derive: <dest> ← <source> <path> @ <7-char>`.\n- [ ] It exits 1, writing nothing, when `git -C <checkout> rev-parse HEAD` isn't the pin.\n- [ ] It stamps `<!-- provenance … -->` after the frontmatter (or as line 1) for `.md`, `# provenance …` after the shebang for scripts, and `// provenance …` as line 1 for `.ts/.js/.mjs`.\n- [ ] `--name` sets the frontmatter `name:`. `--strip-frontmatter` removes the frontmatter.\n- [ ] It applies every `REF_MAP` pair, in order, to the text.\n- [ ] It keeps the executable bit.\n\n**Verify:** `node --test scripts/test/derive.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"scripts/derive.mjs\",\"scripts/test/derive.test.mjs\"],\"verifyCommand\":\"node --test scripts/test/derive.test.mjs\",\"acceptanceCriteria\":[\"`node scripts/derive.mjs <source> <upstream-path> <dest> [--name <skill>] [--strip-frontmatter]` writes `dest` and prints `derive: <dest> ← <source> <path> @ <7-char>`.\",\"It exits 1, writing nothing, when `git -C <checkout> rev-parse HEAD` isn't the pin.\",\"It stamps `<!-- provenance … -->` after the frontmatter (or as line 1) for `.md`, `# provenance …` after the shebang for scripts, and `// provenance …` as line 1 for `.ts/.js/.mjs`.\",\"`--name` sets the frontmatter `name:`. `--strip-frontmatter` removes the frontmatter.\",\"It applies every `REF_MAP` pair, in order, to the text.\",\"It keeps the executable bit.\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 3: Shared rules and `sync-rules.mjs`",
+      "status": "pending",
+      "description": "**Goal:** The mined rules exist once in `plugins/rascal/rules/` and are expanded into skills between markers. Pre-commit fails when a copy drifts.\n\n**Files:**\n- Create: `plugins/rascal/rules/{handoff,autonomy,recommend,questions,three-variants,sources,routing}.md`, `scripts/sync-rules.mjs`, `scripts/test/sync-rules.test.mjs`\n- Modify: `.githooks/pre-commit`\n\n**Acceptance Criteria:**\n- [ ] `node scripts/sync-rules.mjs` replaces the text between `<!-- rule:NAME -->` and `<!-- /rule:NAME -->` in every `plugins/rascal/skills/*/SKILL.md` with `rules/NAME.md`.\n- [ ] `--check` exits 1 and names the stale skills when any copy differs, and exits 0 with `sync-rules: in sync` otherwise.\n- [ ] An unknown rule name exits 2.\n- [ ] The pre-commit hook runs `sync-rules.mjs --check`.\n\n**Verify:** `node --test scripts/test/sync-rules.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/rules/{handoff,autonomy,recommend,questions,three-variants,sources,routing}.md\",\"scripts/sync-rules.mjs\",\"scripts/test/sync-rules.test.mjs\",\".githooks/pre-commit\"],\"verifyCommand\":\"node --test scripts/test/sync-rules.test.mjs\",\"acceptanceCriteria\":[\"`node scripts/sync-rules.mjs` replaces the text between `<!-- rule:NAME -->` and `<!-- /rule:NAME -->` in every `plugins/rascal/skills/*/SKILL.md` with `rules/NAME.md`.\",\"`--check` exits 1 and names the stale skills when any copy differs, and exits 0 with `sync-rules: in sync` otherwise.\",\"An unknown rule name exits 2.\",\"The pre-commit hook runs `sync-rules.mjs --check`.\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 4: `rascal-tdd` (Pocock base)",
+      "status": "pending",
+      "blockedBy": [
+        0,
+        1
+      ],
+      "description": "**Goal:** rascal's canonical TDD skill is Pocock's `tdd`, verbatim apart from names.\n\n**Files:**\n- Create: `plugins/rascal/skills/rascal-tdd/{SKILL.md,mocking.md,tests.md,agents/openai.yaml}`\n- Modify: `plugins/rascal/test/provenance.test.mjs` (EXPECT)\n\n**Acceptance Criteria:**\n- [ ] The three markdown files are derived at the Pocock pin.\n- [ ] `name: rascal-tdd`. The reference to the `code-review` skill reads `rascal-review`.\n- [ ] `openai.yaml` sets display_name `TDD (rascal)`.\n\n**Verify:** `node --test plugins/rascal/test/*.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-tdd/{SKILL.md,mocking.md,tests.md,agents/openai.yaml}\",\"plugins/rascal/test/provenance.test.mjs\"],\"verifyCommand\":\"node --test plugins/rascal/test/*.test.mjs\",\"acceptanceCriteria\":[\"The three markdown files are derived at the Pocock pin.\",\"`name: rascal-tdd`. The reference to the `code-review` skill reads `rascal-review`.\",\"`openai.yaml` sets display_name `TDD (rascal)`.\"]}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 5: `rascal-debugging` (obra base)",
+      "status": "pending",
+      "blockedBy": [
+        0,
+        1
+      ],
+      "description": "**Goal:** rascal's canonical debugging skill is obra's `systematic-debugging` with its supporting techniques.\n\n**Files:**\n- Create: `plugins/rascal/skills/rascal-debugging/{SKILL.md,root-cause-tracing.md,defense-in-depth.md,condition-based-waiting.md,condition-based-waiting-example.ts,find-polluter.sh,agents/openai.yaml}`\n- Modify: `plugins/rascal/test/provenance.test.mjs` (EXPECT)\n\n**Acceptance Criteria:**\n- [ ] Six files are derived at the obra pin. `CREATION-LOG.md` and `test-*.md` are not copied: they are authoring notes and pressure tests, not the skill.\n- [ ] `name: rascal-debugging`. The TDD and verification references read `rascal-tdd` and `rascal-review`.\n\n**Verify:** `node --test plugins/rascal/test/*.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-debugging/{SKILL.md,root-cause-tracing.md,defense-in-depth.md,condition-based-waiting.md,condition-based-waiting-example.ts,find-polluter.sh,agents/openai.yaml}\",\"plugins/rascal/test/provenance.test.mjs\"],\"verifyCommand\":\"node --test plugins/rascal/test/*.test.mjs\",\"acceptanceCriteria\":[\"Six files are derived at the obra pin. `CREATION-LOG.md` and `test-*.md` are not copied: they are authoring notes and pressure tests, not the skill.\",\"`name: rascal-debugging`. The TDD and verification references read `rascal-tdd` and `rascal-review`.\"]}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 6: `rascal-review` (obra base + verification graft)",
+      "status": "pending",
+      "blockedBy": [
+        0,
+        1
+      ],
+      "description": "**Goal:** Review is obra's `requesting-code-review`, plus a **Before claiming done** gate grafted from `verification-before-completion`.\n\n**Files:**\n- Create: `plugins/rascal/skills/rascal-review/{SKILL.md,code-reviewer.md,verification.md,agents/openai.yaml}`\n- Modify: `plugins/rascal/test/provenance.test.mjs` (EXPECT)\n\n**Acceptance Criteria:**\n- [ ] SKILL.md is derived from `requesting-code-review/SKILL.md`, with `name: rascal-review` and a description that also covers claiming work is done.\n- [ ] `code-reviewer.md` and `verification.md` (from `verification-before-completion/SKILL.md`, frontmatter stripped) are derived.\n- [ ] SKILL.md ends with a `## Before claiming done` section carrying a graft line.\n\n**Verify:** `node --test plugins/rascal/test/*.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-review/{SKILL.md,code-reviewer.md,verification.md,agents/openai.yaml}\",\"plugins/rascal/test/provenance.test.mjs\"],\"verifyCommand\":\"node --test plugins/rascal/test/*.test.mjs\",\"acceptanceCriteria\":[\"SKILL.md is derived from `requesting-code-review/SKILL.md`, with `name: rascal-review` and a description that also covers claiming work is done.\",\"`code-reviewer.md` and `verification.md` (from `verification-before-completion/SKILL.md`, frontmatter stripped) are derived.\",\"SKILL.md ends with a `## Before claiming done` section carrying a graft line.\"]}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 7: `rascal-planning` (Pocock to-spec base + obra plan/execute grafts)",
+      "status": "pending",
+      "blockedBy": [
+        0,
+        1
+      ],
+      "description": "**Goal:** One planning skill. It writes the spec (to-spec), then a bite-sized task plan (writing-plans' format), then executes the plan inline with a ledger (executing-plans), without check-ins.\n\n**Files:**\n- Create: `plugins/rascal/skills/rascal-planning/{SKILL.md,plan-format.md,executing.md,agents/openai.yaml}`, `plugins/rascal/skills/rascal-planning/scripts/{sdd-workspace,task-brief,review-package,task-start,task-done}`\n- Modify: `plugins/rascal/test/provenance.test.mjs` (EXPECT)\n\n**Acceptance Criteria:**\n- [ ] SKILL.md is to-spec, derived: `name: rascal-planning`, no `disable-model-invocation`. The spec goes to `docs/specs/<YYYY-MM-DD>-<slug>.md`, with no triage label and no `/setup-matt-pocock-skills`.\n- [ ] SKILL.md gains `## Plan` and `## Execute` sections, each with a graft line.\n- [ ] `plan-format.md` (from writing-plans) and `executing.md` (from executing-plans) are derived with frontmatter stripped. Their references point at rascal skills and at `scripts/` in this skill.\n- [ ] `executing.md`'s stop list no longer stops for a merge or push the user approved.\n- [ ] The five scripts are derived and executable. `task-start` finds `task-brief` in its own folder, and the workspace is `.rascal/sdd/`.\n\n**Verify:** `node --test plugins/rascal/test/*.test.mjs && bash -n plugins/rascal/skills/rascal-planning/scripts/*` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-planning/{SKILL.md,plan-format.md,executing.md,agents/openai.yaml}\",\"plugins/rascal/skills/rascal-planning/scripts/{sdd-workspace,task-brief,review-package,task-start,task-done}\",\"plugins/rascal/test/provenance.test.mjs\"],\"verifyCommand\":\"node --test plugins/rascal/test/*.test.mjs && bash -n plugins/rascal/skills/rascal-planning/scripts/*\",\"acceptanceCriteria\":[\"SKILL.md is to-spec, derived: `name: rascal-planning`, no `disable-model-invocation`. The spec goes to `docs/specs/<YYYY-MM-DD>-<slug>.md`, with no triage label and no `/setup-matt-pocock-skills`.\",\"SKILL.md gains `## Plan` and `## Execute` sections, each with a graft line.\",\"`plan-format.md` (from writing-plans) and `executing.md` (from executing-plans) are derived with frontmatter stripped. Their references point at rascal skills and at `scripts/` in this skill.\",\"`executing.md`'s stop list no longer stops for a merge or push the user approved.\",\"The five scripts are derived and executable. `task-start` finds `task-brief` in its own folder, and the workspace is `.rascal/sdd/`.\"]}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 8: `rascal-grilling` gains the brainstorming grafts and rules",
+      "status": "pending",
+      "blockedBy": [
+        0,
+        1,
+        2
+      ],
+      "description": "**Goal:** Grilling stays Pocock's and adds three grafts from obra brainstorming: approaches first when the design space is wide, a self-review before the doc, and a hand-off. It also takes the questions and recommend rules.\n\n**Files:**\n- Modify: `plugins/rascal/skills/rascal-grilling/SKILL.md`, `plugins/rascal/test/provenance.test.mjs` (EXPECT)\n\n**Acceptance Criteria:**\n- [ ] The Pocock text is unchanged apart from inserted sections.\n- [ ] There are three graft sections, `## Wide design space`, `## Before the doc` and `## Hand-off`, each with a graft line.\n- [ ] `<!-- rule:questions -->` and `<!-- rule:recommend -->` blocks are expanded by sync-rules.\n- [ ] rascal-grill-me-ui and rascal-grill-docs-ui still pass `skills.test.mjs`.\n\n**Verify:** `node scripts/sync-rules.mjs --check && node --test plugins/rascal/test/*.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-grilling/SKILL.md\",\"plugins/rascal/test/provenance.test.mjs\"],\"verifyCommand\":\"node scripts/sync-rules.mjs --check && node --test plugins/rascal/test/*.test.mjs\",\"acceptanceCriteria\":[\"The Pocock text is unchanged apart from inserted sections.\",\"There are three graft sections, `## Wide design space`, `## Before the doc` and `## Hand-off`, each with a graft line.\",\"`<!-- rule:questions -->` and `<!-- rule:recommend -->` blocks are expanded by sync-rules.\",\"rascal-grill-me-ui and rascal-grill-docs-ui still pass `skills.test.mjs`.\"]}\n```"
+    },
+    {
+      "id": 8,
+      "subject": "Task 9: `rascal-wayfinder` and `rascal-prototype` (Pocock, verbatim)",
+      "status": "pending",
+      "blockedBy": [
+        0,
+        1
+      ],
+      "description": "**Goal:** The workflows' charting and prototyping skills exist inside rascal, with their own tracker docs.\n\n**Files:**\n- Create: `plugins/rascal/skills/rascal-wayfinder/{SKILL.md,trackers/github.md,trackers/gitlab.md,trackers/local.md,agents/openai.yaml}`, `plugins/rascal/skills/rascal-prototype/{SKILL.md,UI.md,LOGIC.md,agents/openai.yaml}`\n- Modify: `plugins/rascal/test/provenance.test.mjs` (EXPECT)\n\n**Acceptance Criteria:**\n- [ ] Everything is derived at the Pocock pin.\n- [ ] rascal-wayfinder has no `disable-model-invocation`. It picks a tracker doc from `trackers/` instead of `/setup-matt-pocock-skills`, and calls `rascal-prototype`, `rascal-grilling` and `rascal-domain-modeling`.\n- [ ] The tracker docs carry no triage sections.\n\n**Verify:** `node --test plugins/rascal/test/*.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-wayfinder/{SKILL.md,trackers/github.md,trackers/gitlab.md,trackers/local.md,agents/openai.yaml}\",\"plugins/rascal/skills/rascal-prototype/{SKILL.md,UI.md,LOGIC.md,agents/openai.yaml}\",\"plugins/rascal/test/provenance.test.mjs\"],\"verifyCommand\":\"node --test plugins/rascal/test/*.test.mjs\",\"acceptanceCriteria\":[\"Everything is derived at the Pocock pin.\",\"rascal-wayfinder has no `disable-model-invocation`. It picks a tracker doc from `trackers/` instead of `/setup-matt-pocock-skills`, and calls `rascal-prototype`, `rascal-grilling` and `rascal-domain-modeling`.\",\"The tracker docs carry no triage sections.\"]}\n```"
+    },
+    {
+      "id": 9,
+      "subject": "Task 10: Workflow test, then `rascal-plan`",
+      "status": "pending",
+      "blockedBy": [
+        2,
+        8
+      ],
+      "description": "**Goal:** A test pins what every workflow must contain. `rascal-plan` is the first workflow: wayfinder → grill → domain model.\n\n**Files:**\n- Create: `plugins/rascal/test/workflows.test.mjs`, `plugins/rascal/skills/rascal-plan/{SKILL.md,agents/openai.yaml}`\n\n**Acceptance Criteria:**\n- [ ] `workflows.test.mjs` checks each workflow skill that exists. It must have its required rule blocks; every skill it names must exist as a rascal skill folder; and it must carry no `disable-model-invocation`.\n- [ ] `rascal-plan` calls `rascal-wayfinder` (only when there's fog), `rascal-grilling` with `rascal-domain-modeling` (or `rascal-grill-docs-ui`), and writes the design doc or resolves the ticket.\n\n**Verify:** `node scripts/sync-rules.mjs --check && node --test plugins/rascal/test/workflows.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/test/workflows.test.mjs\",\"plugins/rascal/skills/rascal-plan/{SKILL.md,agents/openai.yaml}\"],\"verifyCommand\":\"node scripts/sync-rules.mjs --check && node --test plugins/rascal/test/workflows.test.mjs\",\"acceptanceCriteria\":[\"`workflows.test.mjs` checks each workflow skill that exists. It must have its required rule blocks; every skill it names must exist as a rascal skill folder; and it must carry no `disable-model-invocation`.\",\"`rascal-plan` calls `rascal-wayfinder` (only when there's fog), `rascal-grilling` with `rascal-domain-modeling` (or `rascal-grill-docs-ui`), and writes the design doc or resolves the ticket.\"]}\n```"
+    },
+    {
+      "id": 10,
+      "subject": "Task 11: `rascal-feature`",
+      "status": "pending",
+      "blockedBy": [
+        6,
+        9
+      ],
+      "description": "**Goal:** The feature workflow runs plan → spec → task plan → execute → ship, and can resume at execute in a fresh session.\n\n**Files:**\n- Create: `plugins/rascal/skills/rascal-feature/{SKILL.md,agents/openai.yaml}`\n- Modify: `plugins/rascal/test/workflows.test.mjs`\n\n**Acceptance Criteria:**\n- [ ] The workflow calls `rascal-plan`, `rascal-planning` and `rascal-review`, in that order.\n- [ ] `execute <plan path>` starts at step 3.\n- [ ] Ship covers docs, push, PR, merge and worktree removal.\n\n**Verify:** `node scripts/sync-rules.mjs --check && node --test plugins/rascal/test/workflows.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-feature/{SKILL.md,agents/openai.yaml}\",\"plugins/rascal/test/workflows.test.mjs\"],\"verifyCommand\":\"node scripts/sync-rules.mjs --check && node --test plugins/rascal/test/workflows.test.mjs\",\"acceptanceCriteria\":[\"The workflow calls `rascal-plan`, `rascal-planning` and `rascal-review`, in that order.\",\"`execute <plan path>` starts at step 3.\",\"Ship covers docs, push, PR, merge and worktree removal.\"]}\n```"
+    },
+    {
+      "id": 11,
+      "subject": "Task 12: `rascal-ui` and the persona walkthrough",
+      "status": "pending",
+      "blockedBy": [
+        8,
+        9
+      ],
+      "description": "**Goal:** The UI workflow goes from real-data variants through parallel reviews, a design-language pass and a feedback checklist to promotion behind a parity gate. A persona walkthrough runs on the promoted build.\n\n**Files:**\n- Create: `plugins/rascal/skills/rascal-ui/{SKILL.md,persona-walkthrough.md,agents/openai.yaml}`\n- Modify: `plugins/rascal/test/workflows.test.mjs`\n\n**Acceptance Criteria:**\n- [ ] The steps appear in this order: mock up (`rascal-prototype`), reviews (UX, accessibility, design critique), design language, feedback checklist, parity gate, persona walkthrough, ship.\n- [ ] The walkthrough uses the agent's browser tool and falls back to Playwright installed under `.rascal/walkthrough/`, never in the project's dependencies.\n\n**Verify:** `node scripts/sync-rules.mjs --check && node --test plugins/rascal/test/workflows.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-ui/{SKILL.md,persona-walkthrough.md,agents/openai.yaml}\",\"plugins/rascal/test/workflows.test.mjs\"],\"verifyCommand\":\"node scripts/sync-rules.mjs --check && node --test plugins/rascal/test/workflows.test.mjs\",\"acceptanceCriteria\":[\"The steps appear in this order: mock up (`rascal-prototype`), reviews (UX, accessibility, design critique), design language, feedback checklist, parity gate, persona walkthrough, ship.\",\"The walkthrough uses the agent's browser tool and falls back to Playwright installed under `.rascal/walkthrough/`, never in the project's dependencies.\"]}\n```"
+    },
+    {
+      "id": 12,
+      "subject": "Task 13: `rascal-scheduled-runbook`",
+      "status": "pending",
+      "blockedBy": [
+        2,
+        9
+      ],
+      "description": "**Goal:** A skill that writes the runbook prompt for a scheduled or recurring agent task, with every guardrail the mining found repeated by hand.\n\n**Files:**\n- Create: `plugins/rascal/skills/rascal-scheduled-runbook/{SKILL.md,agents/openai.yaml}`\n- Modify: `plugins/rascal/test/workflows.test.mjs`\n\n**Acceptance Criteria:**\n- [ ] The runbook template has ten sections in order: purpose, preconditions, trust boundary, watermark, cheap exit, work, dry run then commit, record before render, render and verify, report-only fallback.\n- [ ] It carries the sources rule, fixes siblings, and test-runs the result once.\n\n**Verify:** `node scripts/sync-rules.mjs --check && node --test plugins/rascal/test/workflows.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-scheduled-runbook/{SKILL.md,agents/openai.yaml}\",\"plugins/rascal/test/workflows.test.mjs\"],\"verifyCommand\":\"node scripts/sync-rules.mjs --check && node --test plugins/rascal/test/workflows.test.mjs\",\"acceptanceCriteria\":[\"The runbook template has ten sections in order: purpose, preconditions, trust boundary, watermark, cheap exit, work, dry run then commit, record before render, render and verify, report-only fallback.\",\"It carries the sources rule, fixes siblings, and test-runs the result once.\"]}\n```"
+    },
+    {
+      "id": 13,
+      "subject": "Task 14: `rascal-orchestrate` (experimental)",
+      "status": "pending",
+      "blockedBy": [
+        1,
+        2,
+        8,
+        9
+      ],
+      "description": "**Goal:** A coordinator charts the work and dispatches parallel workers, one per independent ticket in its own worktree, at most 2 at once. It reviews each ticket (the full loop for build tickets, one review for prototypes), then integrates and merges.\n\n**Files:**\n- Create: `plugins/rascal/skills/rascal-orchestrate/{SKILL.md,worker-brief.md,review-loop.md,implementer-prompt.md,task-reviewer-prompt.md,re-review-prompt.md,agents/openai.yaml}`, `plugins/rascal/skills/rascal-orchestrate/scripts/{sdd-workspace,task-brief,review-package}`\n- Modify: `plugins/rascal/test/provenance.test.mjs` (EXPECT), `plugins/rascal/test/workflows.test.mjs`\n\n**Acceptance Criteria:**\n- [ ] The description starts with \"Experimental.\"\n- [ ] Steps: chart (`rascal-wayfinder`), pick the batch (independence check, cap 2), dispatch (claim, worktree, worker brief, no nested dispatch), review (build: review-loop; prototype: `rascal-review` once), integrate, finish.\n- [ ] `review-loop.md` is derived from obra's subagent-driven-development SKILL.md. Its rule against parallel implementers is amended for separate worktrees.\n- [ ] The three prompt templates and three scripts are derived.\n\n**Verify:** `node scripts/sync-rules.mjs --check && node --test plugins/rascal/test/*.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-orchestrate/{SKILL.md,worker-brief.md,review-loop.md,implementer-prompt.md,task-reviewer-prompt.md,re-review-prompt.md,agents/openai.yaml}\",\"plugins/rascal/skills/rascal-orchestrate/scripts/{sdd-workspace,task-brief,review-package}\",\"plugins/rascal/test/provenance.test.mjs\",\"plugins/rascal/test/workflows.test.mjs\"],\"verifyCommand\":\"node scripts/sync-rules.mjs --check && node --test plugins/rascal/test/*.test.mjs\",\"acceptanceCriteria\":[\"The description starts with \\\"Experimental.\\\"\",\"Steps: chart (`rascal-wayfinder`), pick the batch (independence check, cap 2), dispatch (claim, worktree, worker brief, no nested dispatch), review (build: review-loop; prototype: `rascal-review` once), integrate, finish.\",\"`review-loop.md` is derived from obra's subagent-driven-development SKILL.md. Its rule against parallel implementers is amended for separate worktrees.\",\"The three prompt templates and three scripts are derived.\"]}\n```"
+    },
+    {
+      "id": 14,
+      "subject": "Task 15: `smoke-agents.sh`, the cross-agent smoke test",
+      "status": "pending",
+      "description": "**Goal:** A maintainer script runs one fixed prompt in each installed agent CLI from a scratch directory and flags any agent that gave no reply.\n\n**Files:**\n- Create: `scripts/smoke-agents.sh`, `scripts/test/smoke-agents.test.mjs`\n\n**Acceptance Criteria:**\n- [ ] Usage is `scripts/smoke-agents.sh [--prompt <text>] [--agents \"<list>\"] [--timeout <s>]`. The defaults are a PONG prompt, `claude codex opencode pi`, and 180 s.\n- [ ] Each agent prints one line: `replied`, `NO REPLY (exit N)`, or `skipped (not installed)`. Logs go to a printed scratch directory.\n- [ ] It exits 0 when every installed agent replied, 1 when any gave no reply, and 2 on bad usage.\n\n**Verify:** `node --test scripts/test/smoke-agents.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"scripts/smoke-agents.sh\",\"scripts/test/smoke-agents.test.mjs\"],\"verifyCommand\":\"node --test scripts/test/smoke-agents.test.mjs\",\"acceptanceCriteria\":[\"Usage is `scripts/smoke-agents.sh [--prompt <text>] [--agents \\\"<list>\\\"] [--timeout <s>]`. The defaults are a PONG prompt, `claude codex opencode pi`, and 180 s.\",\"Each agent prints one line: `replied`, `NO REPLY (exit N)`, or `skipped (not installed)`. Logs go to a printed scratch directory.\",\"It exits 0 when every installed agent replied, 1 when any gave no reply, and 2 on bad usage.\"]}\n```"
+    },
+    {
+      "id": 15,
+      "subject": "Task 16: `install-rascal.sh --pack`",
+      "status": "pending",
+      "description": "**Goal:** Install any third-party skill pack (local folder, git URL or zip) by symlinking its skills into `~/.agents/skills` and `~/.claude/skills`. It reuses the script's rule of never clobbering what's there.\n\n**Files:**\n- Modify: `scripts/install-rascal.sh`, `scripts/test/install-rascal.test.mjs`\n\n**Acceptance Criteria:**\n- [ ] `install-rascal.sh --pack <dir|git-url|zip>` links every folder in the pack that contains `SKILL.md` (up to 4 levels deep). Links go into `$AGENTS_SKILLS_DIR` (default `~/.agents/skills`) and `$CLAUDE_SKILLS_DIR` (default `~/.claude/skills`).\n- [ ] Git URLs (`https://`, `git@`, `file://`, or ending in `.git`) clone into `$RASCAL_HOME/packs/<name>`, or pull if already there. Zips unzip there.\n- [ ] It exits 1 with nothing linked when a destination is a real directory, or a symlink pointing at a different pack.\n- [ ] Re-running it is a no-op. It prints `install-rascal: linked N skills from <pack>: a, b`.\n- [ ] Without `--pack`, the behavior is unchanged.\n\n**Verify:** `node --test scripts/test/install-rascal.test.mjs` → pass\n\n```json:metadata\n{\"files\":[\"scripts/install-rascal.sh\",\"scripts/test/install-rascal.test.mjs\"],\"verifyCommand\":\"node --test scripts/test/install-rascal.test.mjs\",\"acceptanceCriteria\":[\"`install-rascal.sh --pack <dir|git-url|zip>` links every folder in the pack that contains `SKILL.md` (up to 4 levels deep). Links go into `$AGENTS_SKILLS_DIR` (default `~/.agents/skills`) and `$CLAUDE_SKILLS_DIR` (default `~/.claude/skills`).\",\"Git URLs (`https://`, `git@`, `file://`, or ending in `.git`) clone into `$RASCAL_HOME/packs/<name>`, or pull if already there. Zips unzip there.\",\"It exits 1 with nothing linked when a destination is a real directory, or a symlink pointing at a different pack.\",\"Re-running it is a no-op. It prints `install-rascal: linked N skills from <pack>: a, b`.\",\"Without `--pack`, the behavior is unchanged.\"]}\n```"
+    },
+    {
+      "id": 16,
+      "subject": "Task 17: Docs, version and full verification",
+      "status": "pending",
+      "blockedBy": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "description": "**Goal:** The README, plugin manifest and design doc describe what shipped, and the whole suite and the hooks pass.\n\n**Files:**\n- Modify: `README.md`, `plugins/rascal/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `docs/rascal-v1-design.md`, `.gitignore`\n\n**Acceptance Criteria:**\n- [ ] plugin.json is at version `0.2.0`, with a description naming workflows and canonical skills.\n- [ ] The README's rascal section lists every skill with a one-line purpose. It covers `derive.mjs`, `sync-rules.mjs`, `smoke-agents.sh` and `--pack`, and says the routing note is step 6.\n- [ ] Design doc Q37 says \"one task reviewer with spec-compliance and quality verdicts\".\n- [ ] `.gitignore` contains `.rascal/`.\n- [ ] The full test command, `scrub.mjs`, `sync-transport.mjs --check` and `sync-rules.mjs --check` all pass.\n\n**Verify:** the repo test command, then `node scripts/scrub.mjs --all && node scripts/sync-transport.mjs --check && node scripts/sync-rules.mjs --check` → all pass\n\n```json:metadata\n{\"files\":[\"README.md\",\"plugins/rascal/.claude-plugin/plugin.json\",\".claude-plugin/marketplace.json\",\"docs/rascal-v1-design.md\",\".gitignore\"],\"verifyCommand\":\"node scripts/scrub.mjs --all && node scripts/sync-transport.mjs --check && node scripts/sync-rules.mjs --check\",\"acceptanceCriteria\":[\"plugin.json is at version `0.2.0`, with a description naming workflows and canonical skills.\",\"The README's rascal section lists every skill with a one-line purpose. It covers `derive.mjs`, `sync-rules.mjs`, `smoke-agents.sh` and `--pack`, and says the routing note is step 6.\",\"Design doc Q37 says \\\"one task reviewer with spec-compliance and quality verdicts\\\".\",\"`.gitignore` contains `.rascal/`.\",\"The full test command, `scrub.mjs`, `sync-transport.mjs --check` and `sync-rules.mjs --check` all pass.\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-10-03T04:11:56.024Z"
+}
