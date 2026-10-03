@@ -49,6 +49,12 @@ export const EXPECT = {
   "rascal-tdd/SKILL.md": ["provenance pocock skills/engineering/tdd/SKILL.md"],
   "rascal-tdd/mocking.md": ["provenance pocock skills/engineering/tdd/mocking.md"],
   "rascal-tdd/tests.md": ["provenance pocock skills/engineering/tdd/tests.md"],
+  "rascal-debugging/SKILL.md": ["provenance superpowers skills/systematic-debugging/SKILL.md"],
+  "rascal-debugging/root-cause-tracing.md": ["provenance superpowers skills/systematic-debugging/root-cause-tracing.md"],
+  "rascal-debugging/defense-in-depth.md": ["provenance superpowers skills/systematic-debugging/defense-in-depth.md"],
+  "rascal-debugging/condition-based-waiting.md": ["provenance superpowers skills/systematic-debugging/condition-based-waiting.md"],
+  "rascal-debugging/condition-based-waiting-example.ts": ["provenance superpowers skills/systematic-debugging/condition-based-waiting-example.ts"],
+  "rascal-debugging/find-polluter.sh": ["provenance superpowers skills/systematic-debugging/find-polluter.sh"],
 };
 
 test("each derived file carries exactly its expected provenance", () => {
