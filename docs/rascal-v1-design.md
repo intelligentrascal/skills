@@ -118,7 +118,7 @@ Why each won:
      - Concurrency is capped at **2 by default** and is configurable.
    - Each worker claims its ticket first and works in its own worktree. Prototype tickets load the design-skill bundle, and the coordinator passes the three-variants requirement into their brief.
    - **Per-ticket review** (graft from obra `subagent-driven-development`):
-     - *Build tickets:* implementer → spec-compliance reviewer → code-quality reviewer, looping until both pass. Cheaper models implement and stronger models review.
+     - *Build tickets:* implementer → one task reviewer giving a spec-compliance and a quality verdict → fix loop until both pass (obra's subagent-driven-development at the pin). Cheaper models implement and stronger models review.
      - *Prototype tickets:* one combined review, since the user's choice among the variants is the real review.
    - **Wrap-up:** close the tickets, merge, push, remove the worktrees, then the handoff block.
    - The coordinator brings sub-agent questions up to the main session; they never stay buried inside a worker.

@@ -147,7 +147,7 @@ it again with `SYNC_WAYFINDER_DONE=1`.
 pack built from Pocock's skills, Superpowers and pstack, shaped by mining your own agent sessions.
 It has no dependencies; its grilling skills are its own copies of Pocock's, pinned in
 `plugins/rascal/sources.json`. Design: [docs/rj-skills-pack-design.md](docs/rj-skills-pack-design.md).
-This first slice ships grilling (terminal and browser UI) and the retro.
+It ships workflows, canonical skills for TDD, debugging, review, planning and grilling, and the retro.
 
 Install in Claude Code (the marketplace line only once):
 
@@ -161,9 +161,21 @@ For Codex, OpenCode and Pi, run `scripts/install-rascal.sh`: it symlinks every r
 `~/.agents/skills` (override with `AGENTS_SKILLS_DIR`), creates `~/.rascal/`, and installs no
 upstream skills. Re-running is safe. It refuses, linking nothing, if a real directory is in the way.
 
+### Skills
+
 | Skill | What it does |
 |---|---|
-| `rascal-grilling` | The grilling interview method (Pocock's text, rascal's copy). |
+| `rascal-plan` | Workflow: wayfinder (if there's fog) → grill → domain model → design doc |
+| `rascal-feature` | Workflow: plan → spec → task plan → execute → review → PR → merge |
+| `rascal-ui` | Workflow: three real-data variants → parallel UX/a11y/design reviews → design language → feedback checklist → parity gate → persona walkthrough → ship |
+| `rascal-scheduled-runbook` | Writes guardrailed prompts for unattended recurring runs |
+| `rascal-orchestrate` | Experimental: coordinator plus parallel workers per independent ticket, each reviewed before merge |
+| `rascal-tdd` | Canonical TDD (Pocock) |
+| `rascal-debugging` | Canonical debugging (obra systematic-debugging) |
+| `rascal-review` | Canonical review (obra) plus the before-claiming-done gate |
+| `rascal-planning` | Canonical planning: spec (Pocock to-spec), task plan and execution (obra) |
+| `rascal-grilling` | Canonical grilling (Pocock) plus brainstorming's approaches, self-review and hand-off |
+| `rascal-wayfinder`, `rascal-prototype` | Pocock's, used by the workflows |
 | `rascal-domain-modeling` | Keeps `CONTEXT.md` and ADRs current while designing (Pocock's text, rascal's copy). |
 | `rascal-grill-me` | Grill in the terminal. |
 | `rascal-grill-with-docs` | Grill in the terminal with domain modeling. |
@@ -171,6 +183,15 @@ upstream skills. Re-running is safe. It refuses, linking nothing, if a real dire
 | `rascal-grill-docs-ui` | The same with domain modeling. |
 | `rascal-grilling-ui` | The browser transport. **Generated, never hand-edit**: a mirror of `skills/grilling-ui` made by `node scripts/sync-transport.mjs`. The code is byte-identical, so both plugins share one hub. |
 | `rascal-retro` | Mines past sessions from Claude Code, Claude desktop, Codex, OpenCode and Cursor, then grills you on what to change. `--all` is the seed pass that picks rascal's v1 workflows. |
+
+The routing note that tells every agent when to use these (and when to just do the task) is build step 6; its rules are staged in `plugins/rascal/rules/routing.md`.
+
+### Maintaining rascal
+
+- `node scripts/derive.mjs <source> <upstream path> <dest> [--name <skill>] [--strip-frontmatter]` copies a file from the pinned upstream (`plugins/rascal/sources.json`) with a provenance line.
+- Shared rules live in `plugins/rascal/rules/`. Edit them there, then run `node scripts/sync-rules.mjs`; pre-commit runs `--check`.
+- `scripts/smoke-agents.sh` runs one prompt in every installed agent CLI and flags missing replies.
+- `scripts/install-rascal.sh --pack <dir|git-url|zip>` links a third-party skill pack into `~/.agents/skills` and `~/.claude/skills`.
 
 `~/.rascal/` (mode 700, never in a repo):
 
