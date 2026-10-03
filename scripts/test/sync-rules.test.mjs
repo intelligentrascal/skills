@@ -32,6 +32,26 @@ test("unknown rule throws", () => {
   assert.throws(() => run({ root }), /unknown rule "nope"/);
 });
 
+test("unclosed opener before a well-formed block throws and leaves the file unchanged (both modes)", () => {
+  const before = "<!-- rule:x -->\nstray\n\n<!-- rule:x -->\nold\n<!-- /rule:x -->\n";
+  const root = fixture(before);
+  assert.throws(() => run({ root }), /sync-rules: rascal-a: unbalanced rule:x/);
+  assert.throws(() => run({ check: true, root }), /unbalanced rule:x/);
+  assert.equal(SKILL(root), before);
+});
+
+test("stray closer throws", () => {
+  assert.throws(() => run({ root: fixture("text\n<!-- /rule:x -->\n") }), /unbalanced rule:x/);
+});
+
+test("CRLF files sync and check, keeping CRLF", () => {
+  const root = fixture("# A\r\n\r\n<!-- rule:x -->\r\nold\r\n<!-- /rule:x -->\r\n");
+  assert.deepEqual(run({ check: true, root }), ["rascal-a"]);
+  assert.deepEqual(run({ root }), ["rascal-a"]);
+  assert.equal(SKILL(root), "# A\r\n\r\n<!-- rule:x -->\r\n## X\r\n\r\nBe brief.\r\n<!-- /rule:x -->\r\n");
+  assert.deepEqual(run({ check: true, root }), []);
+});
+
 test("the repo's skills are in sync", () => {
   assert.deepEqual(run({ check: true, root: REPO }), []);
 });

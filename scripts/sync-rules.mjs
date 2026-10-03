@@ -3,13 +3,21 @@
 // <!-- rule:NAME --> … <!-- /rule:NAME -->; the text between is replaced by plugins/rascal/rules/NAME.md.
 //   node scripts/sync-rules.mjs            rewrite stale skills
 //   node scripts/sync-rules.mjs --check    exit 1 if any skill is stale (pre-commit)
-// Exit: 0 ok, 1 stale (--check), 2 unknown rule.
+// Exit: 0 ok, 1 stale (--check), 2 unknown rule or unbalanced markers.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const BLOCK = /<!-- rule:([a-z0-9-]+) -->\n[\s\S]*?<!-- \/rule:\1 -->/g;
+const BLOCK = /<!-- rule:([a-z0-9-]+) -->(\r?\n)[\s\S]*?<!-- \/rule:\1 -->/g;
+const OPEN = /<!-- rule:([a-z0-9-]+) -->/g;
+const CLOSE = /<!-- \/rule:([a-z0-9-]+) -->/g;
+function checkBalanced(skill, text) {
+  const n = {};
+  for (const m of text.matchAll(OPEN)) (n[m[1]] ??= [0, 0])[0]++;
+  for (const m of text.matchAll(CLOSE)) (n[m[1]] ??= [0, 0])[1]++;
+  for (const [name, [o, c]] of Object.entries(n)) if (o !== c) throw new Error(`sync-rules: ${skill}: unbalanced rule:${name}`);
+}
 
 export function run({ check = false, root = ROOT } = {}) {
   const rules = path.join(root, "plugins/rascal/rules");
@@ -20,11 +28,12 @@ export function run({ check = false, root = ROOT } = {}) {
     return fs.readFileSync(f, "utf8").trim();
   };
   const stale = [];
-  for (const d of fs.readdirSync(skills).sort()) {
+  const dirs = fs.readdirSync(skills).sort().filter((d) => fs.existsSync(path.join(skills, d, "SKILL.md")));
+  for (const d of dirs) checkBalanced(d, fs.readFileSync(path.join(skills, d, "SKILL.md"), "utf8"));
+  for (const d of dirs) {
     const f = path.join(skills, d, "SKILL.md");
-    if (!fs.existsSync(f)) continue;
     const before = fs.readFileSync(f, "utf8");
-    const after = before.replace(BLOCK, (_, n) => `<!-- rule:${n} -->\n${rule(n)}\n<!-- /rule:${n} -->`);
+    const after = before.replace(BLOCK, (_, n, eol) => `<!-- rule:${n} -->${eol}${rule(n).replace(/\r?\n/g, eol)}${eol}<!-- /rule:${n} -->`);
     if (before === after) continue;
     stale.push(d);
     if (!check) fs.writeFileSync(f, after);
