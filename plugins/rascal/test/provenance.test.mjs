@@ -37,7 +37,8 @@ test("every provenance/graft line names a pinned source at its pinned commit", (
 
 test("no rascal skill file references an upstream plugin namespace", () => {
   for (const f of files(SKILLS)) {
-    const text = readFileSync(f, "utf8");
+    // provenance/graft lines name upstream paths (e.g. .../setup-matt-pocock-skills/...), so they are not checked
+    const text = readFileSync(f, "utf8").split("\n").filter((l) => !/^(<!--|\/\/|#) ?(provenance|graft):/.test(l)).join("\n");
     assert.doesNotMatch(text, /superpowers:|mattpocock-skills:|\/setup-matt-pocock-skills/, relative(SKILLS, f));
   }
 });
@@ -47,6 +48,13 @@ export const EXPECT = {
   "rascal-grilling/SKILL.md": ["provenance pocock skills/productivity/grilling/SKILL.md",
     "graft superpowers skills/brainstorming/SKILL.md", "graft superpowers skills/brainstorming/SKILL.md",
     "graft superpowers skills/brainstorming/SKILL.md"],
+  "rascal-wayfinder/SKILL.md": ["provenance pocock skills/engineering/wayfinder/SKILL.md"],
+  "rascal-wayfinder/trackers/github.md": ["provenance pocock skills/engineering/setup-matt-pocock-skills/issue-tracker-github.md"],
+  "rascal-wayfinder/trackers/gitlab.md": ["provenance pocock skills/engineering/setup-matt-pocock-skills/issue-tracker-gitlab.md"],
+  "rascal-wayfinder/trackers/local.md": ["provenance pocock skills/engineering/setup-matt-pocock-skills/issue-tracker-local.md"],
+  "rascal-prototype/SKILL.md": ["provenance pocock skills/engineering/prototype/SKILL.md"],
+  "rascal-prototype/UI.md": ["provenance pocock skills/engineering/prototype/UI.md"],
+  "rascal-prototype/LOGIC.md": ["provenance pocock skills/engineering/prototype/LOGIC.md"],
   "rascal-domain-modeling/SKILL.md": ["provenance pocock skills/engineering/domain-modeling/SKILL.md"],
   "rascal-tdd/SKILL.md": ["provenance pocock skills/engineering/tdd/SKILL.md"],
   "rascal-tdd/mocking.md": ["provenance pocock skills/engineering/tdd/mocking.md"],
