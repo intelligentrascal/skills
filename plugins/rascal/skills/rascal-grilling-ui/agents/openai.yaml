@@ -1,0 +1,3 @@
+interface:
+  display_name: "Grilling UI (rascal engine)"
+  short_description: "Browser transport for rascal's -ui grill skills"
