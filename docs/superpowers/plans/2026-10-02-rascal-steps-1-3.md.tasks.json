@@ -28,7 +28,7 @@
     {
       "id": 4,
       "subject": "Task 4: rascal's browser-UI grill entry points",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [
         2,
         3
@@ -124,5 +124,5 @@
       "description": "**Goal:** `/rascal-retro` runs the miner, analyzes the digest with subagents, writes findings locally, and ends in a grill. With `--all`, that grill is the seed grill that picks v1. README and the smoke record are updated.\n\n**Verify:** `node --test plugins/rascal/test/skills.test.mjs` → pass; then the full repo test command → pass\n\n```json:metadata\n{\"files\":[\"plugins/rascal/skills/rascal-retro/SKILL.md\",\"plugins/rascal/skills/rascal-retro/agents/openai.yaml\",\"plugins/rascal/skills/rascal-retro/analyst-brief.md\",\"docs/superpowers/verification/2026-10-02-rascal-smoke.md\",\"plugins/rascal/test/skills.test.mjs\",\"README.md\"],\"verifyCommand\":\"`node --test plugins/rascal/test/skills.test.mjs` → pass; then the full repo test command → pass\",\"acceptanceCriteria\":[\"The SKILL.md drives `mine.mjs` via `$SKILL`, never reads raw transcripts, and writes findings only under `~/.rascal/mining/`.\",\"Findings are classified `generic` or `personal` (Q14). Personal ones only ever become proposed `~/.rascal/preferences.md` entries, after the user accepts them in the grill.\",\"`--all` ends by running `rascal-grill-me-ui` with the seed topic and doc `docs/rascal-v1-design.md`. Its first round covers: v1 workflows; the canonical skill per concept (TDD, debugging, review, planning, grilling) and which upstream it derives from; the just-do-it rule; the wayfinder × playbook experiment (Q29); and each personal preference to adopt.\",\"Incremental mode (`/rascal-retro`) reads only records extracted since `last-retro`, and also ends in a grill (the topic is the proposals).\",\"After the grill's Finish, it runs `mark-retro`.\",\"README documents rascal: install (Claude Code + `install-rascal.sh`), the skills list, `setup-hooks.sh`, `~/.rascal/` and the new test command.\"]}\n```"
     }
   ],
-  "lastUpdated": "2026-10-03T02:51:12.612Z"
+  "lastUpdated": "2026-10-03T02:51:52.416Z"
 }

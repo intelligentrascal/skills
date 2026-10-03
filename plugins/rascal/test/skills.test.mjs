@@ -37,3 +37,17 @@ test("no rascal skill points at Pocock's plugin", () => {
 test("rascal-domain-modeling ships its format references", () => {
   for (const f of ["CONTEXT-FORMAT.md", "ADR-FORMAT.md"]) assert.ok(existsSync(join(SKILLS, "rascal-domain-modeling", f)));
 });
+
+test("ui entry points load rascal's grilling then rascal-grilling-ui", () => {
+  for (const [d, profile, loads] of [
+    ["rascal-grill-me-ui", "design-doc", ["rascal:rascal-grilling"]],
+    ["rascal-grill-docs-ui", "docs", ["rascal:rascal-grilling", "rascal:rascal-domain-modeling"]],
+  ]) {
+    const t = read(d, "SKILL.md");
+    for (const l of loads) assert.ok(t.includes(`\`${l}\``), `${d} loads ${l}`);
+    // Match the closing backtick: "rascal:rascal-grilling" is a prefix of "rascal:rascal-grilling-ui".
+    assert.ok(t.indexOf("`rascal:rascal-grilling-ui`") > t.lastIndexOf(`\`${loads.at(-1)}\``), `${d} loads the transport last`);
+    assert.ok(t.includes(`finish profile **${profile}**`), d);
+    assert.ok(existsSync(join(SKILLS, d, "agents", "openai.yaml")));
+  }
+});
