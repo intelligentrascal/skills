@@ -4,7 +4,7 @@
     "name": "intelligentrascal",
     "url": "https://github.com/intelligentrascal"
   },
-  "description": "The intelligentrascal grill skills: browser-UI versions of Matt Pocock's grill-me, grill-with-docs and wayfinder.",
+  "description": "intelligentrascal's grill skills, plus rascal, a standalone personal skills pack.",
   "allowCrossMarketplaceDependenciesOn": [
     "mattpocock"
   ],
@@ -13,6 +13,11 @@
       "name": "intelligentrascal",
       "source": "./",
       "description": "Grill skills with a browser UI."
+    },
+    {
+      "name": "rascal",
+      "source": "./plugins/rascal",
+      "description": "Rahil's standalone skills pack: grilling, mining, retro."
     }
   ]
 }
