@@ -1,7 +1,7 @@
 {
   "name": "rascal",
-  "version": "0.2.0",
-  "description": "A standalone personal skills pack: plan, feature, ui, scheduled-runbook and orchestrate (experimental) workflows; canonical TDD, debugging, review, planning and grilling skills; transcript mining and retro. Built from Pocock's skills and Superpowers.",
+  "version": "0.3.0",
+  "description": "A standalone personal skills pack: a router (/rascal:go) and an always-on routing note; plan, feature, ui, scheduled-runbook and orchestrate (experimental) workflows; canonical TDD, debugging, review, planning and grilling skills; transcript mining and retro. Built from Pocock's skills and Superpowers.",
   "author": { "name": "intelligentrascal", "url": "https://github.com/intelligentrascal" },
   "license": "MIT",
   "keywords": ["grilling", "retro", "mining", "workflows", "tdd"],

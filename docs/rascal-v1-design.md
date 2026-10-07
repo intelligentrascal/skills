@@ -156,6 +156,19 @@ Each rule is placed where it acts:
 
 *Rejected:* only the three rules with 8+ sessions (it drops cheap, real fixes); none of them (that defeats the purpose of mining).
 
+## Step 6: router and routing note
+
+Build step 6 (pack design Q35) settled these where the pack design left a choice open. The plan is `docs/superpowers/plans/2026-10-07-rascal-step-6-router.md`.
+
+- **The note is generated** by `scripts/routing-note.mjs` from `plugins/rascal/workflows.json` (the workflow list and the canonical table), each workflow's "Use when/for" sentence and `plugins/rascal/rules/routing.md`. It is committed as `plugins/rascal/routing-note.md`; the same routes are written into `rascal-go`, so the router and the note can't disagree. Pre-commit runs `--check`.
+- **`install-rascal.sh` installs the note,** amending pack-design Q20, which named `install-agents.sh`. That script is intelligentrascal's; installing grill-ui must not edit global instruction files. *Cost if wrong:* a rename.
+- **Per-agent files:** Claude Code `~/.claude/CLAUDE.md`, Codex `~/.codex/AGENTS.md`, OpenCode `~/.config/opencode/AGENTS.md`, Pi `~/.pi/agent/AGENTS.md`, each honouring the agent's own directory override. The note is written only where the agent's config directory exists. With its own AGENTS.md present, OpenCode stops falling back to `~/.claude/CLAUDE.md`, so the note never loads twice.
+- **Markers and backup.** The note sits between `rascal:routing-note` begin/end markers; nothing outside them changes. Before any change the file is copied to `<file>.rascal-bak` (one backup, refreshed on each change). Broken markers are refused. `--remove-note` takes the note out. *Cost if wrong:* the backup holds the state before the latest change, not the first install; the content outside the markers is the same in both.
+- **`/rascal:go` is a plugin command** (`commands/go.md`) that loads `rascal-go`. Skill folders keep the `rascal-` prefix; a bare `go` skill in `~/.agents/skills` would collide. Other agents use `rascal-go`. *Cost if wrong:* if Claude Code drops plugin commands, `/rascal:rascal-go` still works.
+- **The 1% override is unconditional.** A skill runs only when a route calls for one. Where Superpowers isn't installed the line costs a sentence.
+- **The router's retro nudge uses the date only** (14 days since `lastRetro` in `~/.rascal/state.json`). The 15-sessions half needs the miner, which lives in `rascal-retro`'s folder, and skills don't reach into each other's folders. *Cost if wrong:* a busy fortnight nudges late.
+- **Router chains:** a bug whose cause isn't obvious → debugging → TDD (regression test first) → review; a design question with nothing to build → grilling alone; finished work → review alone.
+
 ## Routine choices
 
 - The cross-agent smoke test ships as a repo dev script, not a skill (Q4).

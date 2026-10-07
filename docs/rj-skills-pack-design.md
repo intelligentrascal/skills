@@ -152,7 +152,7 @@ The note is generated from the workflow list, never hand-edited, so it can't dri
 - **Q11:** "Just do it" is a first-class route for small, clear tasks. The router needs a crisp rule for "small and clear".
 - **Q15:** Leaks are stopped by review plus a scrub check before commit. The check is a pre-commit hook using a local, gitignored deny-list (names, home paths, emails, token patterns). The same check runs on the digest and on retro proposals before Rahil sees them. CI also runs it, with generic patterns only (paths, emails, token shapes), because the deny-list stays local. This is the only CI check; the transport copy check (Q34) runs pre-commit only.
 - **Q17:** The retro is run manually, and the router nudges when it's due.
-- **Q20:** `install-agents.sh` installs rascal only, on all four agents: its skills, the routing note per agent, and the `~/.rascal/` scaffold. It installs no upstreams.
+- **Q20:** `install-agents.sh` installs rascal only, on all four agents: its skills, the routing note per agent, and the `~/.rascal/` scaffold. It installs no upstreams. *Amended in step 6:* rascal's installer is `install-rascal.sh`; `install-agents.sh` stays intelligentrascal's (`docs/rascal-v1-design.md`, "Step 6").
 - **Q21:** pstack skills rascal draws from and sync tracks are the portable set: principle-* (22), reflect, unslop, how, why, teach, blast-radius and architect.
 - **Q24:** Seed findings are reviewed in a grill. They become questions on a grill page, and Rahil answers them like this session; that grill chooses v1 workflows and canonical skills.
 - **Q26:** Mining state lives in `~/.rascal/`: `mining/` (digest), `cursor.json`, `denylist.txt` and `preferences.md`. It sits outside every checkout, so it can't be committed by accident.
@@ -169,6 +169,8 @@ The note is generated from the workflow list, never hand-edited, so it can't dri
   5. The chosen workflows and canonical skills.
   6. Router and routing note.
   7. Sync.
+
+  Status (2026-10-07): steps 1–6 are built; step 7 (sync) is next.
 - **Q36:** Verification is a smoke-run checklist per agent, per release:
   - install works;
   - the routing note is present;
