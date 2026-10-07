@@ -1,0 +1,10 @@
+{
+  "workflows": ["rascal-plan", "rascal-feature", "rascal-ui", "rascal-scheduled-runbook", "rascal-orchestrate"],
+  "canonical": {
+    "TDD": "rascal-tdd",
+    "debugging": "rascal-debugging",
+    "review": "rascal-review",
+    "planning": "rascal-planning",
+    "grilling": "rascal-grilling"
+  }
+}

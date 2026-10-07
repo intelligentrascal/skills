@@ -1,0 +1,3 @@
+interface:
+  display_name: "Go (rascal router)"
+  short_description: "Pick the route for a task, say it, then run it"

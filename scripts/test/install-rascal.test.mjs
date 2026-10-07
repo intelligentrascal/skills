@@ -12,9 +12,12 @@ const SCRIPT = join(ROOT, "scripts", "install-rascal.sh");
 const SKILLS = readdirSync(join(ROOT, "plugins/rascal/skills"));
 function env() {
   const t = mkdtempSync(join(tmpdir(), "irascal-"));
-  return { t, e: { ...process.env, HOME: t, AGENTS_SKILLS_DIR: join(t, "skills"), CLAUDE_SKILLS_DIR: join(t, "claude-skills"), RASCAL_HOME: join(t, "rascal") } };
+  const e = { ...process.env, HOME: t, AGENTS_SKILLS_DIR: join(t, "skills"), CLAUDE_SKILLS_DIR: join(t, "claude-skills"), RASCAL_HOME: join(t, "rascal") };
+  // Agent config dirs default under the fake HOME; never let the real machine's overrides leak in.
+  for (const k of ["CLAUDE_CONFIG_DIR", "CODEX_HOME", "XDG_CONFIG_HOME", "PI_CODING_AGENT_DIR"]) delete e[k];
+  return { t, e };
 }
-const run = (e) => spawnSync(BASH, [SCRIPT], { env: e, encoding: "utf8" });
+const run = (e, ...args) => spawnSync(BASH, [SCRIPT, ...args], { env: e, encoding: "utf8" });
 
 test("links every rascal skill and scaffolds RASCAL_HOME", () => {
   const { t, e } = env();
@@ -170,4 +173,104 @@ test("--pack <git url>: the same repo spelled with .git re-runs cleanly", () => 
   assert.equal(runPack(e, `file://${a}`).status, 0);
   const r = runPack(e, `file://${a}.git`);
   assert.equal(r.status, 0, r.stderr);
+});
+
+// ---- routing note (pack design Q10, Q20, Q23) ----
+const { buildNote, BEGIN, END } = await import("../routing-note.mjs");
+const AGENT_FILES = { claude: ".claude/CLAUDE.md", codex: ".codex/AGENTS.md", opencode: ".config/opencode/AGENTS.md", pi: ".pi/agent/AGENTS.md" };
+const block = () => `${BEGIN}\n${buildNote()}${END}\n`;
+
+test("routing note: written into every present agent's file, absent agents skipped and not created", () => {
+  const { t, e } = env();
+  for (const a of ["claude", "codex", "pi"]) mkdirSync(dirname(join(t, AGENT_FILES[a])), { recursive: true });
+  writeFileSync(join(t, AGENT_FILES.claude), "# my rules\n");
+  const p = run(e);
+  assert.equal(p.status, 0, p.stderr);
+  assert.equal(readFileSync(join(t, AGENT_FILES.claude), "utf8"), `# my rules\n\n${block()}`);
+  assert.equal(readFileSync(join(t, AGENT_FILES.claude) + ".rascal-bak", "utf8"), "# my rules\n");
+  for (const a of ["codex", "pi"]) {
+    assert.equal(readFileSync(join(t, AGENT_FILES[a]), "utf8"), block());
+    assert.equal(existsSync(join(t, AGENT_FILES[a]) + ".rascal-bak"), false, "a new file needs no backup");
+  }
+  assert.equal(existsSync(join(t, ".config")), false);
+  assert.match(p.stdout, /opencode skipped/);
+  assert.match(p.stdout, /CLAUDE\.md: updated \(backup: /);
+});
+
+test("routing note: re-running changes nothing; --remove-note restores the files", () => {
+  const { t, e } = env();
+  mkdirSync(join(t, ".claude"), { recursive: true });
+  writeFileSync(join(t, AGENT_FILES.claude), "# my rules\n");
+  run(e);
+  writeFileSync(join(t, AGENT_FILES.claude) + ".rascal-bak", "sentinel");
+  const p = run(e);
+  assert.match(p.stdout, /CLAUDE\.md: unchanged/);
+  assert.equal(readFileSync(join(t, AGENT_FILES.claude) + ".rascal-bak", "utf8"), "sentinel");
+  const r = run(e, "--remove-note");
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(readFileSync(join(t, AGENT_FILES.claude), "utf8"), "# my rules\n");
+});
+
+test("routing note: honours CLAUDE_CONFIG_DIR, CODEX_HOME, XDG_CONFIG_HOME, PI_CODING_AGENT_DIR", () => {
+  const { t, e } = env();
+  const dirs = { CLAUDE_CONFIG_DIR: "cc", CODEX_HOME: "cx", XDG_CONFIG_HOME: "xdg", PI_CODING_AGENT_DIR: "pa" };
+  for (const [k, d] of Object.entries(dirs)) { e[k] = join(t, d); mkdirSync(join(t, d), { recursive: true }); }
+  mkdirSync(join(t, "xdg", "opencode"));
+  assert.equal(run(e).status, 0);
+  for (const f of ["cc/CLAUDE.md", "cx/AGENTS.md", "xdg/opencode/AGENTS.md", "pa/AGENTS.md"]) assert.equal(readFileSync(join(t, f), "utf8"), block(), f);
+});
+
+test("routing note: --no-note links and scaffolds only; broken markers exit 1, file untouched", () => {
+  const { t, e } = env();
+  mkdirSync(join(t, ".codex"), { recursive: true });
+  assert.equal(run(e, "--no-note").status, 0);
+  assert.equal(existsSync(join(t, AGENT_FILES.codex)), false);
+  assert.ok(existsSync(join(t, "rascal", "preferences.md")));
+  writeFileSync(join(t, AGENT_FILES.codex), `${BEGIN}\nhalf\n`);
+  const p = run(e);
+  assert.equal(p.status, 1);
+  assert.match(p.stderr, /markers/);
+  assert.equal(readFileSync(join(t, AGENT_FILES.codex), "utf8"), `${BEGIN}\nhalf\n`);
+});
+
+test("routing note: warns when an AGENTS.override.md would shadow the note", () => {
+  const { t, e } = env();
+  mkdirSync(join(t, ".codex"), { recursive: true });
+  writeFileSync(join(t, ".codex", "AGENTS.override.md"), "x\n");
+  const p = run(e);
+  assert.equal(p.status, 0);
+  assert.match(p.stderr, /AGENTS\.override\.md exists/);
+});
+
+test("unknown or extra arguments: exit 2, nothing linked or written", () => {
+  for (const args of [["--no-notes"], ["--no-note", "--pack", "x"], ["--remove-note", "x"], ["--pack"]]) {
+    const { t, e } = env();
+    mkdirSync(join(t, ".codex"), { recursive: true });
+    const p = run(e, ...args);
+    assert.equal(p.status, 2, args.join(" "));
+    assert.equal(existsSync(join(t, AGENT_FILES.codex)), false, args.join(" "));
+    assert.equal(existsSync(join(t, "skills")), false, args.join(" "));
+  }
+});
+
+test("routing note: OpenCode is skipped while its CLAUDE.md fallback carries the user's own rules", () => {
+  const { t, e } = env();
+  mkdirSync(join(t, ".claude"), { recursive: true });
+  mkdirSync(join(t, ".config", "opencode"), { recursive: true });
+  writeFileSync(join(t, AGENT_FILES.claude), "# my rules\n");
+  const p = run(e);
+  assert.equal(p.status, 0, p.stderr);
+  assert.equal(existsSync(join(t, AGENT_FILES.opencode)), false);
+  assert.match(p.stdout, /opencode skipped \(creating .* would stop OpenCode reading your ~\/\.claude\/CLAUDE\.md/);
+  // With an AGENTS.md of its own, OpenCode no longer reads CLAUDE.md, so it gets the note there.
+  writeFileSync(join(t, AGENT_FILES.opencode), "# oc\n");
+  run(e);
+  assert.equal(readFileSync(join(t, AGENT_FILES.opencode), "utf8"), `# oc\n\n${block()}`);
+});
+
+test("routing note: the AGENTS.override.md warning is Codex-only", () => {
+  const { t, e } = env();
+  mkdirSync(join(t, ".pi", "agent"), { recursive: true });
+  writeFileSync(join(t, ".pi", "agent", "AGENTS.override.md"), "x\n");
+  assert.doesNotMatch(run(e).stderr, /override/);
 });

@@ -18,6 +18,10 @@ export const WORKFLOWS = {
 };
 const present = () => Object.keys(WORKFLOWS);
 
+test("workflows.json (the routing note's list) names exactly these workflows", () => {
+  assert.deepEqual(JSON.parse(readFileSync(join(PLUGIN, "workflows.json"), "utf8")).workflows.sort(), present().sort());
+});
+
 test("all five workflows exist", () => {
   assert.equal(present().length, 5);
   for (const w of present()) assert.ok(has(w), `${w} missing`);

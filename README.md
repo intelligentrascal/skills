@@ -147,7 +147,8 @@ it again with `SYNC_WAYFINDER_DONE=1`.
 pack built from Pocock's skills, Superpowers and pstack, shaped by mining your own agent sessions.
 It has no dependencies; its grilling skills are its own copies of Pocock's, pinned in
 `plugins/rascal/sources.json`. Design: [docs/rj-skills-pack-design.md](docs/rj-skills-pack-design.md).
-It ships workflows, canonical skills for TDD, debugging, review, planning and grilling, and the retro.
+It ships workflows, canonical skills for TDD, debugging, review, planning and grilling, the retro, and a
+router with an always-on routing note.
 
 Install in Claude Code (the marketplace line only once):
 
@@ -156,15 +157,44 @@ claude plugin marketplace add intelligentrascal/skills
 claude plugin install rascal@intelligentrascal
 ```
 
-Commands are namespaced: `/rascal:rascal-grill-me-ui <topic>`, `/rascal:rascal-retro --all`, and so on.
-For Codex, OpenCode and Pi, run `scripts/install-rascal.sh`: it symlinks every rascal skill into
-`~/.agents/skills` (override with `AGENTS_SKILLS_DIR`), creates `~/.rascal/`, and installs no
-upstream skills. Re-running is safe. It refuses, linking nothing, if a real directory is in the way.
+Commands are namespaced: `/rascal:go <task>`, `/rascal:rascal-grill-me-ui <topic>`, `/rascal:rascal-retro --all`, and so on.
+Then run `scripts/install-rascal.sh` once on every machine (all agents, Claude Code included): it symlinks
+every rascal skill into `~/.agents/skills` for Codex, OpenCode and Pi (override with `AGENTS_SKILLS_DIR`),
+creates `~/.rascal/`, writes the routing note into each agent's instruction file (below), and installs
+no upstream skills. Re-running is safe. It refuses, linking nothing, if a real directory is in the way.
+
+### Routing
+
+Every agent routes each task the same way, from a short note installed in its global instruction file:
+
+| Agent | File (written only if the agent's config directory exists) |
+|---|---|
+| Claude Code | `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`) |
+| Codex | `~/.codex/AGENTS.md` (or `$CODEX_HOME/AGENTS.md`) |
+| OpenCode | `~/.config/opencode/AGENTS.md` (or `$XDG_CONFIG_HOME/opencode/AGENTS.md`). Skipped while OpenCode has no AGENTS.md and your `~/.claude/CLAUDE.md` has rules of your own: OpenCode reads that file then, note included, and creating AGENTS.md would stop it. |
+| Pi | `~/.pi/agent/AGENTS.md` (or `$PI_CODING_AGENT_DIR/AGENTS.md`) |
+
+The note ([plugins/rascal/routing-note.md](plugins/rascal/routing-note.md), under 30 lines) says: read
+`~/.rascal/preferences.md`; invoke a skill the user names; **just do** a chore with no design decision in
+it; otherwise run the workflow whose trigger fits, or rascal's canonical skill for a single method; and,
+when unsure, run the router. It overrides Superpowers' "use a skill on even a 1% chance" rule.
+
+- `/rascal:go <task>` (other agents: `use rascal-go on <task>`) runs the router: it picks just-do-it, a
+  workflow, a canonical skill or a short chain, says which in one line (`Route: rascal-feature — …`),
+  then runs it. It also nudges when the retro is 14+ days overdue.
+- The note sits between `<!-- rascal:routing-note:begin … -->` and `<!-- rascal:routing-note:end -->`.
+  Nothing outside the markers is touched, and the file is copied to `<file>.rascal-bak` before any change.
+- Reinstall after pulling: `bash scripts/install-rascal.sh`. Skip the note: `--no-note`. Take it out of
+  every agent: `bash scripts/install-rascal.sh --remove-note`.
+- The note is **generated, never hand-edited**: `node scripts/routing-note.mjs` rebuilds it (and the
+  router's copy) from `plugins/rascal/workflows.json`, each workflow's `description:` ("Use when …") and
+  `plugins/rascal/rules/routing.md`. Pre-commit runs `--check`.
 
 ### Skills
 
 | Skill | What it does |
 |---|---|
+| `rascal-go` | The router (`/rascal:go <task>`): picks a route, says it, runs it |
 | `rascal-plan` | Workflow: wayfinder (if there's fog) → grill → domain model → design doc |
 | `rascal-feature` | Workflow: plan → spec → task plan → execute → review → PR → merge |
 | `rascal-ui` | Workflow: three real-data variants → parallel UX/a11y/design reviews → design language → feedback checklist → parity gate → persona walkthrough → ship |
@@ -184,13 +214,12 @@ upstream skills. Re-running is safe. It refuses, linking nothing, if a real dire
 | `rascal-grilling-ui` | The browser transport. **Generated, never hand-edit**: a mirror of `skills/grilling-ui` made by `node scripts/sync-transport.mjs`. The code is byte-identical, so both plugins share one hub. |
 | `rascal-retro` | Mines past sessions from Claude Code, Claude desktop, Codex, OpenCode and Cursor, then grills you on what to change. `--all` is the seed pass that picks rascal's v1 workflows. |
 
-The routing note that tells every agent when to use these (and when to just do the task) is build step 6; its rules are staged in `plugins/rascal/rules/routing.md`.
-
 ### Maintaining rascal
 
 - `node scripts/derive.mjs <source> <upstream path> <dest> [--name <skill>] [--strip-frontmatter]` copies a file from the pinned upstream (`plugins/rascal/sources.json`) with a provenance line.
 - Shared rules live in `plugins/rascal/rules/`. Edit them there, then run `node scripts/sync-rules.mjs`; pre-commit runs `--check`.
-- `scripts/smoke-agents.sh` runs one prompt in every installed agent CLI and flags missing replies.
+- `scripts/smoke-agents.sh` runs one prompt in every installed agent CLI and flags missing replies. The
+  routing probe (pack design Q36) is recorded in `docs/superpowers/verification/2026-10-07-routing-probe.md`.
 - `scripts/install-rascal.sh --pack <dir|git-url|zip>` links a third-party skill pack into `~/.agents/skills` and `~/.claude/skills`.
 
 `~/.rascal/` (mode 700, never in a repo):
@@ -205,7 +234,8 @@ The routing note that tells every agent when to use these (and when to just do t
 ### Privacy
 
 Run `scripts/setup-hooks.sh` once per clone. The pre-commit hook then runs the privacy scrub on
-staged files (generic patterns plus your deny-list) and `sync-transport --check`, so a commit that
+staged files (generic patterns plus your deny-list), `sync-transport --check`, `sync-rules --check`
+and `routing-note --check`, so a commit that
 leaks a home path, email or token, or edits `skills/grilling-ui` without regenerating the mirror,
 is refused. Known-fine hits (synthetic test data) go in `.scrub-allow` as `glob` or
 `glob:literal`, with a comment saying why. CI runs the generic scrub on every push and PR
