@@ -171,7 +171,7 @@ Every agent routes each task the same way, from a short note installed in its gl
 |---|---|
 | Claude Code | `~/.claude/CLAUDE.md` (or `$CLAUDE_CONFIG_DIR/CLAUDE.md`) |
 | Codex | `~/.codex/AGENTS.md` (or `$CODEX_HOME/AGENTS.md`) |
-| OpenCode | `~/.config/opencode/AGENTS.md` (or `$XDG_CONFIG_HOME/opencode/AGENTS.md`) |
+| OpenCode | `~/.config/opencode/AGENTS.md` (or `$XDG_CONFIG_HOME/opencode/AGENTS.md`). Skipped while OpenCode has no AGENTS.md and your `~/.claude/CLAUDE.md` has rules of your own: OpenCode reads that file then, note included, and creating AGENTS.md would stop it. |
 | Pi | `~/.pi/agent/AGENTS.md` (or `$PI_CODING_AGENT_DIR/AGENTS.md`) |
 
 The note ([plugins/rascal/routing-note.md](plugins/rascal/routing-note.md), under 30 lines) says: read

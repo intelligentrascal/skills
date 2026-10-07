@@ -5,7 +5,7 @@ import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { trigger, buildNote, run, install, remove, BEGIN, END } from "../routing-note.mjs";
+import { trigger, buildNote, run, install, remove, hasOwnContent, BEGIN, END, MAX_LINES } from "../routing-note.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SCRIPT = join(ROOT, "scripts", "routing-note.mjs");
@@ -134,4 +134,40 @@ test("CLI: install / remove print the outcome; bad markers exit 1", () => {
   writeFileSync(f, `${BEGIN}\n`);
   assert.equal(cli("install", f).status, 1);
   assert.equal(cli("bogus").status, 2);
+});
+
+test("a note over the line cap fails to build (so --check fails too)", () => {
+  const r = sandbox();
+  const f = join(r, "plugins/rascal/rules/routing.md");
+  writeFileSync(f, readFileSync(f, "utf8") + Array.from({ length: MAX_LINES }, (_, i) => `- **Extra ${i}:** filler.`).join("\n") + "\n");
+  assert.throws(() => buildNote({ root: r }), /caps it at 30/);
+  assert.throws(() => run({ check: true, root: r }), /caps it at 30/);
+});
+
+test("CRLF files stay CRLF through install and remove", () => {
+  const f = tmpFile("a\r\nb\r\n");
+  install(f, "N1\nN2\n");
+  assert.equal(readFileSync(f, "utf8"), `a\r\nb\r\n\r\n${BEGIN}\r\nN1\r\nN2\r\n${END}\r\n`);
+  assert.equal(install(f, "N1\nN2\n"), "unchanged");
+  remove(f);
+  assert.equal(readFileSync(f, "utf8"), "a\r\nb\r\n");
+});
+
+test("a file without a trailing newline gets a blank line before the block", () => {
+  const f = tmpFile("rules");
+  install(f, "N\n");
+  assert.equal(readFileSync(f, "utf8"), `rules\n\n${BEGIN}\nN\n${END}\n`);
+});
+
+test("hasOwnContent: anything besides the note counts", () => {
+  assert.equal(hasOwnContent(tmpFile()), false);
+  const f = tmpFile("");
+  install(f, "N\n");
+  assert.equal(hasOwnContent(f), false);
+  assert.equal(hasOwnContent(tmpFile("mine\n")), true);
+  const g = tmpFile("mine\n"); install(g, "N\n");
+  assert.equal(hasOwnContent(g), true);
+  const p = spawnSync(process.execPath, [SCRIPT, "has-own-content", g]);
+  assert.equal(p.status, 0);
+  assert.equal(spawnSync(process.execPath, [SCRIPT, "has-own-content", f]).status, 1);
 });

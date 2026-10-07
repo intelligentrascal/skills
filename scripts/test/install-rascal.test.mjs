@@ -241,3 +241,36 @@ test("routing note: warns when an AGENTS.override.md would shadow the note", () 
   assert.equal(p.status, 0);
   assert.match(p.stderr, /AGENTS\.override\.md exists/);
 });
+
+test("unknown or extra arguments: exit 2, nothing linked or written", () => {
+  for (const args of [["--no-notes"], ["--no-note", "--pack", "x"], ["--remove-note", "x"], ["--pack"]]) {
+    const { t, e } = env();
+    mkdirSync(join(t, ".codex"), { recursive: true });
+    const p = run(e, ...args);
+    assert.equal(p.status, 2, args.join(" "));
+    assert.equal(existsSync(join(t, AGENT_FILES.codex)), false, args.join(" "));
+    assert.equal(existsSync(join(t, "skills")), false, args.join(" "));
+  }
+});
+
+test("routing note: OpenCode is skipped while its CLAUDE.md fallback carries the user's own rules", () => {
+  const { t, e } = env();
+  mkdirSync(join(t, ".claude"), { recursive: true });
+  mkdirSync(join(t, ".config", "opencode"), { recursive: true });
+  writeFileSync(join(t, AGENT_FILES.claude), "# my rules\n");
+  const p = run(e);
+  assert.equal(p.status, 0, p.stderr);
+  assert.equal(existsSync(join(t, AGENT_FILES.opencode)), false);
+  assert.match(p.stdout, /opencode skipped \(creating .* would stop OpenCode reading your ~\/\.claude\/CLAUDE\.md/);
+  // With an AGENTS.md of its own, OpenCode no longer reads CLAUDE.md, so it gets the note there.
+  writeFileSync(join(t, AGENT_FILES.opencode), "# oc\n");
+  run(e);
+  assert.equal(readFileSync(join(t, AGENT_FILES.opencode), "utf8"), `# oc\n\n${block()}`);
+});
+
+test("routing note: the AGENTS.override.md warning is Codex-only", () => {
+  const { t, e } = env();
+  mkdirSync(join(t, ".pi", "agent"), { recursive: true });
+  writeFileSync(join(t, ".pi", "agent", "AGENTS.override.md"), "x\n");
+  assert.doesNotMatch(run(e).stderr, /override/);
+});

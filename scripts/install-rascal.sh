@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# Install rascal for Codex, OpenCode and Pi (design doc Q20), or with --pack <dir|git-url|zip> link a third-party skill pack into ~/.agents/skills and ~/.claude/skills (rascal v1 Q34).
+# Install rascal on all four agents (design doc Q20): skills for Codex, OpenCode and Pi, the routing note for those and
+# Claude Code (which gets the skills from its plugin), and ~/.rascal/. Or, with --pack <dir|git-url|zip> link a third-party skill pack into ~/.agents/skills and ~/.claude/skills (rascal v1 Q34).
 # Default mode: symlink every plugins/rascal/skills/*
 # into $AGENTS_SKILLS_DIR (default ~/.agents/skills), scaffold $RASCAL_HOME (default ~/.rascal), and write the
 # routing note (Q10, Q23) into each agent's global instruction file, for every agent whose config directory exists:
 #   Claude Code ${CLAUDE_CONFIG_DIR:-~/.claude}/CLAUDE.md      Codex ${CODEX_HOME:-~/.codex}/AGENTS.md
 #   OpenCode ${XDG_CONFIG_HOME:-~/.config}/opencode/AGENTS.md   Pi ${PI_CODING_AGENT_DIR:-~/.pi/agent}/AGENTS.md
 # The note sits between rascal markers; nothing outside them changes, and the file is first copied to <file>.rascal-bak.
+# OpenCode reads ~/.claude/CLAUDE.md only while it has no AGENTS.md of its own, so when that CLAUDE.md holds the user's
+# own rules and OpenCode has no AGENTS.md yet, OpenCode is skipped: it gets the note through that fallback.
 #   --no-note       link and scaffold only
 #   --remove-note   only take the note out of every agent's file
-# Installs no upstream skills. Idempotent. Exit: 0 ok, 1 refused (a real directory or broken markers in the way).
+# Installs no upstream skills. Idempotent. Exit: 0 ok, 1 refused (a real directory or broken markers in the way), 2 usage.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="$(cd "$here/../plugins/rascal/skills" && pwd)"
@@ -24,22 +27,35 @@ note_targets() {
 }
 # $1 = install | remove. Agents without a config directory are skipped, never created.
 routing_note() {
-  command -v node >/dev/null 2>&1 || { echo "install-rascal: node (20+) is required for the routing note; re-run with --no-note to skip it" >&2; exit 1; }
+  if ! command -v node >/dev/null 2>&1; then
+    if [ "$1" = install ]; then echo "install-rascal: node (20+) is required for the routing note; re-run with --no-note to skip it" >&2
+    else echo "install-rascal: node (20+) is required to remove the routing note" >&2; fi
+    exit 1
+  fi
   local rc=0 agent dir file
   while IFS='|' read -r agent dir file; do
     if [ ! -d "$dir" ]; then echo "install-rascal: routing note: $agent skipped ($dir not found)"; continue; fi
+    if [ "$1" = install ] && [ "$agent" = opencode ] && [ ! -e "$dir/$file" ] \
+      && ! { node "$here/routing-note.mjs" has-own-content "$HOME/.claude/CLAUDE.md"; [ $? -eq 1 ]; }; then
+      echo "install-rascal: routing note: opencode skipped (creating $dir/$file would stop OpenCode reading your ~/.claude/CLAUDE.md; it gets the note from there)"
+      continue
+    fi
     node "$here/routing-note.mjs" "$1" "$dir/$file" || rc=1
-    if [ "$1" = install ] && [ -f "$dir/AGENTS.override.md" ]; then
+    if [ "$1" = install ] && [ "$agent" = codex ] && [ -f "$dir/AGENTS.override.md" ]; then
       echo "install-rascal: warning: $dir/AGENTS.override.md exists; $agent reads it instead of $file, so the note won't load there" >&2
     fi
   done < <(note_targets)
   return $rc
 }
 
+usage() { echo "usage: install-rascal.sh [--no-note | --remove-note | --pack <dir|git-url|zip>]" >&2; exit 2; }
 note=1
 case "${1:-}" in
-  --no-note) note=0 ;;
-  --remove-note) routing_note remove || exit 1; exit 0 ;;
+  "") ;;
+  --no-note) [ $# -eq 1 ] || usage; note=0 ;;
+  --remove-note) [ $# -eq 1 ] || usage; routing_note remove || exit 1; exit 0 ;;
+  --pack) [ $# -eq 2 ] || usage ;;
+  *) echo "install-rascal: unknown argument: $1" >&2; usage ;;
 esac
 
 # --pack <dir|git-url|zip>: link a third-party skill pack into both skill dirs (rascal v1 Q34).
@@ -122,5 +138,5 @@ mkdir -p "$RH/mining" && chmod 700 "$RH"
   "# Used by scripts/scrub.mjs (pre-commit) and the miner's redaction. Never commit this file." > "$RH/denylist.txt"
 [ -f "$RH/preferences.md" ] || : > "$RH/preferences.md"
 echo "install-rascal: $RH ready"
-if [ "$note" = 1 ]; then routing_note install || exit 1; fi
 echo "Claude Code: claude plugin marketplace add intelligentrascal/skills && claude plugin install rascal@intelligentrascal"
+if [ "$note" = 1 ]; then routing_note install || exit 1; fi
