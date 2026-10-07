@@ -138,7 +138,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       let res;
       try { res = cmd === "install" ? install(file, buildNote()) : remove(file); }
       catch (e) { if (/markers/.test(e.message)) { console.error(e.message); process.exit(1); } throw e; }
-      console.log(`routing-note: ${file}: ${res}`);
+      console.log(`routing-note: ${file}: ${res}${res === "updated" || res === "removed" ? ` (backup: ${file}.rascal-bak)` : ""}`);
     } else if (cmd === undefined || cmd === "--check") {
       const stale = run({ check: cmd === "--check" });
       if (cmd === "--check" && stale.length) { console.error(`routing-note: out of date: ${stale.join(", ")}; run node scripts/routing-note.mjs`); process.exit(1); }
